@@ -1,9 +1,6 @@
-const DEFAULT_CHECKLAB_API_BASE_URL = "http://192.168.219.46:8000";
 const DEFAULT_CHECKLAB_API_TIMEOUT_MS = 3000;
 export function buildCheckLabApiUrl(path, query) {
-    const baseUrl = process.env.CHECKLAB_API_BASE_URL ??
-        process.env.NEXT_PUBLIC_CHECKLAB_API_BASE_URL ??
-        DEFAULT_CHECKLAB_API_BASE_URL;
+    const baseUrl = readCheckLabApiBaseUrl();
     const normalizedBaseUrl = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
     const url = new URL(path.replace(/^\/+/, ""), normalizedBaseUrl);
     Object.entries(query ?? {}).forEach(([key, value]) => {
@@ -17,7 +14,7 @@ export function buildCheckLabApiUrl(path, query) {
 export function buildCheckLabAssetUrl(asset_id, assetPath, query) {
     return buildCheckLabApiUrl(`api/v1/assets/${encodeURIComponent(asset_id)}/${assetPath.replace(/^\/+/, "")}`, query);
 }
-export async function requestCheckLabJson(url, { body, context, method = "GET", requestName, timeoutMs = DEFAULT_CHECKLAB_API_TIMEOUT_MS, }) {
+export async function requestCheckLabJson(url, { body, context, method = "GET", requestName, timeoutMs = readCheckLabApiTimeoutMs(), }) {
     const abortController = new AbortController();
     const timeoutId = setTimeout(() => abortController.abort(), timeoutMs);
     let response;
@@ -73,6 +70,24 @@ export async function requestCheckLabJson(url, { body, context, method = "GET", 
         url: String(url),
     });
     return data;
+}
+function readCheckLabApiBaseUrl() {
+    const baseUrl = readEnvString("CHECKLAB_API_BASE_URL") ??
+        readEnvString("NEXT_PUBLIC_CHECKLAB_API_BASE_URL");
+    if (!baseUrl) {
+        throw new Error("CHECKLAB_API_BASE_URL is not configured.");
+    }
+    return baseUrl;
+}
+function readCheckLabApiTimeoutMs() {
+    const timeoutMs = Number(readEnvString("CHECKLAB_API_TIMEOUT_MS"));
+    return Number.isFinite(timeoutMs) && timeoutMs > 0
+        ? timeoutMs
+        : DEFAULT_CHECKLAB_API_TIMEOUT_MS;
+}
+function readEnvString(key) {
+    const value = process.env[key];
+    return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 function readErrorMessage(data) {
     if (typeof data === "string" && data.trim())
