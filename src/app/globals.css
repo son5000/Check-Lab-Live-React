@@ -1,0 +1,470 @@
+﻿@import "@fontsource/noto-sans-kr/400.css";
+@import "@fontsource/noto-sans-kr/500.css";
+@import "@fontsource/noto-sans-kr/600.css";
+@import "@fontsource/noto-sans-kr/700.css";
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-app-sans);
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+.GlobalNotifications__exit-card-1 {
+  --global-notification-exit-x: 0px;
+  --global-notification-exit-y: -20px;
+  --global-notification-exit-scale: 0.9;
+  transform: translate3d(0, 0, 0) scale(1);
+  transform-origin: center;
+  will-change: transform, opacity;
+}
+
+.GlobalNotifications__front-card-1 {
+  position: relative;
+  z-index: 10;
+  animation: global-notification-front-settle 160ms ease-out;
+}
+
+/* 스택 카드: 아래에 쌓인 구조를 명확히 표현 */
+.GlobalNotifications__stack-card-1 {
+  --global-notification-stack-index: 1;
+  --global-notification-stack-offset-y: 14px;
+  --global-notification-stack-opacity: 0.66;
+  --global-notification-stack-scale: 0.965;
+  --global-notification-stack-z: 1;
+  position: absolute;
+  z-index: var(--global-notification-stack-z);
+  opacity: var(--global-notification-stack-opacity);
+  transform: translate3d(0, var(--global-notification-stack-offset-y), 0)
+    scale(var(--global-notification-stack-scale));
+  transform-origin: center top;
+  /* 앞 카드가 사라질 때 부드럽게 앞자리로 승격 */
+  transition:
+    opacity 200ms ease-out,
+    transform 200ms ease-out;
+  will-change: transform, opacity;
+}
+
+/* Exit: 핸들 방향으로 짧게 힌트 후 페이드아웃 — 220ms */
+.GlobalNotifications__exit-card--running {
+  animation: global-notification-hint-to-handle 220ms cubic-bezier(0.4, 0, 0.6, 1) forwards;
+}
+
+.GlobalNotifications__target-absorbing {
+  animation: global-notification-target-absorb 220ms ease-out;
+  will-change: box-shadow, filter;
+}
+
+@keyframes global-notification-front-settle {
+  from {
+    transform: translate3d(0, 8px, 0) scale(0.988);
+  }
+
+  to {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+/* 단순 2-step: 제자리 → 짧은 힌트 이동 + 페이드아웃 */
+@keyframes global-notification-hint-to-handle {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate3d(
+      var(--global-notification-exit-x),
+      var(--global-notification-exit-y),
+      0
+    ) scale(var(--global-notification-exit-scale));
+  }
+}
+
+@keyframes global-notification-target-absorb {
+  0%,
+  100% {
+    box-shadow: 0 18px 36px color-mix(in oklch, var(--foreground) 14%, transparent);
+    filter: brightness(1);
+  }
+
+  55% {
+    box-shadow:
+      0 0 0 4px color-mix(in oklch, var(--primary) 16%, transparent),
+      0 18px 36px color-mix(in oklch, var(--foreground) 16%, transparent);
+    filter: brightness(1.06);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .GlobalNotifications__exit-card--running {
+    animation: global-notification-reduced-dismiss 120ms ease-out forwards;
+  }
+
+  .GlobalNotifications__target-absorbing {
+    animation: none;
+  }
+}
+
+@keyframes global-notification-reduced-dismiss {
+  to {
+    opacity: 0;
+  }
+}
+
+:root {
+  --font-app-sans: var(--font-inter), var(--font-pretendard), "Noto Sans KR", sans-serif;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.82 0.24 190);
+  --chart-2: oklch(0.84 0.25 145);
+  --chart-3: oklch(0.74 0.29 330);
+  --chart-4: oklch(0.78 0.24 36);
+  --chart-5: oklch(0.76 0.27 285);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+  --asset-chart-tooltip-backdrop: none;
+  --asset-chart-tooltip-shadow: none;
+  --asset-chart-panel-shadow: none;
+  --asset-chart-series-filter: none;
+  --asset-chart-active-dot-filter: none;
+  --asset-chart-line-marker-shadow: none;
+  --asset-chart-live-shadow: none;
+  --asset-chart-live-shadow-dim: none;
+  --asset-chart-active-range-shadow: none;
+  --asset-ultrasound-average-stroke: #2563eb;
+  --asset-ultrasound-maximum-stroke: #00d5ff;
+  --asset-ultrasound-minimum-stroke: #38bdf8;
+  --asset-temperature-average-stroke: #8b5cf6;
+  --asset-temperature-maximum-stroke: #d946ef;
+  --asset-temperature-minimum-stroke: #a78bfa;
+  --asset-temperature-spread-stroke: #c084fc;
+  --asset-dashboard-strong-text: #475569;
+  --asset-dashboard-label-text: #64748b;
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.82 0.24 190);
+  --chart-2: oklch(0.84 0.25 145);
+  --chart-3: oklch(0.74 0.29 330);
+  --chart-4: oklch(0.78 0.24 36);
+  --chart-5: oklch(0.76 0.27 285);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+  --asset-chart-tooltip-backdrop: blur(8px);
+  --asset-chart-tooltip-shadow: 0 12px 30px color-mix(in oklch, var(--foreground) 12%, transparent);
+  --asset-chart-panel-shadow: inset 0 1px 0 color-mix(in oklch, var(--foreground) 8%, transparent), 0 8px 24px color-mix(in oklch, var(--foreground) 8%, transparent);
+  --asset-chart-series-filter: drop-shadow(0 0 3px rgb(56 189 248 / 0.32)) drop-shadow(0 0 6px rgb(168 85 247 / 0.2));
+  --asset-chart-active-dot-filter: drop-shadow(0 0 7px rgb(56 189 248 / 0.48)) drop-shadow(0 0 10px rgb(217 70 239 / 0.32));
+  --asset-chart-line-marker-shadow: 0 0 5px currentColor;
+  --asset-chart-live-shadow: 0 0 8px #22c55e, 0 0 16px #22c55e80;
+  --asset-chart-live-shadow-dim: 0 0 4px #22c55e, 0 0 8px #22c55e40;
+  --asset-chart-active-range-shadow: 0 2px 8px color-mix(in oklch, var(--chart-1) 35%, transparent), 0 0 0 1px color-mix(in oklch, var(--chart-1) 40%, transparent);
+  --asset-ultrasound-average-stroke: #38bdf8;
+  --asset-ultrasound-maximum-stroke: #22d3ee;
+  --asset-ultrasound-minimum-stroke: #60a5fa;
+  --asset-temperature-average-stroke: #a78bfa;
+  --asset-temperature-maximum-stroke: #f0abfc;
+  --asset-temperature-minimum-stroke: #c084fc;
+  --asset-temperature-spread-stroke: #e879f9;
+  --asset-dashboard-strong-text: #cbd5e1;
+  --asset-dashboard-label-text: #94a3b8;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html,
+  body {
+    height: 100%;
+    overflow: hidden;
+  }
+  body {
+    @apply bg-background text-foreground;
+    overflow-wrap: break-word;
+    word-break: keep-all;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+@layer components {
+  .AssetPartList__container-4 {
+    scrollbar-color: color-mix(in oklch, var(--muted-foreground) 45%, transparent) transparent;
+  }
+
+  .AssetPartList__container-4::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .AssetPartList__container-4::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .AssetPartList__container-4::-webkit-scrollbar-thumb {
+    background: color-mix(in oklch, var(--muted-foreground) 38%, transparent);
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background-clip: content-box;
+  }
+
+  .AssetDashboardPage__layout-parts-1 {
+    display: grid;
+    gap: 0.5rem;
+    grid-auto-rows: minmax(12rem, auto);
+    grid-template-areas:
+      "t"
+      "z"
+      "m"
+      "g"
+      "d";
+    min-height: 100%;
+  }
+
+  .AssetDashboardPage__area-title {
+    grid-area: t;
+  }
+
+  .AssetDashboardPage__area-camera {
+    grid-area: z;
+  }
+
+  .AssetDashboardPage__area-metrics {
+    grid-area: m;
+  }
+
+  .AssetDashboardPage__area-trends {
+    grid-area: g;
+  }
+
+  .AssetDashboardPage__area-events {
+    grid-area: e;
+  }
+
+  .AssetDashboardPage__area-detection {
+    grid-area: d;
+  }
+
+  .AssetDashboardPage__layout-parts-1 > .AssetDashboardPage__area-1 {
+    background:
+      linear-gradient(
+        145deg,
+        color-mix(in oklch, var(--card) 98%, white 2%) 0%,
+        color-mix(in oklch, var(--card) 99%, var(--foreground) 1%) 48%,
+        color-mix(in oklch, var(--card) 96%, black 4%) 100%
+      );
+    border: 0;
+    border-radius: 0.625rem;
+    box-shadow:
+      0 18px 34px color-mix(in oklch, var(--foreground) 14%, transparent),
+      0 7px 14px color-mix(in oklch, var(--foreground) 10%, transparent),
+      0 -1px 0 color-mix(in oklch, white 34%, transparent),
+      inset 0 1px 0 color-mix(in oklch, white 42%, transparent),
+      inset 0 -1px 0 color-mix(in oklch, var(--foreground) 12%, transparent);
+    padding: 0;
+    position: relative;
+    transform: translateY(-1px) translateZ(0);
+  }
+
+  .AssetDashboardPage__layout-parts-1 > .AssetDashboardPage__area-1::before {
+    background:
+      linear-gradient(
+        135deg,
+        color-mix(in oklch, white 18%, transparent),
+        transparent 32%,
+        color-mix(in oklch, var(--foreground) 6%, transparent) 100%
+      );
+    border-radius: inherit;
+    content: "";
+    inset: 0;
+    mix-blend-mode: screen;
+    opacity: 0.42;
+    pointer-events: none;
+    position: absolute;
+    z-index: 2;
+  }
+
+  .AssetDashboardPage__layout-parts-1 > .AssetDashboardPage__area-1::after {
+    border: 1px solid color-mix(in oklch, white 18%, transparent);
+    border-radius: calc(0.625rem - 1px);
+    content: "";
+    inset: 0;
+    pointer-events: none;
+    position: absolute;
+    z-index: 2;
+  }
+
+  .AssetDashboardPage__layout-parts-1 > .AssetDashboardPage__area-1 > * {
+    min-height: 0;
+    min-width: 0;
+    position: relative;
+    z-index: 0;
+  }
+
+  .dark .AssetDashboardPage__layout-parts-1 > .AssetDashboardPage__area-1 {
+    background:
+      linear-gradient(
+        145deg,
+        color-mix(in oklch, var(--card) 92%, white 8%) 0%,
+        color-mix(in oklch, var(--card) 97%, white 3%) 45%,
+        color-mix(in oklch, var(--card) 92%, black 8%) 100%
+      );
+    box-shadow:
+      0 22px 40px color-mix(in oklch, black 46%, transparent),
+      0 8px 18px color-mix(in oklch, black 32%, transparent),
+      0 -1px 0 color-mix(in oklch, white 11%, transparent),
+      inset 0 1px 0 color-mix(in oklch, white 18%, transparent),
+      inset 0 -1px 0 color-mix(in oklch, black 30%, transparent);
+  }
+
+  .dark .AssetDashboardPage__layout-parts-1 > .AssetDashboardPage__area-1::before {
+    opacity: 0.5;
+  }
+
+  .dark .AssetDashboardPage__layout-parts-1 > .AssetDashboardPage__area-1::after {
+    border-color: color-mix(in oklch, white 8%, transparent);
+  }
+
+  @media (min-width: 768px) {
+    .AssetDashboardPage__layout-parts-1 {
+      grid-auto-rows: initial;
+      grid-template-columns: repeat(8, minmax(0, 1fr));
+      grid-template-rows: repeat(9, minmax(0, 1fr));
+      grid-template-areas:
+        "t t t t t t z z"
+        "m m g g g g z z"
+        "m m g g g g z z"
+        "m m g g g g z z"
+        "m m g g g g d d"
+        "m m g g g g d d"
+        "m m g g g g d d"
+        "m m g g g g d d"
+        "m m g g g g d d";
+      height: 100%;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .AssetDashboardPage__area-events {
+      display: none;
+    }
+
+    .AssetDashboardPage__layout-parts-1[data-adding-part="true"] {
+      grid-template-areas:
+        "t t t t t t z z"
+        "m m g g g g z z"
+        "m m g g g g z z"
+        "m m g g g g z z"
+        "m m g g g g d d"
+        "m m g g g g d d"
+        "m m g g g g d d"
+        "m m g g g g d d"
+        "m m g g g g d d";
+    }
+  }
+
+  .AssetDashboardPage__root-1 :where(.text-foreground, .text-card-foreground) {
+    color: var(--asset-dashboard-strong-text) !important;
+  }
+
+  .AssetStatusTitlePanel__container-1 :where(.text-foreground) {
+    color: var(--foreground) !important;
+  }
+
+  .AssetDashboardPage__root-1 :where(.text-muted-foreground) {
+    color: var(--asset-dashboard-label-text) !important;
+  }
+
+}

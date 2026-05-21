@@ -1,0 +1,89 @@
+export const DEFAULT_MODEL_3D_FILE = {
+    label: "기본 PLY 모델",
+    normalizeSize: 120,
+    plyUrl: "/3d/sample.ply",
+    textures: [
+        {
+            enabled: true,
+            id: "base-texture",
+            label: "PNG 텍스처",
+            role: "baseColor",
+            source: "/3d/sample.png",
+            strength: 1,
+        },
+    ],
+};
+export const DEFAULT_VIEWER_3D_CONFIG = {
+    autoRotate: true,
+    background: {
+        color: "#111827",
+        gridColor: "#475569",
+        gridDivisions: 24,
+        gridSize: 180,
+        groundColor: "#0f172a",
+        showAxes: true,
+        showGrid: true,
+        showGround: false,
+    },
+    camera: {
+        damping: true,
+        fov: 45,
+        maxDistance: 640,
+        minDistance: 18,
+        position: { x: 150, y: 105, z: 155 },
+        preset: "isometric",
+        target: { x: 0, y: 0, z: 0 },
+    },
+    controls: {
+        autoRotateSpeed: 0.7,
+        enableFileInputs: true,
+        enablePan: true,
+        enableRotate: true,
+        enableZoom: true,
+        showOptionBar: true,
+    },
+    lighting: {
+        ambientLight: {
+            color: "#ffffff",
+            intensity: 1,
+        },
+        directionalLight: {
+            color: "#ffffff",
+            intensity: 1.25,
+            position: { x: 110, y: 170, z: 95 },
+        },
+        hemisphereLight: {
+            color: "#dbeafe",
+            groundColor: "#1e293b",
+            intensity: 0.35,
+        },
+        pointLight: {
+            color: "#67e8f9",
+            distance: 420,
+            enabled: true,
+            intensity: 0.65,
+            position: { x: -115, y: 86, z: -90 },
+        },
+    },
+    model: {
+        castShadow: false,
+        color: "#ffffff",
+        metalness: 0.1,
+        opacity: 1,
+        receiveShadow: false,
+        roughness: 0.72,
+        rotation: { x: -90, y: 0, z: 0 },
+        scale: 1,
+        textureBlend: 1,
+        wireframe: false,
+    },
+};
+export const CAMERA_PRESET_LABELS = {
+    back: "후면",
+    bottom: "하단",
+    front: "정면",
+    isometric: "사선",
+    left: "좌측",
+    right: "우측",
+    top: "상단",
+};

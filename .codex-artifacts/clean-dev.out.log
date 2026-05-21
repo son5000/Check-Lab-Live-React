@@ -1,0 +1,38 @@
+
+> checklab-front@0.1.0 dev
+> next dev
+
+  ▲ Next.js 14.2.35
+  - Local:        http://localhost:3000
+
+ ✓ Starting...
+ ✓ Ready in 1972ms
+ ○ Compiling / ...
+ ✓ Compiled / in 7.6s (1809 modules)
+ GET /login 404 in 7833ms
+ GET / 200 in 7913ms
+ ○ Compiling /site/[site_id]/location/[locationId] ...
+ ✓ Compiled /site/[site_id]/location/[locationId] in 1289ms (1831 modules)
+[CheckLab API] global alerts success {
+  asset_id: undefined,
+  isRead: undefined,
+  limit: 200,
+  severity: undefined,
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/alerts?limit=200'
+}
+[CheckLab API] dashboard asset context success {
+  asset_id: 'asset-compressor-01',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-01/mock-dashboard'
+}
+[CheckLab API] dashboard asset context success {
+  asset_id: 'asset-compressor-02',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-02/mock-dashboard'
+}
+ GET /site/compression-process/location/compression-process-machine-room-1f 200 in 1965ms
+ ✓ Compiled in 942ms (1409 modules)
+ ✓ Compiled in 917ms (1409 modules)
+ ✓ Compiled in 1251ms (1407 modules)
+ ✓ Compiled in 1419ms (1407 modules)

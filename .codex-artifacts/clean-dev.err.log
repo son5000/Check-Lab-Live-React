@@ -1,0 +1,13 @@
+[CheckLab API] monitoring tree failed {
+  status: 404,
+  statusText: 'Not Found',
+  url: 'http://192.168.219.46:8000/api/v1/monitoring-tree'
+}
+[CheckLab API] native monitoring tree unavailable {
+  error: Error: monitoring tree request failed: 404 Not Found
+      at requestCheckLabJson (webpack-internal:///(rsc)/./src/app/monitoring/services/checklab-api-client.ts:42:15)
+      at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+      at async fetchMonitoringTree (webpack-internal:///(rsc)/./src/app/monitoring/services/monitoring-tree-api.ts:19:18)
+      at async fetchBackendMonitoringTree (webpack-internal:///(rsc)/./src/app/monitoring/services/monitoring-tree-loader.ts:13:16)
+      at async LocationPage (webpack-internal:///(rsc)/./src/app/site/[site_id]/location/[locationId]/page.tsx:17:28)
+}

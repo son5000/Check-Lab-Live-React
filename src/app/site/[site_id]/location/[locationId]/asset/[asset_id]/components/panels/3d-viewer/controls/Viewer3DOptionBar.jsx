@@ -1,0 +1,32 @@
+"use client";
+import { SlidersHorizontal } from "lucide-react";
+import { BackgroundControls } from "./BackgroundControls";
+import { CameraControls } from "./CameraControls";
+import { ControlSection, RangeField, } from "./control-fields";
+import { LightingControls } from "./LightingControls";
+import { ModelControls } from "./ModelControls";
+import { ModelFileControls } from "./ModelFileControls";
+const TEXT = {
+    animation: "\uC560\uB2C8\uBA54\uC774\uC158",
+    rotationSpeed: "\uD68C\uC804 \uC18D\uB3C4",
+};
+export function Viewer3DOptionBar({ config, modelFile, onConfigChange, onModelFileChange, }) {
+    const controls = config.controls ?? {};
+    return (<aside className="Viewer3DOptionBar Viewer3DOptionBar__aside-1 min-h-0 min-w-0 overflow-y-auto border-t border-border bg-card/95 p-2 md:border-l md:border-t-0">
+      <div className="Viewer3DOptionBar Viewer3DOptionBar__stack-1 grid gap-2">
+        {controls.enableFileInputs !== false ? (<ModelFileControls modelFile={modelFile} onChange={onModelFileChange}/>) : null}
+
+        <ControlSection icon={SlidersHorizontal} title={TEXT.animation}>
+          <RangeField label={TEXT.rotationSpeed} max={4} min={0.1} onChange={(autoRotateSpeed) => onConfigChange({
+            ...config,
+            controls: { ...controls, autoRotateSpeed },
+        })} step={0.1} value={controls.autoRotateSpeed ?? 0.7}/>
+        </ControlSection>
+
+        <CameraControls config={config.camera} onChange={(camera) => onConfigChange({ ...config, camera })}/>
+        <ModelControls config={config.model} onChange={(model) => onConfigChange({ ...config, model })}/>
+        <LightingControls config={config.lighting} onChange={(lighting) => onConfigChange({ ...config, lighting })}/>
+        <BackgroundControls config={config.background} onChange={(background) => onConfigChange({ ...config, background })}/>
+      </div>
+    </aside>);
+}
