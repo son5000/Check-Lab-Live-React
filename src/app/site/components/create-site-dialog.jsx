@@ -21,8 +21,6 @@ import {
 } from "@/app/site/components/site-builder-model";
 import {
   ImageUploadField,
-  OperationStateSelect,
-  StatusSelect,
   TextAreaField,
   TextField,
 } from "@/app/site/components/site-form-fields";
@@ -277,11 +275,6 @@ function SiteCreateStep({ site, onSiteChange }) {
           onSiteChange((current) => ({ ...current, imageUrl: undefined }))
         }
       />
-      <StatusSelect
-        label="상태"
-        onChange={(value) => onSiteChange((current) => ({ ...current, status: value }))}
-        value={site.status}
-      />
     </div>
   );
 }
@@ -335,13 +328,6 @@ function LocationCreateStep({
         onRemove={() =>
           onLocationChange((current) => ({ ...current, imageUrl: undefined }))
         }
-      />
-      <StatusSelect
-        label="상태"
-        onChange={(value) =>
-          onLocationChange((current) => ({ ...current, status: value }))
-        }
-        value={location.status}
       />
       <div className="CreateSiteDialog flex justify-end">
         <button
@@ -439,21 +425,14 @@ function AssetCreateStep({
           placeholder="시리얼 번호"
           value={asset.serial_number}
         />
-        <OperationStateSelect
-          label="가동 여부"
-          onChange={(value) =>
-            onAssetChange((current) => ({ ...current, operation_state: value }))
-          }
-          value={asset.operation_state}
-        />
-      </div>
-      <div className="CreateSiteDialog grid gap-5 sm:grid-cols-2">
         <TextField
           label="유형"
           onChange={(value) => onAssetChange((current) => ({ ...current, type: value }))}
           placeholder="회전 설비"
           value={asset.type}
         />
+      </div>
+      <div className="CreateSiteDialog grid gap-5 sm:grid-cols-2">
         <TextField
           label="담당자"
           onChange={(value) =>
@@ -498,11 +477,6 @@ function AssetCreateStep({
         onRemove={() =>
           onAssetChange((current) => ({ ...current, imageUrl: undefined }))
         }
-      />
-      <StatusSelect
-        label="상태"
-        onChange={(value) => onAssetChange((current) => ({ ...current, status: value }))}
-        value={asset.status}
       />
       <div className="CreateSiteDialog flex justify-end">
         <button
@@ -628,7 +602,6 @@ function CreateSummaryStep({
           rows={[
             ["공정명", previewSite.name],
             ["설명", previewSite.description],
-            ["상태", previewSite.status],
           ]}
         />
         <SummaryBlock

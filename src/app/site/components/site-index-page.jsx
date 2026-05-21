@@ -594,7 +594,7 @@ export function SiteIndexPage({ initialSites = EMPTY_INITIAL_SITES, }) {
                 : "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300")} title={apiMessage.text}>
                 {apiMessage.text}
               </span>) : null}
-            <button type="button" className="SiteIndexPage SiteIndexPage__button-1 inline-flex h-10 shrink-0 items-center gap-1.5 rounded-md border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50" disabled={isMutating} onClick={handleStartSite}>
+            <button type="button" className="SiteIndexPage SiteIndexPage__button-1 inline-flex h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50" disabled={isMutating} onClick={handleStartSite}>
               <Plus className="SiteIndexPage SiteIndexPage__icon-1 h-4 w-4" aria-hidden="true"/>
               공정 생성
             </button>

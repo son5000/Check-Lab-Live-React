@@ -52,7 +52,7 @@ export function ThresholdEditor({ isSaving = false, onDirtyChange, saveError, th
             설비 임계치 설정
           </h2>
         </div>
-        <div className="ThresholdEditor ThresholdEditor__container-6 flex shrink-0 items-center gap-1">
+        <div className="ThresholdEditor ThresholdEditor__container-6 flex min-w-0 shrink-0 items-center justify-end gap-1">
           <span className={cn("ThresholdEditor ThresholdEditor__label-1 inline-flex shrink-0 items-center gap-1 rounded-sm border px-1.5 py-0.5 text-[10px] font-semibold", !isConfigured
             ? "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
             : temperatureExceeded || ultrasoundExceeded

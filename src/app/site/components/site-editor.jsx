@@ -17,7 +17,6 @@ import { dashboardStatusClassName } from "@/app/layouts/constants/status-styles"
 import {
   ImageUploadField,
   OperationStateSelect,
-  StatusSelect,
   TextAreaField,
   TextField,
 } from "@/app/site/components/site-form-fields";
@@ -204,11 +203,6 @@ function SiteEditForm({
         value={draftSite.imageUrl}
         onRemove={() => onSiteChange((site) => ({ ...site, imageUrl: undefined }))}
       />
-      <StatusSelect
-        label="상태 (status)"
-        onChange={(value) => onSiteChange((site) => ({ ...site, status: value }))}
-        value={draftSite.status}
-      />
       <div className="SiteEditor SiteIndexPage__actions-1 flex justify-between gap-3">
         {activeSiteIndex !== undefined ? (
           <DeleteButton
@@ -294,12 +288,6 @@ function LocationEditForm({
         onChange={(value) => onLocationChange((loc) => ({ ...loc, imageUrl: value }))}
         value={draftLocation.imageUrl}
         onRemove={() => onLocationChange((loc) => ({ ...loc, imageUrl: undefined }))}
-      />
-      <StatusSelect
-        disabled={!activeSite}
-        label="상태 (status)"
-        onChange={(value) => onLocationChange((loc) => ({ ...loc, status: value }))}
-        value={draftLocation.status}
       />
       <div className="SiteEditor SiteIndexPage__actions-2 flex flex-wrap justify-between gap-3">
         {activeLocationIndex !== undefined ? (
@@ -470,23 +458,35 @@ function AssetFields({
           placeholder="시리얼 번호"
           value={draftAsset.serial_number}
         />
-        <OperationStateSelect
-          disabled={!activeLocation}
-          label="가동 여부 (operation_state)"
-          onChange={(value) =>
-            onAssetChange((asset) => ({ ...asset, operation_state: value }))
-          }
-          value={draftAsset.operation_state}
-        />
+        {editingAssetId ? (
+          <OperationStateSelect
+            disabled={!activeLocation}
+            label="가동 여부 (operation_state)"
+            onChange={(value) =>
+              onAssetChange((asset) => ({ ...asset, operation_state: value }))
+            }
+            value={draftAsset.operation_state}
+          />
+        ) : (
+          <TextField
+            disabled={!activeLocation}
+            label="유형 (type)"
+            onChange={(value) => onAssetChange((asset) => ({ ...asset, type: value }))}
+            placeholder="회전 설비"
+            value={draftAsset.type}
+          />
+        )}
       </div>
       <div className="SiteEditor grid gap-5 sm:grid-cols-2">
-        <TextField
-          disabled={!activeLocation}
-          label="유형 (type)"
-          onChange={(value) => onAssetChange((asset) => ({ ...asset, type: value }))}
-          placeholder="회전 설비"
-          value={draftAsset.type}
-        />
+        {editingAssetId ? (
+          <TextField
+            disabled={!activeLocation}
+            label="유형 (type)"
+            onChange={(value) => onAssetChange((asset) => ({ ...asset, type: value }))}
+            placeholder="회전 설비"
+            value={draftAsset.type}
+          />
+        ) : null}
         <TextField
           disabled={!activeLocation}
           label="담당자 (manager)"
@@ -530,12 +530,6 @@ function AssetFields({
         onChange={(value) => onAssetChange((asset) => ({ ...asset, imageUrl: value }))}
         value={draftAsset.imageUrl}
         onRemove={() => onAssetChange((asset) => ({ ...asset, imageUrl: undefined }))}
-      />
-      <StatusSelect
-        disabled={!activeLocation}
-        label="상태 (status)"
-        onChange={(value) => onAssetChange((asset) => ({ ...asset, status: value }))}
-        value={draftAsset.status}
       />
       <div className="SiteEditor flex justify-end">
         <button

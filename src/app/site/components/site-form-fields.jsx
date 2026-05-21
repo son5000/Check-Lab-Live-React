@@ -2,7 +2,6 @@
 
 import { useRef } from "react";
 import { Image as ImageIcon, X } from "lucide-react";
-import { statusOptions } from "@/app/site/components/site-builder-model";
 
 const operationStateOptions = [
   { label: "\uBBF8\uC9C0\uC815", value: "" },
@@ -70,26 +69,6 @@ export function TextAreaField({
         placeholder={placeholder}
         value={value}
       />
-    </label>
-  );
-}
-
-export function StatusSelect({ disabled = false, label, onChange, value }) {
-  return (
-    <label className="SiteStatusSelect SiteStatusSelect__label-1 grid gap-2 text-sm font-semibold text-muted-foreground">
-      {label}
-      <select
-        className="SiteStatusSelect SiteStatusSelect__select-1 h-10 min-w-0 rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground outline-none transition focus:border-cyan-300/60 disabled:cursor-not-allowed disabled:opacity-50"
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.value)}
-        value={value}
-      >
-        {statusOptions.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
     </label>
   );
 }

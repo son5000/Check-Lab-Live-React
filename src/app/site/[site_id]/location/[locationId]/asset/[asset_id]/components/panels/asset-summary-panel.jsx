@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowDown, ArrowUp, Box, Gauge, MapPinned, SlidersHorizontal, } from "lucide-react";
+import { ArrowDown, ArrowUp, Box, ChevronLeft, ChevronRight, Gauge, MapPinned, Pause, Play, SlidersHorizontal, } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AssetPartList } from "./summary/asset-part-list";
 import { judgementClassName, judgementLabel, } from "./summary/judgement";
@@ -19,6 +19,7 @@ const summaryMetricCardLabels = {
 export function AssetSummaryPanel({ averageTemperature, assetParts, assetPartStates, assetThresholds, assetJudgement, asset, isSimplified = false, isThresholdSaving = false, temperatureMax, temperatureMin, thresholdSaveError, ultrasoundAverageDb, ultrasoundDetectionCount, ultrasoundMax, selectedAssetPartId, onAssetPartSelect, onAssetThresholdSave, onThresholdEditorDirtyChange, onStartAssetPart, variant = "full", }) {
     const [isThresholdEditorOpen, setIsThresholdEditorOpen] = useState(false);
     const [activeDetectionMetricIndex, setActiveDetectionMetricIndex] = useState(0);
+    const [isDetectionMetricPlaying, setIsDetectionMetricPlaying] = useState(true);
     const [summaryMetricOrder, setSummaryMetricOrder] = useState(DEFAULT_SUMMARY_METRIC_ORDER);
     const isTemperatureExceeded = assetThresholds
         ? isCriticalThresholdExceeded(averageTemperature, assetThresholds.temperature, assetThresholds.temperatureCritical)
@@ -32,15 +33,37 @@ export function AssetSummaryPanel({ averageTemperature, assetParts, assetPartSta
             return;
         }
         setActiveDetectionMetricIndex((currentIndex) => currentIndex % assetParts.length);
-        if (assetParts.length === 1) {
+        if (assetParts.length === 1 || !isDetectionMetricPlaying) {
             return;
         }
         const intervalId = window.setInterval(() => {
             setActiveDetectionMetricIndex((currentIndex) => (currentIndex + 1) % assetParts.length);
         }, DETECTION_AREA_SLIDE_INTERVAL_MS);
         return () => window.clearInterval(intervalId);
-    }, [assetParts.length]);
+    }, [assetParts.length, isDetectionMetricPlaying]);
     if (variant === "metrics") {
+        const handlePreviousDetectionMetric = () => {
+            if (!assetParts.length) {
+                return;
+            }
+            setIsDetectionMetricPlaying(false);
+            setActiveDetectionMetricIndex((currentIndex) => (currentIndex - 1 + assetParts.length) % assetParts.length);
+        };
+        const handleNextDetectionMetric = () => {
+            if (!assetParts.length) {
+                return;
+            }
+            setIsDetectionMetricPlaying(false);
+            setActiveDetectionMetricIndex((currentIndex) => (currentIndex + 1) % assetParts.length);
+        };
+        const detectionSlideOptions = {
+            activeIndex: activeDetectionMetricIndex,
+            isPlaying: isDetectionMetricPlaying,
+            total: assetParts.length,
+            onNext: handleNextDetectionMetric,
+            onPrevious: handlePreviousDetectionMetric,
+            onTogglePlaying: () => setIsDetectionMetricPlaying((isPlaying) => !isPlaying),
+        };
         const renderSummaryMetricCard = (metricId) => {
             if (metricId === "ultrasound") {
                 return (<UltrasoundMetricCard key={metricId} averageDb={ultrasoundAverageDb} peakDb={ultrasoundMax.peakDb} dominantFrequencyKHz={ultrasoundMax.dominantFrequencyKHz} frequencyBandKHz={ultrasoundMax.frequencyBandKHz} detectionCount={ultrasoundDetectionCount} threshold={assetThresholds?.ultrasoundDb} isExceeded={isUltrasoundExceeded}/>);
@@ -48,7 +71,7 @@ export function AssetSummaryPanel({ averageTemperature, assetParts, assetPartSta
             if (metricId === "temperature") {
                 return (<TemperatureMetricCard key={metricId} averageTemperature={averageTemperature} temperatureMax={temperatureMax} temperatureMin={temperatureMin} threshold={assetThresholds?.temperature} isExceeded={isTemperatureExceeded}/>);
             }
-            return (<AssetPartMetricCarousel key={metricId} activeIndex={activeDetectionMetricIndex} partStates={assetPartStates} parts={assetParts}/>);
+            return (<AssetPartMetricCarousel key={metricId} activeIndex={activeDetectionMetricIndex} partStates={assetPartStates} parts={assetParts} slideOptions={detectionSlideOptions}/>);
         };
         return (<section className="AssetDetailSummaryPanel AssetDetailSummaryPanel__section-1 relative flex min-h-0 min-w-0 flex-col overflow-hidden rounded-md border border-border bg-card p-2 text-card-foreground">
         <div className="AssetDetailSummaryPanel AssetDetailSummaryPanel__container-1 mb-2 flex min-w-0 items-center justify-between gap-2">
@@ -184,7 +207,21 @@ function AssetAssetInfoSection({ asset, }) {
       </dl>
     </section>);
 }
-function AssetPartMetricCarousel({ activeIndex, parts, partStates, }) {
+function MetricSlideControls({ slideOptions, }) {
+    const hasMultipleSlides = slideOptions.total > 1;
+    return (<div className="ThresholdEditor ThresholdEditor__slide-controls-1 flex shrink-0 items-center gap-1 rounded-sm border border-border bg-card p-0.5">
+      <button type="button" className="ThresholdEditor ThresholdEditor__slide-button-1 grid h-6 w-6 place-items-center rounded-[3px] text-muted-foreground transition hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40" aria-label="이전 슬라이드" title="이전" disabled={!hasMultipleSlides} onClick={slideOptions.onPrevious}>
+        <ChevronLeft className="ThresholdEditor ThresholdEditor__slide-icon-1 h-3.5 w-3.5" aria-hidden="true"/>
+      </button>
+      <button type="button" className="ThresholdEditor ThresholdEditor__slide-button-2 grid h-6 w-6 place-items-center rounded-[3px] text-muted-foreground transition hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40" aria-label={slideOptions.isPlaying ? "슬라이드 일시정지" : "슬라이드 재생"} title={slideOptions.isPlaying ? "일시정지" : "재생"} disabled={!hasMultipleSlides} onClick={slideOptions.onTogglePlaying}>
+        {slideOptions.isPlaying ? (<Pause className="ThresholdEditor ThresholdEditor__slide-icon-2 h-3.5 w-3.5" aria-hidden="true"/>) : (<Play className="ThresholdEditor ThresholdEditor__slide-icon-2 h-3.5 w-3.5" aria-hidden="true"/>)}
+      </button>
+      <button type="button" className="ThresholdEditor ThresholdEditor__slide-button-3 grid h-6 w-6 place-items-center rounded-[3px] text-muted-foreground transition hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40" aria-label="다음 슬라이드" title="다음" disabled={!hasMultipleSlides} onClick={slideOptions.onNext}>
+        <ChevronRight className="ThresholdEditor ThresholdEditor__slide-icon-3 h-3.5 w-3.5" aria-hidden="true"/>
+      </button>
+    </div>);
+}
+function AssetPartMetricCarousel({ activeIndex, parts, partStates, slideOptions, }) {
     const activePart = parts.length ? parts[activeIndex % parts.length] : undefined;
     const activePartState = activePart
         ? partStates.find((partState) => partState.partId === activePart.id)
@@ -193,10 +230,13 @@ function AssetPartMetricCarousel({ activeIndex, parts, partStates, }) {
         return (<div className="UltrasoundMetricCard MetricPlaceholderCard relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-md border border-border/60 bg-background/80">
         <div className="h-[3px] w-full shrink-0 bg-muted-foreground/25"/>
         <div className="flex min-w-0 items-center justify-between gap-2 border-b border-border/40 px-3 py-1.5">
-          <p className="min-w-0 truncate text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+          <p className="min-w-0 flex-1 truncate text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
             감지 데이터
           </p>
-          <MapPinned className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true"/>
+          {slideOptions ? (<MetricSlideControls slideOptions={slideOptions}/>) : null}
+          <span className="flex flex-1 justify-end">
+            <MapPinned className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true"/>
+          </span>
         </div>
         <div className="grid min-h-0 flex-1 place-items-center px-3 text-center">
           <p className="text-[11px] font-semibold text-muted-foreground">
@@ -218,14 +258,17 @@ function AssetPartMetricCarousel({ activeIndex, parts, partStates, }) {
     return (<article className="UltrasoundMetricCard MetricPlaceholderCard relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-md border border-border/60 bg-background/80">
       <div className={cn("h-[3px] w-full shrink-0", accentClassName)}/>
       <div className="flex min-w-0 items-center justify-between gap-2 border-b border-border/40 px-3 py-1.5">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="min-w-0 truncate text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
             감지 데이터
           </p>
           <p className="truncate text-xs font-semibold">{activePart.name}</p>
         </div>
-        <span className="shrink-0 rounded-sm border border-border bg-card px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-          {(activeIndex % parts.length) + 1}/{parts.length}
+        {slideOptions ? (<MetricSlideControls slideOptions={slideOptions}/>) : null}
+        <span className="flex flex-1 justify-end">
+          <span className="shrink-0 rounded-sm border border-border bg-card px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+            {(activeIndex % parts.length) + 1}/{parts.length}
+          </span>
         </span>
       </div>
 

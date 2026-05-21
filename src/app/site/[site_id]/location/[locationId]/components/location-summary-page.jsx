@@ -137,10 +137,6 @@ export function LocationSummaryPage({ site, location, assets, }) {
     const handleRemoveAsset = (assetId) => {
         setManagedAssets((currentAssets) => currentAssets.filter((asset) => asset.id !== assetId));
     };
-    const handleRestoreBackendAssets = () => {
-        setManagedAssets(initialAssets);
-        setSelectedAssetId(initialAssets[0]?.id ?? "");
-    };
     const handleAssetChange = (assetId, patch) => {
         setManagedAssets((currentAssets) => currentAssets.map((asset) => asset.id === assetId ? { ...asset, ...patch } : asset));
     };
@@ -223,10 +219,6 @@ export function LocationSummaryPage({ site, location, assets, }) {
               <h2 className="LocationSummaryPage LocationSummaryPage__title-2 truncate text-sm font-semibold">
                 하위 설비 현상 요약
               </h2>
-              <button type="button" className="LocationSummaryPage LocationSummaryPage__button-3 inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-border bg-background px-2 text-[11px] font-semibold text-muted-foreground transition hover:bg-accent hover:text-foreground" onClick={handleRestoreBackendAssets}>
-                <X className="LocationSummaryPage LocationSummaryPage__icon-6 h-3 w-3" aria-hidden="true"/>
-                백엔드 값 복원
-              </button>
             </div>
 
             <div className="LocationSummaryPage LocationSummaryPage__container-6 mt-2 grid gap-2 md:grid-cols-2">

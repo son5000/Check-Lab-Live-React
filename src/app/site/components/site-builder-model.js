@@ -132,7 +132,6 @@ function toCreateSiteAssetPayload(asset) {
         manager: asset.manager,
         model_name: asset.model_name,
         name: asset.name,
-        operation_state: asset.operation_state,
         serial_number: asset.serial_number,
         type: asset.type,
     };
@@ -169,7 +168,6 @@ export function toCreateAssetPayload(site_id, location_id, asset) {
         manager: asset.manager,
         model_name: asset.model_name,
         name: asset.name,
-        operation_state: asset.operation_state,
         serial_number: asset.serial_number,
         site_id,
         type: asset.type,

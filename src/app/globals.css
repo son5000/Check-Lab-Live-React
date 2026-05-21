@@ -265,6 +265,13 @@
   * {
     @apply border-border outline-ring/50;
   }
+  :where(button, [role="button"]):not(:disabled):not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+  :where(button, [role="button"]):disabled,
+  :where(button, [role="button"])[aria-disabled="true"] {
+    cursor: not-allowed;
+  }
   html,
   body {
     height: 100%;
