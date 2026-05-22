@@ -1,12 +1,14 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BellRing, ChevronLeft, X } from "lucide-react";
+import Link from "next/link";
+import { BellRing, ChevronLeft, FileText, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCheckLabKoreanDateTime } from "@/app/layouts/helpers/time-formatters";
 import { useDashboardHeaderStateController } from "@/app/layouts/hooks/use-dashboard-header-state";
 import { useDashboardNotificationsController } from "@/app/layouts/hooks/use-dashboard-notifications";
 import { AssetCameraPanel } from "./panels/asset-camera-panel";
 import { AssetEventLogPanel, } from "./panels/asset-event-log-panel";
+import { persistAssetReportDraft } from "./asset-report-draft-storage";
 import { AssetSummaryPanel } from "./panels/asset-summary-panel";
 import { AssetTrendPanel, } from "./panels/asset-trend-panel";
 const assetTrendRanges = [
@@ -24,6 +26,16 @@ const EVENT_DRAWER_HANDLE_DEFAULT_TOP_PERCENT = 50;
 const EVENT_DRAWER_HANDLE_MIN_TOP_PERCENT = 12;
 const EVENT_DRAWER_HANDLE_MAX_TOP_PERCENT = 88;
 const EVENT_DRAWER_HANDLE_DRAG_THRESHOLD_PX = 4;
+const DASHBOARD_REFRESH_INTERVAL_MS = 2000;
+const REALTIME_TREND_FRAME_INTERVAL_MS = 33;
+const REALTIME_TREND_SMOOTHING_DURATION_MS = 900;
+const SMOOTHED_TREND_VALUE_KEYS = [
+    "average",
+    "max",
+    "min",
+    "peakFrequency",
+    "spread",
+];
 const OPEN_ASSET_EVENT_DETAIL_EVENT = "checklab:open-asset-event";
 export function AssetDashboardPage({ asset_id, asset, initialEventId, site, location, remoteDashboard, }) {
     const { setHeaderState } = useDashboardHeaderStateController();
@@ -36,12 +48,12 @@ export function AssetDashboardPage({ asset_id, asset, initialEventId, site, loca
     const [isEventDrawerOpen, setIsEventDrawerOpen] = useState(Boolean(initialEventId));
     const [assetParts, setAssetParts] = useState(() => remoteDashboard?.initialAssetParts ?? []);
     const previousRemoteAssetIdRef = useRef(remoteDashboard?.asset_id);
+    const dashboardRefreshInFlightRef = useRef(false);
     const [selectedAssetPartId, setSelectedAssetPartId] = useState();
     const [assetThresholds, setAssetThresholds] = useState(() => remoteDashboard?.initialThresholds ?? null);
     const [isThresholdSaving, setIsThresholdSaving] = useState(false);
     const [thresholdSaveError, setThresholdSaveError] = useState();
     const [isThresholdEditorDirty, setIsThresholdEditorDirty] = useState(false);
-    const [isAddingAssetPart, setIsAddingAssetPart] = useState(false);
     const [eventTick, setEventTick] = useState(0);
     const sample = useMemo(() => buildDashboardSample(asset, remoteSnapshot), [asset, remoteSnapshot]);
     const defaultAssetThresholds = useMemo(() => ({
@@ -69,7 +81,6 @@ export function AssetDashboardPage({ asset_id, asset, initialEventId, site, loca
             : mergeAssetPartConfigs(remoteAssetParts, currentParts));
         if (isAssetChanged) {
             setSelectedAssetPartId(undefined);
-            setIsAddingAssetPart(false);
         }
         previousRemoteAssetIdRef.current = nextRemoteAssetId;
     }, [remoteSnapshot?.asset_id, remoteSnapshot?.initialAssetParts]);
@@ -120,6 +131,10 @@ export function AssetDashboardPage({ asset_id, asset, initialEventId, site, loca
         }
         let isCancelled = false;
         const refreshRemoteSnapshot = async () => {
+            if (dashboardRefreshInFlightRef.current) {
+                return;
+            }
+            dashboardRefreshInFlightRef.current = true;
             try {
                 const response = await fetch(`/api/asset-dashboard/${encodeURIComponent(asset_id)}`, { cache: "no-store" });
                 if (!response.ok) {
@@ -133,8 +148,12 @@ export function AssetDashboardPage({ asset_id, asset, initialEventId, site, loca
             catch (error) {
                 console.warn("Failed to refresh asset dashboard.", error);
             }
+            finally {
+                dashboardRefreshInFlightRef.current = false;
+            }
         };
-        const intervalId = window.setInterval(refreshRemoteSnapshot, 5000);
+        void refreshRemoteSnapshot();
+        const intervalId = window.setInterval(refreshRemoteSnapshot, DASHBOARD_REFRESH_INTERVAL_MS);
         return () => {
             isCancelled = true;
             window.clearInterval(intervalId);
@@ -150,15 +169,28 @@ export function AssetDashboardPage({ asset_id, asset, initialEventId, site, loca
     const changedCoordinates = useMemo(() => extractChangedTemperatureCoordinates(sample.temperatureParts, sample.threshold.changeDetectionDelta), [sample]);
     const ultrasoundSummary = useMemo(() => getUltrasoundSummary(sample.ultrasoundDetections), [sample.ultrasoundDetections]);
     const assetPartStates = useMemo(() => mergeAssetPartStates(buildAssetPartStates(assetParts, sample), remoteSnapshot?.initialAssetPartStates), [assetParts, remoteSnapshot?.initialAssetPartStates, sample]);
+    const reportDraft = useMemo(() => ({
+        assetPartStates,
+        assetParts,
+        assetThresholds,
+    }), [assetPartStates, assetParts, assetThresholds]);
+    const persistCurrentReportDraft = useCallback(() => {
+        persistAssetReportDraft(asset_id, reportDraft);
+    }, [asset_id, reportDraft]);
+    useEffect(() => {
+        persistCurrentReportDraft();
+    }, [persistCurrentReportDraft]);
     const requestPreview = useMemo(() => buildUltrasoundDetectionRequest(sample.asset.id, changedCoordinates), [changedCoordinates, sample.asset.id]);
     const activeRange = assetTrendRanges.find((range) => range.id === activeRangeId) ??
         assetTrendRanges[0];
-    const temperatureData = useMemo(() => remoteSnapshot?.trend?.temperatureData?.length
+    const rawTemperatureData = useMemo(() => remoteSnapshot?.trend?.temperatureData?.length
         ? remoteSnapshot.trend.temperatureData
         : buildEmptyTrendData(activeRange), [activeRange, remoteSnapshot?.trend?.temperatureData]);
-    const ultrasonicData = useMemo(() => remoteSnapshot?.trend?.ultrasonicData?.length
+    const rawUltrasonicData = useMemo(() => remoteSnapshot?.trend?.ultrasonicData?.length
         ? remoteSnapshot.trend.ultrasonicData
         : buildEmptyTrendData(activeRange), [activeRange, remoteSnapshot?.trend?.ultrasonicData]);
+    const temperatureData = useSmoothedTrendData(rawTemperatureData, activeRange.id);
+    const ultrasonicData = useSmoothedTrendData(rawUltrasonicData, activeRange.id);
     const latestTemperaturePoint = getLatestTrendPoint(temperatureData);
     const latestUltrasonicPoint = getLatestTrendPoint(ultrasonicData);
     const averageTemperature = latestTemperaturePoint?.average ??
@@ -238,6 +270,7 @@ export function AssetDashboardPage({ asset_id, asset, initialEventId, site, loca
         site,
         sample,
     }), [asset_id, events, location, site, sample]);
+    const reportHref = `/site/${encodeURIComponent(site.site_id)}/location/${encodeURIComponent(location.id)}/asset/${encodeURIComponent(asset_id)}/report`;
     const unresolvedAlarmCount = globalNotifications.length;
     const chartReferenceThresholds = assetThresholds ?? defaultAssetThresholds;
     const chartTemperatureReferenceLines = remoteSnapshot?.trend?.temperatureReferenceLines?.length
@@ -261,7 +294,6 @@ export function AssetDashboardPage({ asset_id, asset, initialEventId, site, loca
     const handleCreateAssetPart = (part) => {
         setAssetParts((currentParts) => [part, ...currentParts]);
         setSelectedAssetPartId(part.id);
-        setIsAddingAssetPart(false);
     };
     const handleUpdateAssetPart = (nextPart) => {
         setAssetParts((currentParts) => currentParts.some((currentPart) => currentPart.id === nextPart.id)
@@ -275,11 +307,6 @@ export function AssetDashboardPage({ asset_id, asset, initialEventId, site, loca
     };
     const handleSelectAssetPart = (partId) => {
         setSelectedAssetPartId(partId);
-        setIsAddingAssetPart(false);
-    };
-    const handleStartAssetPart = () => {
-        setSelectedAssetPartId(undefined);
-        setIsAddingAssetPart(true);
     };
     const handleAssetThresholdSave = useCallback(async (nextThresholds) => {
         setThresholdSaveError(undefined);
@@ -357,17 +384,17 @@ export function AssetDashboardPage({ asset_id, asset, initialEventId, site, loca
         return () => setNotifications([]);
     }, [setNotifications]);
     return (<main className="AssetDashboardPage AssetDashboardPage__root-1 h-full min-h-0 min-w-0 flex-1 overflow-y-auto bg-muted/35 p-2 md:overflow-hidden">
-      <div className="AssetDashboardPage AssetDashboardPage__layout-parts-1" data-adding-part={isAddingAssetPart ? "true" : "false"}>
+      <div className="AssetDashboardPage AssetDashboardPage__layout-parts-1">
         <DashboardArea className="AssetDashboardPage__area-title">
-          <AssetStatusTitlePanel assetJudgement={assetJudgement} events={events} location={location} site={site} sample={sample} unresolvedAlarmCount={unresolvedAlarmCount}/>
+          <AssetStatusTitlePanel assetJudgement={assetJudgement} events={events} location={location} reportHref={reportHref} site={site} sample={sample} unresolvedAlarmCount={unresolvedAlarmCount} onReportOpen={persistCurrentReportDraft}/>
         </DashboardArea>
 
         <DashboardArea className="AssetDashboardPage__area-camera">
-          <AssetCameraPanel activeCameraId={activeCameraId} cameraFeeds={remoteSnapshot?.cameraFeeds} defaultAssetThresholds={defaultAssetThresholds} assetParts={assetParts} assetPartStates={assetPartStates} isAddingAssetPart={isAddingAssetPart} selectedAssetPartId={selectedAssetPartId} assetThresholds={assetThresholds} onCancelAssetPart={() => setIsAddingAssetPart(false)} onCameraSelect={setActiveCameraId} onCreateAssetPart={handleCreateAssetPart} onDeleteAssetPart={handleDeleteAssetPart} onSelectAssetPart={setSelectedAssetPartId} onUpdateAssetPart={handleUpdateAssetPart} temperatureData={temperatureData} ultrasonicData={ultrasonicData} variant="stream"/>
+          <AssetCameraPanel activeCameraId={activeCameraId} cameraFeeds={remoteSnapshot?.cameraFeeds} defaultAssetThresholds={defaultAssetThresholds} assetParts={assetParts} assetPartStates={assetPartStates} selectedAssetPartId={selectedAssetPartId} assetThresholds={assetThresholds} onCameraSelect={setActiveCameraId} onCreateAssetPart={handleCreateAssetPart} onDeleteAssetPart={handleDeleteAssetPart} onSelectAssetPart={setSelectedAssetPartId} onUpdateAssetPart={handleUpdateAssetPart} temperatureData={temperatureData} ultrasonicData={ultrasonicData} variant="stream"/>
         </DashboardArea>
 
         <DashboardArea className="AssetDashboardPage__area-metrics">
-          <AssetSummaryPanel averageTemperature={averageTemperature} assetParts={assetParts} assetPartStates={assetPartStates} assetThresholds={assetThresholds} assetJudgement={assetJudgement} asset={sample.asset} isThresholdSaving={isThresholdSaving} temperatureMax={temperatureMax} temperatureMin={temperatureMin} thresholdSaveError={thresholdSaveError} ultrasoundAverageDb={ultrasoundAverageDb} ultrasoundDetectionCount={ultrasoundDetectionCount} ultrasoundMax={liveUltrasoundMax} selectedAssetPartId={selectedAssetPartId} onAssetPartSelect={handleSelectAssetPart} onAssetThresholdSave={handleAssetThresholdSave} onThresholdEditorDirtyChange={setIsThresholdEditorDirty} onStartAssetPart={handleStartAssetPart} variant="metrics"/>
+          <AssetSummaryPanel averageTemperature={averageTemperature} assetParts={assetParts} assetPartStates={assetPartStates} assetThresholds={assetThresholds} assetJudgement={assetJudgement} asset={sample.asset} isThresholdSaving={isThresholdSaving} temperatureMax={temperatureMax} temperatureMin={temperatureMin} thresholdSaveError={thresholdSaveError} ultrasoundAverageDb={ultrasoundAverageDb} ultrasoundDetectionCount={ultrasoundDetectionCount} ultrasoundMax={liveUltrasoundMax} selectedAssetPartId={selectedAssetPartId} onAssetPartSelect={handleSelectAssetPart} onAssetThresholdSave={handleAssetThresholdSave} onThresholdEditorDirtyChange={setIsThresholdEditorDirty} variant="metrics"/>
         </DashboardArea>
 
         <DashboardArea className="AssetDashboardPage__area-trends">
@@ -375,7 +402,7 @@ export function AssetDashboardPage({ asset_id, asset, initialEventId, site, loca
         </DashboardArea>
 
         <DashboardArea className="AssetDashboardPage__area-detection">
-          <AssetSummaryPanel averageTemperature={averageTemperature} assetParts={assetParts} assetPartStates={assetPartStates} assetThresholds={assetThresholds} assetJudgement={assetJudgement} asset={sample.asset} isThresholdSaving={isThresholdSaving} temperatureMax={temperatureMax} temperatureMin={temperatureMin} thresholdSaveError={thresholdSaveError} ultrasoundAverageDb={ultrasoundAverageDb} ultrasoundDetectionCount={ultrasoundDetectionCount} ultrasoundMax={liveUltrasoundMax} selectedAssetPartId={selectedAssetPartId} onAssetPartSelect={handleSelectAssetPart} onAssetThresholdSave={handleAssetThresholdSave} onThresholdEditorDirtyChange={setIsThresholdEditorDirty} onStartAssetPart={handleStartAssetPart} variant="detection"/>
+          <AssetSummaryPanel averageTemperature={averageTemperature} assetParts={assetParts} assetPartStates={assetPartStates} assetThresholds={assetThresholds} assetJudgement={assetJudgement} asset={sample.asset} isThresholdSaving={isThresholdSaving} temperatureMax={temperatureMax} temperatureMin={temperatureMin} thresholdSaveError={thresholdSaveError} ultrasoundAverageDb={ultrasoundAverageDb} ultrasoundDetectionCount={ultrasoundDetectionCount} ultrasoundMax={liveUltrasoundMax} selectedAssetPartId={selectedAssetPartId} onAssetPartSelect={handleSelectAssetPart} onAssetThresholdSave={handleAssetThresholdSave} onThresholdEditorDirtyChange={setIsThresholdEditorDirty} variant="detection"/>
         </DashboardArea>
       </div>
 
@@ -386,6 +413,94 @@ function DashboardArea({ children, className, }) {
     return (<div className={cn("AssetDashboardPage AssetDashboardPage__area-1 grid min-h-0 min-w-0 overflow-hidden", className)}>
       {children}
     </div>);
+}
+function useSmoothedTrendData(targetData, resetKey) {
+    const [displayData, setDisplayData] = useState(() => cloneTrendData(targetData));
+    const displayDataRef = useRef(displayData);
+    const animationFrameRef = useRef(0);
+    const previousResetKeyRef = useRef(resetKey);
+    useEffect(() => {
+        displayDataRef.current = displayData;
+    }, [displayData]);
+    useEffect(() => {
+        window.cancelAnimationFrame(animationFrameRef.current);
+        const targetSnapshot = cloneTrendData(targetData);
+        if (previousResetKeyRef.current !== resetKey ||
+            !displayDataRef.current.length ||
+            !targetSnapshot.length) {
+            previousResetKeyRef.current = resetKey;
+            displayDataRef.current = targetSnapshot;
+            setDisplayData(targetSnapshot);
+            return () => window.cancelAnimationFrame(animationFrameRef.current);
+        }
+        const startSnapshot = buildTrendAnimationStartData(displayDataRef.current, targetSnapshot);
+        const animationStartedAt = window.performance.now();
+        let lastPublishedAt = 0;
+        const animate = (frameTime) => {
+            const elapsed = frameTime - animationStartedAt;
+            if (elapsed < REALTIME_TREND_SMOOTHING_DURATION_MS &&
+                frameTime - lastPublishedAt < REALTIME_TREND_FRAME_INTERVAL_MS) {
+                animationFrameRef.current = window.requestAnimationFrame(animate);
+                return;
+            }
+            lastPublishedAt = frameTime;
+            const progress = easeOutCubic(Math.min(elapsed / REALTIME_TREND_SMOOTHING_DURATION_MS, 1));
+            const nextDisplayData = interpolateTrendData(startSnapshot, targetSnapshot, progress);
+            displayDataRef.current = nextDisplayData;
+            setDisplayData(nextDisplayData);
+            if (progress < 1) {
+                animationFrameRef.current = window.requestAnimationFrame(animate);
+                return;
+            }
+            displayDataRef.current = targetSnapshot;
+            setDisplayData(targetSnapshot);
+        };
+        animationFrameRef.current = window.requestAnimationFrame(animate);
+        return () => window.cancelAnimationFrame(animationFrameRef.current);
+    }, [resetKey, targetData]);
+    return displayData;
+}
+function cloneTrendData(data) {
+    return data.map((point) => ({ ...point }));
+}
+function buildTrendAnimationStartData(currentData, targetData) {
+    return targetData.map((targetPoint, index) => {
+        const currentPoint = currentData.find((point) => point.time === targetPoint.time) ??
+            currentData[index] ??
+            targetPoint;
+        return {
+            ...targetPoint,
+            ...SMOOTHED_TREND_VALUE_KEYS.reduce((values, key) => {
+                values[key] = currentPoint[key];
+                return values;
+            }, {}),
+        };
+    });
+}
+function interpolateTrendData(startData, targetData, progress) {
+    return targetData.map((targetPoint, index) => {
+        const startPoint = startData[index] ?? targetPoint;
+        const nextPoint = { ...targetPoint };
+        for (const key of SMOOTHED_TREND_VALUE_KEYS) {
+            nextPoint[key] = interpolateTrendValue(startPoint[key], targetPoint[key], progress);
+        }
+        return nextPoint;
+    });
+}
+function interpolateTrendValue(startValue, targetValue, progress) {
+    if (!isFiniteNumber(startValue) || !isFiniteNumber(targetValue)) {
+        return targetValue;
+    }
+    return roundRealtimeValue(startValue + (targetValue - startValue) * progress);
+}
+function isFiniteNumber(value) {
+    return typeof value === "number" && Number.isFinite(value);
+}
+function easeOutCubic(value) {
+    return 1 - Math.pow(1 - value, 3);
+}
+function roundRealtimeValue(value) {
+    return Math.round(value * 100) / 100;
 }
 function EventLogBlindDrawer({ asset_id, assetId, events, initialSelectedEventId, isOpen, onEventRead, onClose, onOpen, }) {
     const [handleTopPercent, setHandleTopPercent] = useState(EVENT_DRAWER_HANDLE_DEFAULT_TOP_PERCENT);
@@ -476,9 +591,9 @@ function EventLogBlindDrawer({ asset_id, assetId, events, initialSelectedEventId
 function clampHandleTopPercent(topPercent) {
     return Math.min(Math.max(topPercent, EVENT_DRAWER_HANDLE_MIN_TOP_PERCENT), EVENT_DRAWER_HANDLE_MAX_TOP_PERCENT);
 }
-function AssetStatusTitlePanel({ assetJudgement, events, location, site, sample, unresolvedAlarmCount, }) {
+function AssetStatusTitlePanel({ assetJudgement, events, location, reportHref, site, sample, unresolvedAlarmCount, onReportOpen, }) {
     const latestEventGrade = events[0]?.grade ?? "normal";
-    return (<section className={cn("AssetStatusTitlePanel AssetStatusTitlePanel__section-1 grid min-h-0 min-w-0 grid-cols-1 items-center gap-3 overflow-hidden rounded-md border border-border bg-card px-5 text-card-foreground sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:gap-4", assetStatusTitlePanelClassName[assetJudgement])}>
+    return (<section className={cn("AssetStatusTitlePanel AssetStatusTitlePanel__section-1 grid min-h-0 min-w-0 grid-cols-1 items-center gap-3 overflow-hidden rounded-md border border-border bg-card px-5 text-card-foreground sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:gap-4", assetStatusTitlePanelClassName[assetJudgement])}>
       <div className="AssetStatusTitlePanel AssetStatusTitlePanel__container-1 min-w-0">
         <p className="AssetStatusTitlePanel AssetStatusTitlePanel__text-1 truncate text-xs font-bold text-muted-foreground">
           {site.name} · {location.name}
@@ -508,6 +623,10 @@ function AssetStatusTitlePanel({ assetJudgement, events, location, site, sample,
           {events.length}건 · 미해결 {unresolvedAlarmCount}건
         </span>
       </div>
+      <Link aria-label="보고서 생성 화면 열기" className="AssetStatusTitlePanel AssetStatusTitlePanel__report-link-1 inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-md border border-primary/35 bg-primary/10 px-4 text-xs font-extrabold text-primary shadow-sm transition hover:border-primary/60 hover:bg-primary/15 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35" href={reportHref} target="_blank" title="보고서 생성 화면 열기" onAuxClick={onReportOpen} onClick={onReportOpen}>
+        <FileText className="AssetStatusTitlePanel AssetStatusTitlePanel__report-icon-1 h-3.5 w-3.5" aria-hidden="true"/>
+        보고서 생성
+      </Link>
     </section>);
 }
 function buildDashboardSample(asset, remoteDashboard) {

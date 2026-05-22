@@ -130,28 +130,6 @@ export function SiteSummaryPage({ site, locations, assets }) {
         </section>
 
         <section className="SiteSummaryPage SiteSummaryPage__section-2 grid gap-2 lg:grid-cols-[1fr_1.2fr]">
-          <div className="SiteSummaryPage SiteSummaryPage__container-5 rounded-md border border-border bg-card p-3 text-card-foreground">
-            <h2 className="SiteSummaryPage SiteSummaryPage__title-2 truncate text-sm font-semibold">
-              주요 알림
-            </h2>
-            <div className="SiteSummaryPage SiteSummaryPage__container-6 mt-2 grid gap-2">
-              {site.alertCount > 0 ? (
-                <div className="SiteSummaryPage SiteSummaryPage__alert-summary-1 rounded-md border border-border bg-background px-3 py-2">
-                  <p className="truncate text-sm font-semibold">
-                    백엔드 알림 집계 {site.alertCount}건
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    알림 상세 목록 API가 연결되면 이 영역에 실제 알림 행을 표시합니다.
-                  </p>
-                </div>
-              ) : (
-                <div className="SiteSummaryPage SiteSummaryPage__alert-empty-1 rounded-md border border-dashed border-border bg-background px-3 py-4 text-sm text-muted-foreground">
-                  백엔드에서 전달된 주요 알림이 없습니다.
-                </div>
-              )}
-            </div>
-          </div>
-
           <div className="SiteSummaryPage SiteSummaryPage__container-7 rounded-md border border-border bg-card p-3 text-card-foreground">
             <div className="SiteSummaryPage SiteSummaryPage__container-11 flex min-w-0 items-center justify-between gap-2">
               <h2 className="SiteSummaryPage SiteSummaryPage__title-3 truncate text-sm font-semibold">
@@ -269,7 +247,7 @@ export function SiteSummaryPage({ site, locations, assets }) {
                       </span>
                     </div>
                     <p className="SiteSummaryPage SiteSummaryPage__text-4 mt-2 line-clamp-2 text-xs text-muted-foreground">
-                      {location.summary || "백엔드 설명 없음"}
+                      {location.summary || "설명 없음"}
                     </p>
                     <p className="SiteSummaryPage SiteSummaryPage__text-5 mt-3 text-xs font-medium">
                       설비 {location.assetCount}대
@@ -279,6 +257,28 @@ export function SiteSummaryPage({ site, locations, assets }) {
               ) : (
                 <div className="SiteSummaryPage SiteSummaryPage__location-empty-1 rounded-md border border-dashed border-border bg-background p-4 text-sm text-muted-foreground sm:col-span-2">
                   백엔드에서 전달된 위치가 없습니다.
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="SiteSummaryPage SiteSummaryPage__container-5 rounded-md border border-border bg-card p-3 text-card-foreground">
+            <h2 className="SiteSummaryPage SiteSummaryPage__title-2 truncate text-sm font-semibold">
+              주요 알림
+            </h2>
+            <div className="SiteSummaryPage SiteSummaryPage__container-6 mt-2 grid gap-2">
+              {site.alertCount > 0 ? (
+                <div className="SiteSummaryPage SiteSummaryPage__alert-summary-1 rounded-md border border-border bg-background px-3 py-2">
+                  <p className="truncate text-sm font-semibold">
+                    백엔드 알림 집계 {site.alertCount}건
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    알림 상세 목록 API가 연결되면 이 영역에 실제 알림 행을 표시합니다.
+                  </p>
+                </div>
+              ) : (
+                <div className="SiteSummaryPage SiteSummaryPage__alert-empty-1 rounded-md border border-dashed border-border bg-background px-3 py-4 text-sm text-muted-foreground">
+                  전달된 주요 알림이 없습니다.
                 </div>
               )}
             </div>

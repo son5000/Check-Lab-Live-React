@@ -79,7 +79,7 @@
   opacity: var(--global-notification-stack-opacity);
   transform: translate3d(0, var(--global-notification-stack-offset-y), 0)
     scale(var(--global-notification-stack-scale));
-  transform-origin: center top;
+  transform-origin: var(--global-notification-stack-origin, center top);
   /* 앞 카드가 사라질 때 부드럽게 앞자리로 승격 */
   transition:
     opacity 200ms ease-out,

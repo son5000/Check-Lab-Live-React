@@ -21,21 +21,39 @@ import * as THREE from "three";
 import { cn } from "@/lib/utils";
 import { ModelLoader } from "@/app/site/[site_id]/location/[locationId]/asset/[asset_id]/components/panels/3d-viewer/modules/ModelLoader";
 import { disposeObject3D } from "@/app/site/[site_id]/location/[locationId]/asset/[asset_id]/components/panels/3d-viewer/utils/threeDisposal";
-const SAMPLE_MODEL_FILE = {
-  label: "Sample PLY",
-  normalizeSize: 3.8,
-  plyUrl: "/3d/sample.ply",
-  textures: [
-    {
-      enabled: true,
-      id: "world-sample-texture",
-      label: "Sample PNG",
-      role: "baseColor",
-      source: "/3d/sample.png",
-      strength: 1,
-    },
-  ],
-};
+const WORLD_SAMPLE_MODEL_FILES = [
+  createWorldSampleModelFile({
+    id: "equipment-sample",
+    label: "Equipment Sample",
+    plyUrl: "/3d/equipment_sample_threejs.ply",
+    textureUrl: "/3d/equipment_sample_texture.png",
+  }),
+  createWorldSampleModelFile({
+    id: "pump-unit",
+    label: "Pump Unit",
+    plyUrl: "/3d/sample_pump_unit.ply",
+    textureUrl: "/3d/sample_pump_unit_texture.png",
+  }),
+  createWorldSampleModelFile({
+    id: "thermal-node",
+    label: "Thermal Node",
+    plyUrl: "/3d/sample_thermal_node.ply",
+    textureUrl: "/3d/sample_thermal_node_texture.png",
+  }),
+  createWorldSampleModelFile({
+    id: "valve-box",
+    label: "Valve Box",
+    plyUrl: "/3d/sample_valve_box.ply",
+    textureUrl: "/3d/sample_valve_box_texture.png",
+  }),
+  createWorldSampleModelFile({
+    id: "main-sample",
+    label: "Main Sample",
+    normalizeSize: 4.6,
+    plyUrl: "/3d/sample.ply",
+    textureUrl: "/3d/sample.png",
+  }),
+];
 const DEMO_ASSETS = [
   {
     id: "world-demo-compressor-01",
@@ -74,8 +92,44 @@ const DEMO_ASSETS = [
     type: "이상 샘플 설비",
   },
 ];
-const ABNORMAL_DEMO_ASSET_ID = "world-demo-abnormal-06";
-const REGISTERED_ASSET_SAMPLES = [
+const WORLD_SAMPLE_ASSET_OVERRIDES = [
+  {
+    id: "world-sample-equipment-01",
+    name: "Equipment Sample 01",
+    status: "normal",
+    type: "Sample Equipment",
+  },
+  {
+    id: "world-sample-pump-02",
+    name: "Pump Unit 02",
+    status: "normal",
+    type: "Sample Pump",
+  },
+  {
+    id: "world-sample-thermal-03",
+    name: "Thermal Node 03",
+    status: "caution",
+    type: "Sample Thermal Node",
+  },
+  {
+    id: "world-sample-valve-04",
+    name: "Valve Box 04",
+    status: "caution",
+    type: "Sample Valve Box",
+  },
+  {
+    id: "world-sample-abnormal-05",
+    name: "Abnormal Sample 05",
+    status: "danger",
+    type: "Sample Abnormal Equipment",
+  },
+];
+const WORLD_SAMPLE_ASSETS = WORLD_SAMPLE_MODEL_FILES.map((modelFile, index) => ({
+  ...DEMO_ASSETS[index],
+  ...WORLD_SAMPLE_ASSET_OVERRIDES[index],
+  modelFile,
+}));
+const REGISTERED_ASSET_SAMPLES = buildRegisteredAssetSamples(WORLD_SAMPLE_ASSETS, [
   {
     id: "registered-sample-motor-01",
     name: "Motor Unit A",
@@ -100,7 +154,7 @@ const REGISTERED_ASSET_SAMPLES = [
     status: "danger",
     type: "송풍 설비",
   },
-];
+]);
 const statusLabel = {
   caution: "요주의",
   danger: "이상",
@@ -114,9 +168,45 @@ const statusColor = {
   normal: "#67e8f9",
   warning: "#fde047",
 };
+function createWorldSampleModelFile({
+  id,
+  label,
+  normalizeSize = 3.8,
+  plyUrl,
+  textureUrl,
+}) {
+  return {
+    id,
+    label,
+    normalizeSize,
+    plyUrl,
+    textures: [
+      {
+        enabled: true,
+        id: `${id}-base-color`,
+        label: `${label} Texture`,
+        role: "baseColor",
+        source: textureUrl,
+        strength: 1,
+      },
+    ],
+  };
+}
+function buildRegisteredAssetSamples(sampleAssets, fallbackAssets) {
+  return sampleAssets.length
+    ? sampleAssets.map((asset) => ({
+        ...cloneWorldAsset(asset),
+        id: `registered-${asset.id}`,
+      }))
+    : fallbackAssets;
+}
 const WORLD_SIZE = { depth: 48, width: 72 };
 const EYE_HEIGHT = 3.4;
-const DEFAULT_ASSET_ROTATION_X = -90;
+const DEFAULT_ASSET_ROTATION = {
+  pitch: -64,
+  roll: -135,
+  yaw: 38,
+};
 const DEFAULT_CAMERA_VIEW_PRESET_ID = "person";
 const CAMERA_VIEW_PRESETS = [
   {
@@ -161,7 +251,8 @@ const DEFAULT_WORLD_SETTINGS = {
 };
 export function LocationWorldViewerPage({ assets, location, site }) {
   const storageKey = `checklab:location-world:${site.id}:${location.id}`;
-  const assetStorageKey = `${storageKey}:assets`;
+  const assetStorageKey = `${storageKey}:assets:v2`;
+  const placementStorageKey = `${storageKey}:placements:v2`;
   const settingsStorageKey = `${storageKey}:settings`;
   const initialAssets = useMemo(() => buildDisplayAssets(assets), [assets]);
   const [worldAssets, setWorldAssets] = useState(initialAssets);
@@ -185,7 +276,7 @@ export function LocationWorldViewerPage({ assets, location, site }) {
   useEffect(() => {
     const storedAssets = readStoredWorldAssets(assetStorageKey, initialAssets);
     setWorldAssets(storedAssets);
-    setPlacements(readStoredPlacements(storageKey, storedAssets));
+    setPlacements(readStoredPlacements(placementStorageKey, storedAssets));
     setWorldSettings(readStoredWorldSettings(settingsStorageKey));
     setSelectedAssetId((currentId) =>
       currentId && storedAssets.some((asset) => asset.id === currentId)
@@ -193,7 +284,7 @@ export function LocationWorldViewerPage({ assets, location, site }) {
         : (storedAssets[0]?.id ?? ""),
     );
     setIsSaved(true);
-  }, [assetStorageKey, initialAssets, settingsStorageKey, storageKey]);
+  }, [assetStorageKey, initialAssets, placementStorageKey, settingsStorageKey]);
   useEffect(() => {
     setPlacements((currentPlacements) =>
       mergePlacements(worldAssets, currentPlacements),
@@ -219,7 +310,7 @@ export function LocationWorldViewerPage({ assets, location, site }) {
     setIsSaved(false);
   };
   const handleSavePlacements = () => {
-    window.localStorage.setItem(storageKey, JSON.stringify(placements));
+    window.localStorage.setItem(placementStorageKey, JSON.stringify(placements));
     window.localStorage.setItem(assetStorageKey, JSON.stringify(worldAssets));
     window.localStorage.setItem(
       settingsStorageKey,
@@ -232,7 +323,7 @@ export function LocationWorldViewerPage({ assets, location, site }) {
     const nextPlacements = buildDefaultPlacements(nextAssets);
     setWorldAssets(nextAssets);
     setPlacements(nextPlacements);
-    window.localStorage.setItem(storageKey, JSON.stringify(nextPlacements));
+    window.localStorage.setItem(placementStorageKey, JSON.stringify(nextPlacements));
     window.localStorage.setItem(assetStorageKey, JSON.stringify(nextAssets));
     setIsSaved(true);
     setIsAddingAsset(false);
@@ -260,8 +351,9 @@ export function LocationWorldViewerPage({ assets, location, site }) {
     setPlacements((currentPlacements) => ({
       ...currentPlacements,
       [nextAsset.id]: {
-        rotationX: DEFAULT_ASSET_ROTATION_X,
-        rotationY: 0,
+        rotationX: DEFAULT_ASSET_ROTATION.pitch,
+        rotationY: DEFAULT_ASSET_ROTATION.yaw,
+        rotationZ: DEFAULT_ASSET_ROTATION.roll,
         x: clampNumber(
           position.x,
           -WORLD_SIZE.width / 2 + 3,
@@ -485,7 +577,7 @@ function LocationWorldScene({
 }) {
   const containerRef = useRef(null);
   const assetGroupsRef = useRef(new Map());
-  const baseModelRef = useRef(null);
+  const modelCacheRef = useRef(new Map());
   const keysRef = useRef(new Set());
   const sceneRef = useRef(null);
   const cameraStateRef = useRef({
@@ -521,8 +613,8 @@ function LocationWorldScene({
     assetsRef.current = assets;
     syncAssetModels({
       assets,
-      baseModel: baseModelRef.current,
       groups: assetGroupsRef.current,
+      modelCache: modelCacheRef.current,
       placements: placementsRef.current,
       scene: sceneRef.current,
       selectedAssetId: selectedAssetIdRef.current,
@@ -696,18 +788,23 @@ function LocationWorldScene({
     window.addEventListener("location-world-move", handleMoveEvent);
     renderer.domElement.addEventListener("pointerdown", handlePointerDown);
     renderer.domElement.addEventListener("pointermove", handlePointerMove);
-    new ModelLoader()
-      .loadModel(SAMPLE_MODEL_FILE)
-      .then((baseModel) => {
+    const modelLoader = new ModelLoader();
+    Promise.all(
+      getWorldAssetModelFiles(assetsRef.current).map(async (modelFile) => [
+        getModelFileKey(modelFile),
+        await modelLoader.loadModel(modelFile),
+      ]),
+    )
+      .then((modelEntries) => {
         if (isDisposed) {
-          disposeObject3D(baseModel);
+          modelEntries.forEach(([, model]) => disposeObject3D(model));
           return;
         }
-        baseModelRef.current = baseModel;
+        modelCacheRef.current = new Map(modelEntries);
         syncAssetModels({
           assets: assetsRef.current,
-          baseModel,
           groups: assetGroupsRef.current,
+          modelCache: modelCacheRef.current,
           placements: placementsRef.current,
           scene,
           selectedAssetId: selectedAssetIdRef.current,
@@ -762,13 +859,11 @@ function LocationWorldScene({
       resizeObserver.disconnect();
       keysRef.current.clear();
       assetGroupsRef.current.clear();
-      baseModelRef.current = null;
+      modelCacheRef.current.forEach((model) => disposeObject3D(model));
+      modelCacheRef.current.clear();
       sceneRef.current = null;
       if (renderer.domElement.parentNode === container) {
         container.removeChild(renderer.domElement);
-      }
-      if (baseModelRef.current) {
-        disposeObject3D(baseModelRef.current);
       }
       disposeObject3D(scene);
       renderer.dispose();
@@ -887,26 +982,36 @@ function WorldPlacementPanel({
           value={selectedPlacement.z}
         />
       </div>
-      <div className="LocationWorldViewerPage LocationWorldViewerPage__rotation-grid-1 grid grid-cols-2 gap-2">
+      <div className="LocationWorldViewerPage LocationWorldViewerPage__rotation-grid-1 grid grid-cols-3 gap-2">
         <WorldNumberField
-          label="X 회전"
+          label="Pitch"
           max={180}
           min={-180}
           onChange={(rotationX) =>
             onPlacementChange(selectedAsset.id, { rotationX })
           }
           suffix="°"
-          value={selectedPlacement.rotationX ?? 0}
+          value={selectedPlacement.rotationX ?? DEFAULT_ASSET_ROTATION.pitch}
         />
         <WorldNumberField
-          label="Y 회전"
+          label="Yaw"
           max={180}
           min={-180}
           onChange={(rotationY) =>
             onPlacementChange(selectedAsset.id, { rotationY })
           }
           suffix="°"
-          value={selectedPlacement.rotationY}
+          value={selectedPlacement.rotationY ?? DEFAULT_ASSET_ROTATION.yaw}
+        />
+        <WorldNumberField
+          label="Roll"
+          max={180}
+          min={-180}
+          onChange={(rotationZ) =>
+            onPlacementChange(selectedAsset.id, { rotationZ })
+          }
+          suffix="°"
+          value={selectedPlacement.rotationZ ?? DEFAULT_ASSET_ROTATION.roll}
         />
       </div>
       <div className="LocationWorldViewerPage LocationWorldViewerPage__summary-1 rounded-md border border-white/10 bg-white/[0.05] p-2 text-[11px] text-white/70">
@@ -915,8 +1020,9 @@ function WorldPlacementPanel({
         </p>
         <p className="LocationWorldViewerPage LocationWorldViewerPage__summary-line-1">
           위치 X {round(selectedPlacement.x)} / Z {round(selectedPlacement.z)} /
-          X 회전 {round(selectedPlacement.rotationX ?? 0)}° / Y 회전{" "}
-          {round(selectedPlacement.rotationY)}°
+          Pitch {round(selectedPlacement.rotationX ?? DEFAULT_ASSET_ROTATION.pitch)}°
+          / Yaw {round(selectedPlacement.rotationY ?? DEFAULT_ASSET_ROTATION.yaw)}°
+          / Roll {round(selectedPlacement.rotationZ ?? DEFAULT_ASSET_ROTATION.roll)}°
         </p>
         <p className="LocationWorldViewerPage LocationWorldViewerPage__summary-line-2">
           {selectedAsset.type} / {telemetry.camera} / {telemetry.temperature}°C
@@ -1666,15 +1772,29 @@ function createPlacementPreview() {
   group.visible = false;
   return group;
 }
+function getWorldAssetModelFiles(assets) {
+  const modelFilesByKey = new Map();
+  assets.forEach((asset) => {
+    const modelFile = asset.modelFile ?? WORLD_SAMPLE_MODEL_FILES[0];
+    modelFilesByKey.set(getModelFileKey(modelFile), modelFile);
+  });
+  return Array.from(modelFilesByKey.values());
+}
+function getCachedModelForAsset(asset, modelCache) {
+  return modelCache.get(getModelFileKey(asset.modelFile ?? WORLD_SAMPLE_MODEL_FILES[0]));
+}
+function getModelFileKey(modelFile) {
+  return modelFile.id ?? modelFile.plyUrl;
+}
 function syncAssetModels({
   assets,
-  baseModel,
   groups,
+  modelCache,
   placements,
   scene,
   selectedAssetId,
 }) {
-  if (!baseModel || !scene) {
+  if (!scene || !modelCache?.size) {
     return;
   }
   const assetIds = new Set(assets.map((asset) => asset.id));
@@ -1686,6 +1806,10 @@ function syncAssetModels({
     }
   });
   assets.forEach((asset, index) => {
+    const baseModel = getCachedModelForAsset(asset, modelCache);
+    if (!baseModel) {
+      return;
+    }
     let group = groups.get(asset.id);
     if (!group) {
       group = createAssetModel(asset, baseModel);
@@ -1739,7 +1863,12 @@ function createAssetModel(asset, baseModel) {
   root.userData.model = model;
   root.userData.platform = platform;
   root.userData.selectionRing = selectionRing;
-  model.rotation.x = THREE.MathUtils.degToRad(DEFAULT_ASSET_ROTATION_X);
+  model.rotation.order = "XYZ";
+  model.rotation.set(
+    THREE.MathUtils.degToRad(DEFAULT_ASSET_ROTATION.pitch),
+    THREE.MathUtils.degToRad(DEFAULT_ASSET_ROTATION.yaw),
+    THREE.MathUtils.degToRad(DEFAULT_ASSET_ROTATION.roll),
+  );
   model.position.y = 2.06;
   model.traverse((object) => {
     object.userData.assetId = asset.id;
@@ -1854,10 +1983,20 @@ function updateNearestAssetFocus({
 }
 function applyPlacement(group, placement) {
   group.position.set(placement.x, 0, placement.z);
-  group.rotation.y = THREE.MathUtils.degToRad(placement.rotationY ?? 0);
+  group.rotation.y = 0;
   if (group.userData.model) {
-    group.userData.model.rotation.x =
-      THREE.MathUtils.degToRad(placement.rotationX ?? DEFAULT_ASSET_ROTATION_X);
+    group.userData.model.rotation.order = "XYZ";
+    group.userData.model.rotation.set(
+      THREE.MathUtils.degToRad(
+        placement.rotationX ?? DEFAULT_ASSET_ROTATION.pitch,
+      ),
+      THREE.MathUtils.degToRad(
+        placement.rotationY ?? DEFAULT_ASSET_ROTATION.yaw,
+      ),
+      THREE.MathUtils.degToRad(
+        placement.rotationZ ?? DEFAULT_ASSET_ROTATION.roll,
+      ),
+    );
   }
 }
 function updateProjectedCards({
@@ -2053,47 +2192,20 @@ function findAssetId(object) {
   }
   return undefined;
 }
-function buildDisplayAssets(assets) {
-  const normalizedAssets = assets.map((asset) => ({
+function cloneWorldAsset(asset) {
+  return {
     ...asset,
-    status: asset.status ?? "normal",
-    type: asset.type || "설비",
-  }));
-  const existingIds = new Set(normalizedAssets.map((asset) => asset.id));
-  const hasAbnormalAsset = normalizedAssets.some(
-    (asset) => getWorldStatusSeverity(asset.status) >= 2,
-  );
-  let demoAssets = DEMO_ASSETS.filter((asset) => !existingIds.has(asset.id));
-  if (!hasAbnormalAsset) {
-    const abnormalDemoAsset = demoAssets.find(
-      (asset) => asset.id === ABNORMAL_DEMO_ASSET_ID,
-    );
-    if (abnormalDemoAsset) {
-      demoAssets = [
-        abnormalDemoAsset,
-        ...demoAssets.filter((asset) => asset.id !== ABNORMAL_DEMO_ASSET_ID),
-      ];
-    }
-  }
-  const targetAssetCount = Math.max(
-    5,
-    normalizedAssets.length + (hasAbnormalAsset ? 0 : 1),
-  );
-  return ensureAbnormalDemoAsset(
-    [...normalizedAssets, ...demoAssets].slice(0, targetAssetCount),
-  );
+    modelFile: cloneWorldModelFile(asset.modelFile),
+  };
 }
-function ensureAbnormalDemoAsset(assets) {
-  if (assets.some((asset) => getWorldStatusSeverity(asset.status) >= 2)) {
-    return assets;
-  }
-  if (assets.some((asset) => asset.id === ABNORMAL_DEMO_ASSET_ID)) {
-    return assets;
-  }
-  const abnormalDemoAsset = DEMO_ASSETS.find(
-    (asset) => asset.id === ABNORMAL_DEMO_ASSET_ID,
-  );
-  return abnormalDemoAsset ? [...assets, abnormalDemoAsset] : assets;
+function cloneWorldModelFile(modelFile) {
+  return {
+    ...modelFile,
+    textures: modelFile.textures?.map((texture) => ({ ...texture })) ?? [],
+  };
+}
+function buildDisplayAssets() {
+  return WORLD_SAMPLE_ASSETS.map(cloneWorldAsset);
 }
 function readStoredWorldAssets(storageKey, fallbackAssets) {
   if (typeof window === "undefined") {
@@ -2108,13 +2220,14 @@ function readStoredWorldAssets(storageKey, fallbackAssets) {
     if (!Array.isArray(parsedValue)) {
       return fallbackAssets;
     }
-    return ensureAbnormalDemoAsset(
-      parsedValue.map((asset) => ({
-        ...asset,
-        status: asset.status ?? "normal",
-        type: asset.type || "설비",
-      })),
-    );
+    return parsedValue.map((asset) => ({
+      ...asset,
+      modelFile: asset.modelFile
+        ? cloneWorldModelFile(asset.modelFile)
+        : cloneWorldModelFile(WORLD_SAMPLE_MODEL_FILES[0]),
+      status: asset.status ?? "normal",
+      type: asset.type || "설비",
+    }));
   } catch {
     return fallbackAssets;
   }
@@ -2169,8 +2282,9 @@ function buildDefaultPlacement(index) {
   const column = index % columns;
   const row = Math.floor(index / columns);
   return {
-    rotationX: DEFAULT_ASSET_ROTATION_X,
-    rotationY: [-18, 14, -8, 22, 0, -28][index % 6],
+    rotationX: DEFAULT_ASSET_ROTATION.pitch,
+    rotationY: DEFAULT_ASSET_ROTATION.yaw,
+    rotationZ: DEFAULT_ASSET_ROTATION.roll,
     x: -18 + column * 18,
     z: -12 + row * 13,
   };
@@ -2188,6 +2302,11 @@ function sanitizePlacement(placement, index) {
     ),
     rotationY: clampNumber(
       readNumber(placement.rotationY, fallback.rotationY),
+      -180,
+      180,
+    ),
+    rotationZ: clampNumber(
+      readNumber(placement.rotationZ, fallback.rotationZ),
       -180,
       180,
     ),

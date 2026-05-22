@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { MainLayout } from "@/app/layouts/main-layout";
-import { buildBackendHeaderState, fetchBackendWorkflowTree, findLocationNode, findSiteNode, toAssetModel, toLocationModel, toSiteModel, } from "@/app/site/utils/backend-workflow";
+import { buildBackendHeaderState, fetchBackendWorkflowTree, findAssetPathNode, findLocationNode, findSiteNode, toAssetModel, toLocationModel, toSiteModel, } from "@/app/site/utils/backend-workflow";
 import { fetchSite, fetchSiteLocation, fetchSiteLocationAssets, } from "@/app/site/services/site-management-api";
 import { LocationSummaryPage } from "@/app/site/[site_id]/location/[locationId]/components/location-summary-page";
 const dashboardStatuses = [
@@ -53,7 +53,7 @@ export default async function LocationPage({ params }) {
         ? toLocationModelFromDetail(locationDetail)
         : toLocationModel(siteNode, locationNode);
     const assets = locationAssets.length
-        ? locationAssets.map(toAssetModelFromSummary)
+        ? locationAssets.map((asset) => toAssetModelFromSummary(asset, monitoringTree))
         : (locationNode?.children ?? []).map((assetNode) => toAssetModel({
             assetNode,
             locationNode: locationNode,
@@ -99,10 +99,12 @@ function toLocationModelFromDetail(location) {
         summary: "",
     };
 }
-function toAssetModelFromSummary(asset) {
+function toAssetModelFromSummary(asset, monitoringTree) {
+    const treeAssetNode = findAssetPathNode(monitoringTree, asset.asset_id)?.assetNode;
     return {
         asset_id: asset.asset_id,
-        href: `/site/${encodeURIComponent(asset.site_id)}/location/${encodeURIComponent(asset.location_id)}/asset/${encodeURIComponent(asset.asset_id)}`,
+        href: treeAssetNode?.href ??
+            `/site/${encodeURIComponent(asset.site_id)}/location/${encodeURIComponent(asset.location_id)}/asset/${encodeURIComponent(asset.asset_id)}`,
         id: asset.asset_id,
         lastCollectedAt: "수집 대기",
         locationId: asset.location_id,

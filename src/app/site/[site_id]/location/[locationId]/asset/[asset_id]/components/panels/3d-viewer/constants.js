@@ -72,7 +72,7 @@ export const DEFAULT_VIEWER_3D_CONFIG = {
         opacity: 1,
         receiveShadow: false,
         roughness: 0.72,
-        rotation: { x: -90, y: 0, z: 0 },
+        rotation: { x: -64, y: 38, z: -135 },
         scale: 1,
         textureBlend: 1,
         wireframe: false,

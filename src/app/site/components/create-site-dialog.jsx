@@ -36,16 +36,23 @@ export function buildCreatePreviewSite({
   site,
 }) {
   const normalizedLocations = appendCurrentLocation(locations, location);
-  const targetLocationKey = assetLocationKey ?? normalizedLocations[0]?._clientId;
+  const targetLocationKey =
+    assetLocationKey ?? normalizedLocations[0]?._clientId;
   const normalizedAssets = appendCurrentAsset(assets, asset, targetLocationKey);
-  const assetsByLocationKey = normalizedAssets.reduce((groupedAssets, nextAsset) => {
-    const locationKey = nextAsset._locationKey;
-    if (!locationKey) return groupedAssets;
-    return {
-      ...groupedAssets,
-      [locationKey]: [...(groupedAssets[locationKey] ?? []), stripAssetMeta(nextAsset)],
-    };
-  }, {});
+  const assetsByLocationKey = normalizedAssets.reduce(
+    (groupedAssets, nextAsset) => {
+      const locationKey = nextAsset._locationKey;
+      if (!locationKey) return groupedAssets;
+      return {
+        ...groupedAssets,
+        [locationKey]: [
+          ...(groupedAssets[locationKey] ?? []),
+          stripAssetMeta(nextAsset),
+        ],
+      };
+    },
+    {},
+  );
 
   return normalizeSite({
     ...site,
@@ -56,7 +63,7 @@ export function buildCreatePreviewSite({
             ...nextLocation,
             assets: isAssetSkipped
               ? []
-              : assetsByLocationKey[nextLocation._clientId] ?? [],
+              : (assetsByLocationKey[nextLocation._clientId] ?? []),
           }),
         ),
   });
@@ -151,7 +158,9 @@ export function CreateSiteDialog({
       <div className="CreateSiteDialog CreateSiteDialog__panel-1 grid h-[min(90dvh,46rem)] w-[min(56rem,calc(100dvw-1.5rem))] min-h-0 grid-rows-[auto_auto_minmax(0,1fr)_auto] overflow-hidden rounded-md border border-border bg-card text-card-foreground shadow-2xl">
         <header className="CreateSiteDialog CreateSiteDialog__header-1 flex h-14 min-w-0 items-center justify-between gap-3 border-b border-border px-4">
           <div className="CreateSiteDialog min-w-0">
-            <h2 className="CreateSiteDialog truncate text-base font-semibold">공정 생성</h2>
+            <h2 className="CreateSiteDialog truncate text-base font-semibold">
+              공정 생성
+            </h2>
             <p className="CreateSiteDialog truncate text-xs text-muted-foreground">
               입력한 구성은 마지막 요약 단계에서 한 번에 저장됩니다.
             </p>
@@ -253,7 +262,9 @@ function SiteCreateStep({ site, onSiteChange }) {
       />
       <TextField
         label="공정명 *"
-        onChange={(value) => onSiteChange((current) => ({ ...current, name: value }))}
+        onChange={(value) =>
+          onSiteChange((current) => ({ ...current, name: value }))
+        }
         placeholder="압축 공정"
         value={site.name}
       />
@@ -292,7 +303,10 @@ function LocationCreateStep({
         title="2. 위치 등록"
         description="위치명만 필수입니다. 여러 위치를 추가한 뒤 설비 단계로 이동할 수 있습니다."
       />
-      <DraftLocationList locations={locations} onRemoveLocation={onRemoveLocation} />
+      <DraftLocationList
+        locations={locations}
+        onRemoveLocation={onRemoveLocation}
+      />
       <div className="CreateSiteDialog grid gap-5 sm:grid-cols-2">
         <TextField
           label="위치명 *"
@@ -385,7 +399,9 @@ function AssetCreateStep({
       <div className="CreateSiteDialog grid gap-5 sm:grid-cols-2">
         <TextField
           label="설비명 *"
-          onChange={(value) => onAssetChange((current) => ({ ...current, name: value }))}
+          onChange={(value) =>
+            onAssetChange((current) => ({ ...current, name: value }))
+          }
           placeholder="압축기 1호기"
           value={asset.name}
         />
@@ -427,7 +443,9 @@ function AssetCreateStep({
         />
         <TextField
           label="유형"
-          onChange={(value) => onAssetChange((current) => ({ ...current, type: value }))}
+          onChange={(value) =>
+            onAssetChange((current) => ({ ...current, type: value }))
+          }
           placeholder="회전 설비"
           value={asset.type}
         />
@@ -446,7 +464,10 @@ function AssetCreateStep({
         <TextField
           label="비상 연락처"
           onChange={(value) =>
-            onAssetChange((current) => ({ ...current, emergency_contact: value }))
+            onAssetChange((current) => ({
+              ...current,
+              emergency_contact: value,
+            }))
           }
           placeholder="010-0000-0000"
           value={asset.emergency_contact}
@@ -454,7 +475,10 @@ function AssetCreateStep({
         <TextField
           label="마지막 점검일"
           onChange={(value) =>
-            onAssetChange((current) => ({ ...current, last_inspection_date: value }))
+            onAssetChange((current) => ({
+              ...current,
+              last_inspection_date: value,
+            }))
           }
           type="date"
           value={asset.last_inspection_date}
@@ -498,7 +522,9 @@ function DraftLocationList({ locations, onRemoveLocation }) {
 
   return (
     <div className="CreateSiteDialog grid gap-2">
-      <p className="CreateSiteDialog text-xs font-semibold text-muted-foreground">추가된 위치</p>
+      <p className="CreateSiteDialog text-xs font-semibold text-muted-foreground">
+        추가된 위치
+      </p>
       <div className="CreateSiteDialog grid gap-2">
         {locations.map((location, index) => (
           <div
@@ -538,7 +564,9 @@ function DraftAssetList({ assets, locations, onRemoveAsset }) {
 
   return (
     <div className="CreateSiteDialog grid gap-2">
-      <p className="CreateSiteDialog text-xs font-semibold text-muted-foreground">추가된 설비</p>
+      <p className="CreateSiteDialog text-xs font-semibold text-muted-foreground">
+        추가된 설비
+      </p>
       <div className="CreateSiteDialog grid gap-2">
         {assets.map((asset, index) => (
           <div
@@ -569,11 +597,7 @@ function DraftAssetList({ assets, locations, onRemoveAsset }) {
   );
 }
 
-function CreateSummaryStep({
-  isAssetSkipped,
-  isLocationSkipped,
-  previewSite,
-}) {
+function CreateSummaryStep({ isAssetSkipped, isLocationSkipped, previewSite }) {
   const locationRows = previewSite.locations.length
     ? previewSite.locations.flatMap((location, index) => [
         [`위치 ${index + 1}`, location.name],
@@ -588,13 +612,18 @@ function CreateSummaryStep({
         asset.name,
         asset.asset_code ? `코드 ${asset.asset_code}` : "",
         asset.asset_number ? `자산 ${asset.asset_number}` : "",
-      ].filter(Boolean).join(" / "),
+      ]
+        .filter(Boolean)
+        .join(" / "),
     ]),
   );
 
   return (
     <div className="CreateSiteDialog grid gap-4">
-      <StepHeading title="생성 요약" description="아래 내용으로 공정을 생성합니다." />
+      <StepHeading
+        title="생성 요약"
+        description="아래 내용으로 공정을 생성합니다."
+      />
       <div className="CreateSiteDialog grid gap-3 md:grid-cols-3">
         <SummaryBlock
           icon={Factory}
@@ -612,9 +641,11 @@ function CreateSummaryStep({
         <SummaryBlock
           icon={Cpu}
           title="설비"
-          rows={isLocationSkipped || isAssetSkipped || !assetRows.length
-            ? [["등록 여부", "건너뜀"]]
-            : assetRows}
+          rows={
+            isLocationSkipped || isAssetSkipped || !assetRows.length
+              ? [["등록 여부", "건너뜀"]]
+              : assetRows
+          }
         />
       </div>
     </div>
@@ -680,8 +711,9 @@ function CreateDialogFooter({
 function StepHeading({ description, title }) {
   return (
     <div>
-      <h3 className="CreateSiteDialog text-sm font-semibold text-foreground">{title}</h3>
-      <p className="CreateSiteDialog mt-1 text-xs text-muted-foreground">{description}</p>
+      <h3 className="CreateSiteDialog text-sm font-semibold text-foreground">
+        {title}
+      </h3>
     </div>
   );
 }
@@ -719,7 +751,9 @@ function SummaryBlock({ icon: Icon, rows, title }) {
         <span className="CreateSiteDialog grid h-8 w-8 place-items-center rounded-md border border-border bg-card">
           <Icon className="CreateSiteDialog h-4 w-4" aria-hidden="true" />
         </span>
-        <h4 className="CreateSiteDialog truncate text-sm font-semibold">{title}</h4>
+        <h4 className="CreateSiteDialog truncate text-sm font-semibold">
+          {title}
+        </h4>
       </div>
       <div className="CreateSiteDialog grid gap-2">
         {rows.map(([label, value], index) => (

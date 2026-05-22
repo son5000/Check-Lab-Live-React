@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowDown, ArrowUp, Box, ChevronLeft, ChevronRight, Gauge, MapPinned, Pause, Play, SlidersHorizontal, } from "lucide-react";
+import { Box, ChevronLeft, ChevronRight, Gauge, GripVertical, MapPinned, Pause, Play, SlidersHorizontal, } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AssetPartList } from "./summary/asset-part-list";
 import { judgementClassName, judgementLabel, } from "./summary/judgement";
@@ -11,22 +11,92 @@ const DEFAULT_SUMMARY_METRIC_ORDER = [
     "temperature",
     "assetPart",
 ];
+const SUMMARY_METRIC_ORDER_STORAGE_KEY = "checklab.assetDetailSummary.metricOrder.v1";
 const summaryMetricCardLabels = {
     assetPart: "파트",
     temperature: "온도",
     ultrasound: "초음파",
 };
-export function AssetSummaryPanel({ averageTemperature, assetParts, assetPartStates, assetThresholds, assetJudgement, asset, isSimplified = false, isThresholdSaving = false, temperatureMax, temperatureMin, thresholdSaveError, ultrasoundAverageDb, ultrasoundDetectionCount, ultrasoundMax, selectedAssetPartId, onAssetPartSelect, onAssetThresholdSave, onThresholdEditorDirtyChange, onStartAssetPart, variant = "full", }) {
+function readSummaryMetricOrderFromStorage() {
+    if (typeof window === "undefined") {
+        return [...DEFAULT_SUMMARY_METRIC_ORDER];
+    }
+    try {
+        const storedValue = window.localStorage.getItem(SUMMARY_METRIC_ORDER_STORAGE_KEY);
+        return storedValue
+            ? normalizeSummaryMetricOrder(JSON.parse(storedValue))
+            : [...DEFAULT_SUMMARY_METRIC_ORDER];
+    }
+    catch {
+        return [...DEFAULT_SUMMARY_METRIC_ORDER];
+    }
+}
+function writeSummaryMetricOrderToStorage(order) {
+    if (typeof window === "undefined") {
+        return;
+    }
+    try {
+        window.localStorage.setItem(SUMMARY_METRIC_ORDER_STORAGE_KEY, JSON.stringify(normalizeSummaryMetricOrder(order)));
+    }
+    catch {
+        // Local storage can be unavailable in constrained browser modes.
+    }
+}
+function normalizeSummaryMetricOrder(order) {
+    const nextOrder = [];
+    if (Array.isArray(order)) {
+        for (const metricId of order) {
+            if (DEFAULT_SUMMARY_METRIC_ORDER.includes(metricId) && !nextOrder.includes(metricId)) {
+                nextOrder.push(metricId);
+            }
+        }
+    }
+    for (const metricId of DEFAULT_SUMMARY_METRIC_ORDER) {
+        if (!nextOrder.includes(metricId)) {
+            nextOrder.push(metricId);
+        }
+    }
+    return nextOrder;
+}
+function reorderSummaryMetricOrder(order, sourceMetricId, targetMetricId, placement) {
+    if (!sourceMetricId || !targetMetricId || sourceMetricId === targetMetricId) {
+        return order;
+    }
+    const nextOrder = normalizeSummaryMetricOrder(order);
+    const sourceIndex = nextOrder.indexOf(sourceMetricId);
+    const targetIndex = nextOrder.indexOf(targetMetricId);
+    if (sourceIndex < 0 || targetIndex < 0) {
+        return nextOrder;
+    }
+    const [movedMetricId] = nextOrder.splice(sourceIndex, 1);
+    const adjustedTargetIndex = nextOrder.indexOf(targetMetricId);
+    nextOrder.splice(placement === "after" ? adjustedTargetIndex + 1 : adjustedTargetIndex, 0, movedMetricId);
+    return nextOrder;
+}
+export function AssetSummaryPanel({ averageTemperature, assetParts, assetPartStates, assetThresholds, assetJudgement, asset, isSimplified = false, isThresholdSaving = false, temperatureMax, temperatureMin, thresholdSaveError, ultrasoundAverageDb, ultrasoundDetectionCount, ultrasoundMax, selectedAssetPartId, onAssetPartSelect, onAssetThresholdSave, onThresholdEditorDirtyChange, variant = "full", }) {
     const [isThresholdEditorOpen, setIsThresholdEditorOpen] = useState(false);
     const [activeDetectionMetricIndex, setActiveDetectionMetricIndex] = useState(0);
     const [isDetectionMetricPlaying, setIsDetectionMetricPlaying] = useState(true);
     const [summaryMetricOrder, setSummaryMetricOrder] = useState(DEFAULT_SUMMARY_METRIC_ORDER);
+    const [isSummaryMetricOrderLoaded, setIsSummaryMetricOrderLoaded] = useState(false);
+    const [draggingSummaryMetricId, setDraggingSummaryMetricId] = useState();
+    const [dropTargetSummaryMetricId, setDropTargetSummaryMetricId] = useState();
     const isTemperatureExceeded = assetThresholds
         ? isCriticalThresholdExceeded(averageTemperature, assetThresholds.temperature, assetThresholds.temperatureCritical)
         : false;
     const isUltrasoundExceeded = assetThresholds
         ? isCriticalThresholdExceeded(ultrasoundAverageDb, assetThresholds.ultrasoundDb, assetThresholds.ultrasoundCriticalDb)
         : false;
+    useEffect(() => {
+        setSummaryMetricOrder(readSummaryMetricOrderFromStorage());
+        setIsSummaryMetricOrderLoaded(true);
+    }, []);
+    useEffect(() => {
+        if (!isSummaryMetricOrderLoaded) {
+            return;
+        }
+        writeSummaryMetricOrderToStorage(summaryMetricOrder);
+    }, [isSummaryMetricOrderLoaded, summaryMetricOrder]);
     useEffect(() => {
         if (!assetParts.length) {
             setActiveDetectionMetricIndex(0);
@@ -73,6 +143,55 @@ export function AssetSummaryPanel({ averageTemperature, assetParts, assetPartSta
             }
             return (<AssetPartMetricCarousel key={metricId} activeIndex={activeDetectionMetricIndex} partStates={assetPartStates} parts={assetParts} slideOptions={detectionSlideOptions}/>);
         };
+        const moveSummaryMetric = (sourceMetricId, targetMetricId, placement) => {
+            setSummaryMetricOrder((currentOrder) => reorderSummaryMetricOrder(currentOrder, sourceMetricId, targetMetricId, placement));
+        };
+        const handleSummaryMetricDragStart = (event, metricId) => {
+            event.dataTransfer.effectAllowed = "move";
+            event.dataTransfer.setData("text/plain", metricId);
+            setDraggingSummaryMetricId(metricId);
+            setDropTargetSummaryMetricId(metricId);
+        };
+        const handleSummaryMetricDragOver = (event, metricId) => {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "move";
+            setDropTargetSummaryMetricId((currentMetricId) => currentMetricId === metricId ? currentMetricId : metricId);
+        };
+        const handleSummaryMetricDrop = (event, targetMetricId) => {
+            event.preventDefault();
+            const sourceMetricId = event.dataTransfer.getData("text/plain") || draggingSummaryMetricId;
+            const targetBounds = event.currentTarget.getBoundingClientRect();
+            const placement = event.clientY > targetBounds.top + targetBounds.height / 2 ? "after" : "before";
+            moveSummaryMetric(sourceMetricId, targetMetricId, placement);
+            setDraggingSummaryMetricId(undefined);
+            setDropTargetSummaryMetricId(undefined);
+        };
+        const handleSummaryMetricDragEnd = () => {
+            setDraggingSummaryMetricId(undefined);
+            setDropTargetSummaryMetricId(undefined);
+        };
+        const handleSummaryMetricHandleKeyDown = (event, metricId) => {
+            if (event.key !== "ArrowUp" && event.key !== "ArrowDown") {
+                return;
+            }
+            event.preventDefault();
+            const currentIndex = summaryMetricOrder.indexOf(metricId);
+            const targetMetricId = summaryMetricOrder[currentIndex + (event.key === "ArrowUp" ? -1 : 1)];
+            if (!targetMetricId) {
+                return;
+            }
+            moveSummaryMetric(metricId, targetMetricId, event.key === "ArrowUp" ? "before" : "after");
+        };
+        const renderDraggableSummaryMetricCard = (metricId) => (<div key={metricId} className={cn("AssetDetailSummaryPanel AssetDetailSummaryPanel__metric-card-wrap-1 relative min-h-0 min-w-0 overflow-hidden rounded-md transition", draggingSummaryMetricId === metricId && "opacity-70", dropTargetSummaryMetricId === metricId && draggingSummaryMetricId !== metricId && "ring-2 ring-primary/45 ring-offset-1 ring-offset-background")} onDragEnter={(event) => handleSummaryMetricDragOver(event, metricId)} onDragOver={(event) => handleSummaryMetricDragOver(event, metricId)} onDragLeave={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget)) {
+                    setDropTargetSummaryMetricId(undefined);
+                }
+            }} onDrop={(event) => handleSummaryMetricDrop(event, metricId)}>
+          {renderSummaryMetricCard(metricId)}
+          <button type="button" draggable className={cn("AssetDetailSummaryPanel AssetDetailSummaryPanel__drag-handle-1 absolute right-2 top-2 z-20 grid h-6 w-6 shrink-0 cursor-grab touch-none place-items-center rounded-sm border border-border bg-background/90 text-muted-foreground shadow-sm backdrop-blur transition hover:bg-accent hover:text-foreground active:cursor-grabbing", draggingSummaryMetricId === metricId && "cursor-grabbing border-primary text-primary")} aria-label={`${summaryMetricCardLabels[metricId]} 카드 순서 변경`} title="드래그해서 순서 변경" onDragStart={(event) => handleSummaryMetricDragStart(event, metricId)} onDragEnd={handleSummaryMetricDragEnd} onKeyDown={(event) => handleSummaryMetricHandleKeyDown(event, metricId)}>
+            <GripVertical className="AssetDetailSummaryPanel AssetDetailSummaryPanel__drag-icon-1 h-3.5 w-3.5" aria-hidden="true"/>
+          </button>
+        </div>);
         return (<section className="AssetDetailSummaryPanel AssetDetailSummaryPanel__section-1 relative flex min-h-0 min-w-0 flex-col overflow-hidden rounded-md border border-border bg-card p-2 text-card-foreground">
         <div className="AssetDetailSummaryPanel AssetDetailSummaryPanel__container-1 mb-2 flex min-w-0 items-center justify-between gap-2">
           <div className="AssetDetailSummaryPanel AssetDetailSummaryPanel__container-2 min-w-0">
@@ -91,17 +210,16 @@ export function AssetSummaryPanel({ averageTemperature, assetParts, assetPartSta
         </div>
         {isThresholdEditorOpen ? (<div id="asset-threshold-popover" className="AssetDetailSummaryPanel AssetDetailSummaryPanel__popover-1 absolute right-2 top-10 z-20 grid max-h-[calc(100%-2.75rem)] w-[min(22rem,calc(100%-1rem))] gap-2 overflow-y-auto overscroll-contain rounded-md shadow-2xl [scrollbar-width:thin]">
             <ThresholdEditor isSaving={isThresholdSaving} onDirtyChange={onThresholdEditorDirtyChange} saveError={thresholdSaveError} thresholds={assetThresholds} temperatureExceeded={isTemperatureExceeded} ultrasoundExceeded={isUltrasoundExceeded} onClose={() => setIsThresholdEditorOpen(false)} onSave={onAssetThresholdSave}/>
-            <SummaryMetricOrderEditor order={summaryMetricOrder} onOrderChange={setSummaryMetricOrder}/>
           </div>) : null}
         <div className="AssetDetailSummaryPanel AssetDetailSummaryPanel__container-3 grid min-h-0 flex-1 grid-rows-3 gap-2 overflow-hidden">
-          {summaryMetricOrder.map(renderSummaryMetricCard)}
+          {summaryMetricOrder.map(renderDraggableSummaryMetricCard)}
         </div>
       </section>);
     }
     if (variant === "detection") {
         return (<section className="AssetDetailSummaryPanel AssetDetailSummaryPanel__section-1 grid h-full min-h-0 min-w-0 grid-rows-[minmax(0,2fr)_minmax(0,3fr)] gap-2 overflow-hidden rounded-md border border-border bg-card p-2 text-card-foreground">
         <div className="AssetDetailSummaryPanel AssetDetailSummaryPanel__container-5 min-h-0 min-w-0 overflow-hidden">
-          <AssetPartList parts={assetParts} partStates={assetPartStates} selectedPartId={selectedAssetPartId} onPartSelect={onAssetPartSelect} onStartAssetPart={onStartAssetPart}/>
+          <AssetPartList parts={assetParts} partStates={assetPartStates} selectedPartId={selectedAssetPartId} onPartSelect={onAssetPartSelect}/>
         </div>
         <AssetAssetInfoSection asset={asset}/>
       </section>);
@@ -121,49 +239,6 @@ export function AssetSummaryPanel({ averageTemperature, assetParts, assetPartSta
       <div className="AssetDetailSummaryPanel AssetDetailSummaryPanel__row-3 min-h-0 overflow-hidden p-2">
         <AssetPartMetricCarousel activeIndex={activeDetectionMetricIndex} partStates={assetPartStates} parts={assetParts}/>
       </div>
-    </section>);
-}
-function SummaryMetricOrderEditor({ order, onOrderChange, }) {
-    const moveItem = (fromIndex, toIndex) => {
-        if (toIndex < 0 || toIndex >= order.length) {
-            return;
-        }
-        const nextOrder = [...order];
-        const [movedItem] = nextOrder.splice(fromIndex, 1);
-        if (!movedItem) {
-            return;
-        }
-        nextOrder.splice(toIndex, 0, movedItem);
-        onOrderChange(nextOrder);
-    };
-    return (<section className="SummaryMetricOrderEditor SummaryMetricOrderEditor__section-1 rounded-md border border-border bg-background p-1.5">
-      <div className="SummaryMetricOrderEditor SummaryMetricOrderEditor__header-1 mb-1.5 flex min-w-0 items-center justify-between gap-2">
-        <h2 className="SummaryMetricOrderEditor SummaryMetricOrderEditor__title-1 truncate text-xs font-semibold">
-          요약 카드 순서
-        </h2>
-        <span className="SummaryMetricOrderEditor SummaryMetricOrderEditor__label-1 shrink-0 rounded-sm border border-border bg-card px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-          {order.length}
-        </span>
-      </div>
-
-      <ol className="SummaryMetricOrderEditor SummaryMetricOrderEditor__list-1 grid gap-1.5">
-        {order.map((metricId, index) => (<li key={metricId} className="SummaryMetricOrderEditor SummaryMetricOrderEditor__item-1 grid min-w-0 grid-cols-[1.5rem_minmax(0,1fr)_auto] items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1.5">
-            <span className="SummaryMetricOrderEditor SummaryMetricOrderEditor__index-1 font-mono text-[10px] font-bold text-muted-foreground">
-              {index + 1}
-            </span>
-            <span className="SummaryMetricOrderEditor SummaryMetricOrderEditor__text-1 min-w-0 truncate text-[11px] font-semibold">
-              {summaryMetricCardLabels[metricId]}
-            </span>
-            <span className="SummaryMetricOrderEditor SummaryMetricOrderEditor__actions-1 flex shrink-0 items-center gap-1">
-              <button type="button" className="SummaryMetricOrderEditor SummaryMetricOrderEditor__button-1 grid h-6 w-6 place-items-center rounded-sm border border-border bg-background text-muted-foreground transition hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40" aria-label={`${summaryMetricCardLabels[metricId]} 위로 이동`} title="위로 이동" disabled={index === 0} onClick={() => moveItem(index, index - 1)}>
-                <ArrowUp className="SummaryMetricOrderEditor SummaryMetricOrderEditor__icon-1 h-3.5 w-3.5" aria-hidden="true"/>
-              </button>
-              <button type="button" className="SummaryMetricOrderEditor SummaryMetricOrderEditor__button-2 grid h-6 w-6 place-items-center rounded-sm border border-border bg-background text-muted-foreground transition hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40" aria-label={`${summaryMetricCardLabels[metricId]} 아래로 이동`} title="아래로 이동" disabled={index === order.length - 1} onClick={() => moveItem(index, index + 1)}>
-                <ArrowDown className="SummaryMetricOrderEditor SummaryMetricOrderEditor__icon-2 h-3.5 w-3.5" aria-hidden="true"/>
-              </button>
-            </span>
-          </li>))}
-      </ol>
     </section>);
 }
 function AssetAssetInfoSection({ asset, }) {
@@ -231,7 +306,7 @@ function AssetPartMetricCarousel({ activeIndex, parts, partStates, slideOptions,
         <div className="h-[3px] w-full shrink-0 bg-muted-foreground/25"/>
         <div className="flex min-w-0 items-center justify-between gap-2 border-b border-border/40 px-3 py-1.5">
           <p className="min-w-0 flex-1 truncate text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-            감지 데이터
+            관심 영역
           </p>
           {slideOptions ? (<MetricSlideControls slideOptions={slideOptions}/>) : null}
           <span className="flex flex-1 justify-end">
@@ -260,7 +335,7 @@ function AssetPartMetricCarousel({ activeIndex, parts, partStates, slideOptions,
       <div className="flex min-w-0 items-center justify-between gap-2 border-b border-border/40 px-3 py-1.5">
         <div className="min-w-0 flex-1">
           <p className="min-w-0 truncate text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-            감지 데이터
+            관심 영역
           </p>
           <p className="truncate text-xs font-semibold">{activePart.name}</p>
         </div>

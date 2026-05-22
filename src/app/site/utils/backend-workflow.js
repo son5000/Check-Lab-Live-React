@@ -18,6 +18,23 @@ export function findLocationNode(siteNode, locationId) {
 export function findAssetNode(locationNode, asset_id) {
     return (locationNode.children ?? []).find((node) => node.type === "asset" && node.id === asset_id);
 }
+export function findAssetPathNode(tree, asset_id) {
+    for (const siteNode of tree.children ?? []) {
+        if (siteNode.type !== "site") {
+            continue;
+        }
+        for (const locationNode of siteNode.children ?? []) {
+            if (locationNode.type !== "place") {
+                continue;
+            }
+            const assetNode = findAssetNode(locationNode, asset_id);
+            if (assetNode) {
+                return { assetNode, locationNode, siteNode };
+            }
+        }
+    }
+    return undefined;
+}
 export function toSiteModel(siteNode) {
     const locations = siteNode.children ?? [];
     return {

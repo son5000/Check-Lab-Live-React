@@ -15,25 +15,51 @@ const VIEWER_3D_ANALYSIS_COLORS = [
     "#f0abfc",
     "#a5b4fc",
 ];
-const defaultCameraFeeds = [
+const PRESENTATION_CAMERA_IMAGE_URLS = [
+    "/cam/cam_sample_1.PNG",
+    "/cam/cam_sample_2.PNG",
+    "/cam/cam_sample_3.PNG",
+    "/cam/cam_sample_4.PNG",
+    "/cam/cam_sample_5.PNG",
+];
+const PRESENTATION_INTEREST_AREA_IMAGES = [
+    "/cam/cam_sample_3.PNG",
+    "/cam/cam_sample_4.PNG",
+];
+const defaultCameraFeeds = PRESENTATION_CAMERA_IMAGE_URLS.map((presentationImageUrl, index) => ({
+    id: `cam-${index + 1}`,
+    label: `CAM ${index + 1}`,
+    name: `카메라 ${index + 1}`,
+    presentationImageUrl,
+    streamMessage: "임시 카메라 이미지",
+    streamState: "presentation",
+    streamUrl: null,
+}));
+const defaultPresentationInterestAreas = [
     {
-        id: "cam-1",
-        label: "CAM 1",
-        name: "카메라 1",
-        streamMessage: "스트림 대기",
-        streamState: "idle",
-        streamUrl: null,
+        id: "presentation-interest-area-1",
+        mode: "area",
+        name: "임시 관심 영역 1",
+        presentationImageUrl: PRESENTATION_INTEREST_AREA_IMAGES[0],
+        presentationOnly: true,
+    },
+    {
+        id: "presentation-interest-area-2",
+        mode: "area",
+        name: "임시 관심 영역 2",
+        presentationImageUrl: PRESENTATION_INTEREST_AREA_IMAGES[1],
+        presentationOnly: true,
     },
 ];
-export function AssetCameraPanel({ activeCameraId, cameraFeeds = defaultCameraFeeds, defaultAssetThresholds, assetParts, assetPartStates = [], assetThresholds, isAddingAssetPart, selectedAssetPartId, onCameraSelect, onCancelAssetPart, onCreateAssetPart, onDeleteAssetPart, onSelectAssetPart, onUpdateAssetPart, initialViewMode = "3d", onViewer3DConfigChange, onViewer3DModelFileChange, temperatureData = [], ultrasonicData = [], viewer3DConfig, viewer3DModelFile, }) {
-    const availableCameraFeeds = cameraFeeds.length
-        ? cameraFeeds
-        : defaultCameraFeeds;
+export function AssetCameraPanel({ activeCameraId, cameraFeeds = defaultCameraFeeds, defaultAssetThresholds, assetParts, assetPartStates = [], assetThresholds, selectedAssetPartId, onCameraSelect, onCreateAssetPart, onDeleteAssetPart, onSelectAssetPart, onUpdateAssetPart, initialViewMode = "3d", onViewer3DConfigChange, onViewer3DModelFileChange, temperatureData = [], ultrasonicData = [], viewer3DConfig, viewer3DModelFile, }) {
+    const availableCameraFeeds = useMemo(() => buildPresentationCameraFeeds(cameraFeeds), [cameraFeeds]);
     const selectedCamera = useMemo(() => availableCameraFeeds.find((camera) => camera.id === activeCameraId) ??
         availableCameraFeeds[0], [activeCameraId, availableCameraFeeds]);
     const activeAssetThresholds = assetThresholds ?? defaultAssetThresholds;
+    const cameraAssetParts = useMemo(() => assetParts.filter((part) => part.source !== "3d"), [assetParts]);
     const [draftName, setDraftName] = useState("단자부");
     const [selectionMode, setSelectionMode] = useState("area");
+    const [cameraSetupMode, setCameraSetupMode] = useState();
     const [draftThresholds, setDraftThresholds] = useState(activeAssetThresholds);
     const [areDraftThresholdsDirty, setAreDraftThresholdsDirty] = useState(false);
     const [draftRoi, setDraftRoi] = useState();
@@ -48,7 +74,8 @@ export function AssetCameraPanel({ activeCameraId, cameraFeeds = defaultCameraFe
     const [viewer3DAnalysisMode, setViewer3DAnalysisMode] = useState();
     const [viewer3DAnalysisTargets, setViewer3DAnalysisTargets] = useState([]);
     const [selectedViewer3DAnalysisTargetId, setSelectedViewer3DAnalysisTargetId,] = useState();
-    const canSave = draftName.trim().length > 0 &&
+    const canSave = Boolean(cameraSetupMode) &&
+        draftName.trim().length > 0 &&
         (selectionMode === "area"
             ? Boolean(draftRoi && draftRoi.width >= 2 && draftRoi.height >= 2)
             : draftPoints.length > 0);
@@ -79,6 +106,13 @@ export function AssetCameraPanel({ activeCameraId, cameraFeeds = defaultCameraFe
     const selectedViewer3DAnalysisItem = selectedViewer3DAnalysisTargetId
         ? viewer3DAnalysisItems.find((item) => item.target.id === selectedViewer3DAnalysisTargetId)
         : undefined;
+    const selectedCameraAssetPart = selectedAssetPartId
+        ? cameraAssetParts.find((part) => part.id === selectedAssetPartId)
+        : undefined;
+    const selectedCameraAssetPartState = selectedCameraAssetPart
+        ? assetPartStates.find((partState) => partState.partId === selectedCameraAssetPart.id)
+        : undefined;
+    const isCameraSetupActive = viewMode === "camera" && isPreviewOpen && Boolean(cameraSetupMode);
     useEffect(() => {
         if (selectedAssetPartId &&
             viewer3DAnalysisTargets.some((target) => target.id === selectedAssetPartId)) {
@@ -99,7 +133,7 @@ export function AssetCameraPanel({ activeCameraId, cameraFeeds = defaultCameraFe
         }
     }, [viewer3DModelFile]);
     useEffect(() => {
-        if (!isAddingAssetPart) {
+        if (!cameraSetupMode) {
             return;
         }
         if (areDraftThresholdsDirty) {
@@ -111,11 +145,13 @@ export function AssetCameraPanel({ activeCameraId, cameraFeeds = defaultCameraFe
     }, [
         activeAssetThresholds,
         areDraftThresholdsDirty,
-        isAddingAssetPart,
+        cameraSetupMode,
     ]);
     useEffect(() => {
         if (!isPreviewOpen) {
             setViewer3DAnalysisMode(undefined);
+            setCameraSetupMode(undefined);
+            resetDraft(activeAssetThresholds);
             return;
         }
         const handleKeyDown = (event) => {
@@ -148,8 +184,8 @@ export function AssetCameraPanel({ activeCameraId, cameraFeeds = defaultCameraFe
             return;
         }
         const point = getRelativePoint(event);
-        if (!isAddingAssetPart) {
-            const hitPoint = findAreaPointHit(point, assetParts, selectedAssetPartId);
+        if (!isCameraSetupActive) {
+            const hitPoint = findAreaPointHit(point, cameraAssetParts, selectedAssetPartId);
             if (hitPoint) {
                 capturePointer(event);
                 onSelectAssetPart(hitPoint.area.id);
@@ -162,7 +198,7 @@ export function AssetCameraPanel({ activeCameraId, cameraFeeds = defaultCameraFe
                 });
                 return;
             }
-            const hitRoi = findAreaRoiHit(point, assetParts, selectedAssetPartId);
+            const hitRoi = findAreaRoiHit(point, cameraAssetParts, selectedAssetPartId);
             if (hitRoi?.roi) {
                 capturePointer(event);
                 onSelectAssetPart(hitRoi.area.id);
@@ -241,7 +277,7 @@ export function AssetCameraPanel({ activeCameraId, cameraFeeds = defaultCameraFe
                 : currentPoint));
             return;
         }
-        const targetArea = assetParts.find((area) => area.id === activeInteraction.partId);
+        const targetArea = cameraAssetParts.find((area) => area.id === activeInteraction.partId);
         if (!targetArea) {
             return;
         }
@@ -318,6 +354,22 @@ export function AssetCameraPanel({ activeCameraId, cameraFeeds = defaultCameraFe
     const handleViewer3DAnalysisModeChange = (mode) => {
         setViewer3DAnalysisMode(mode);
     };
+    const handleCameraSetupModeChange = (mode) => {
+        setCameraSetupMode(mode);
+        clearDragInteraction();
+        if (!mode) {
+            resetDraft(activeAssetThresholds);
+            return;
+        }
+        setSelectionMode(mode);
+        onSelectAssetPart(undefined);
+        if (mode === "area") {
+            setDraftPoints([]);
+        }
+        else {
+            setDraftRoi(undefined);
+        }
+    };
     const handleViewer3DAnalysisTargetCreate = (draft) => {
         const nextIndex = viewer3DAnalysisTargets.length;
         const nextTarget = {
@@ -366,19 +418,26 @@ export function AssetCameraPanel({ activeCameraId, cameraFeeds = defaultCameraFe
             return;
         }
         onCreateAssetPart({
-            id: `detection-${Date.now()}`,
+            id: `interest-area-${Date.now()}`,
             linkedAlarm: true,
             mode: selectionMode,
             name: draftName.trim(),
             points: selectionMode === "points" ? draftPoints : [],
             roi: selectionMode === "area" ? draftRoi : undefined,
+            source: "camera",
             thresholds: draftThresholds,
         });
+        setCameraSetupMode(undefined);
         resetDraft(activeAssetThresholds);
     };
     const handleCancel = () => {
+        setCameraSetupMode(undefined);
         resetDraft(activeAssetThresholds);
-        onCancelAssetPart();
+    };
+    const handleCameraAssetPartSelect = (partId) => {
+        setCameraSetupMode(undefined);
+        resetDraft(activeAssetThresholds);
+        onSelectAssetPart(partId);
     };
     return (<section className="AssetCameraPanel AssetCameraPanel__section-1 flex min-h-0 min-w-0 flex-col overflow-hidden rounded-md border border-border bg-card p-1 text-card-foreground">
       <div className="AssetCameraPanel AssetCameraPanel__container-1 mb-1 flex min-w-0 items-center justify-between gap-2">
@@ -403,7 +462,7 @@ export function AssetCameraPanel({ activeCameraId, cameraFeeds = defaultCameraFe
       </div>
       <div className="AssetCameraPanel AssetCameraPanel__container-5 grid min-h-0 flex-1 place-items-center overflow-hidden rounded-md border border-border bg-neutral-950/85 p-1 [container-type:size]">
         <div className={cn("AssetCameraPanel AssetCameraPanel__container-6 relative h-[min(100cqw,100cqh)] w-[min(100cqw,100cqh)] touch-none overflow-hidden rounded-md border border-white/15 bg-neutral-950 shadow-[0_0_28px_rgba(34,211,238,0.16)]", viewMode === "camera" &&
-            isAddingAssetPart &&
+            isCameraSetupActive &&
             "cursor-crosshair border-primary/70", viewMode === "camera" && isDraggingRoi && "cursor-move")} onPointerDown={viewMode === "camera" ? handlePointerDown : undefined} onPointerMove={viewMode === "camera" ? handlePointerMove : undefined} onPointerCancel={viewMode === "camera" ? handlePointerCancel : undefined} onPointerUp={viewMode === "camera" ? handlePointerUp : undefined}>
           {viewMode === "3d" ? (<>
               {readyViewer3DModelFile ? (<>
@@ -417,30 +476,16 @@ export function AssetCameraPanel({ activeCameraId, cameraFeeds = defaultCameraFe
                 </>) : (<Viewer3DModelUploadPanel modelFile={currentViewer3DModelFile} onPlyFileChange={handleViewer3DPlyFileChange} onTextureFileChange={handleViewer3DTextureFileChange} onUseSample={handleUseSampleViewer3DModel}/>)}
             </>) : (<>
               <div className="AssetCameraPanel AssetCameraPanel__container-7 absolute inset-0 opacity-25 [background-image:linear-gradient(90deg,rgba(255,255,255,0.16)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.16)_1px,transparent_1px)] [background-size:34px_34px]"/>
-              <CameraViewport focused={selectedCamera.id !== "default"} streamMessage={selectedCamera.streamMessage} streamState={selectedCamera.streamState} streamUrl={selectedCamera.streamUrl} onOpenPreview={() => setIsPreviewOpen(true)}>
-                <DetectionOverlays parts={assetParts} draftPoints={draftPoints} draftRoi={draftRoi} isDraftVisible={isAddingAssetPart} selectedPartId={selectedAssetPartId}/>
+              <CameraViewport focused={selectedCamera.id !== "default"} imageUrl={selectedCamera.presentationImageUrl} streamMessage={selectedCamera.streamMessage} streamState={selectedCamera.streamState} streamUrl={selectedCamera.streamUrl} onOpenPreview={() => setIsPreviewOpen(true)}>
+                <DetectionOverlays parts={cameraAssetParts} draftPoints={draftPoints} draftRoi={draftRoi} isDraftVisible={isCameraSetupActive} selectedPartId={selectedAssetPartId}/>
               </CameraViewport>
             </>)}
         </div>
       </div>
 
-      {isAddingAssetPart && canRenderPreviewPortal
-            ? createPortal(<DetectionSetupDialog canSave={canSave} assetParts={assetParts} draftName={draftName} draftPoints={draftPoints} draftRoi={draftRoi} draftThresholds={draftThresholds} isDraggingRoi={isDraggingRoi} selectedCamera={selectedCamera} selectedPartId={selectedAssetPartId} selectionMode={selectionMode} onCancel={handleCancel} onDraftNameChange={setDraftName} onDraftThresholdChange={handleDraftThresholdChange} onPointerCancel={handlePointerCancel} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onSave={handleSave} onSelectionModeChange={(mode) => {
-                    setSelectionMode(mode);
-                    if (mode === "area") {
-                        setDraftPoints([]);
-                    }
-                    else {
-                        setDraftRoi(undefined);
-                    }
-                }}/>, document.body)
-            : null}
-
       {isPreviewOpen && canRenderPreviewPortal
             ? createPortal(<div className="AssetCameraPanel AssetCameraPanel__container-15 fixed inset-0 z-[100] grid place-items-center bg-black/70 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={viewMode === "3d" ? "3D 크게 보기" : "캠 크게 보기"} onClick={() => setIsPreviewOpen(false)}>
-              <div className={cn("AssetCameraPanel AssetCameraPanel__container-16 flex max-h-[calc(100dvh-2rem)] max-w-[calc(100dvw-2rem)] min-w-0 flex-col overflow-hidden rounded-md border border-white/15 bg-neutral-950 text-white shadow-2xl", viewMode === "3d"
-                    ? "h-[min(92dvh,56rem)] w-[min(98dvw,104rem)]"
-                    : "h-[min(92dvh,92dvw)] w-[min(92dvh,92dvw)]")} onClick={(event) => event.stopPropagation()}>
+              <div className="AssetCameraPanel AssetCameraPanel__container-16 flex h-[min(92dvh,56rem)] max-h-[calc(100dvh-2rem)] w-[min(98dvw,104rem)] max-w-[calc(100dvw-2rem)] min-w-0 flex-col overflow-hidden rounded-md border border-white/15 bg-neutral-950 text-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
                 <div className="AssetCameraPanel AssetCameraPanel__container-17 flex h-10 shrink-0 items-center justify-between gap-2 border-b border-white/15 px-3">
                   <div className="AssetCameraPanel AssetCameraPanel__container-18 flex min-w-0 items-center gap-2">
                     {viewMode === "3d" ? (<Box className="AssetCameraPanel AssetCameraPanel__icon-3 h-4 w-4 shrink-0 text-cyan-200" aria-hidden="true"/>) : (<Camera className="AssetCameraPanel AssetCameraPanel__icon-3 h-4 w-4 shrink-0 text-cyan-200" aria-hidden="true"/>)}
@@ -460,14 +505,18 @@ export function AssetCameraPanel({ activeCameraId, cameraFeeds = defaultCameraFe
                     </div>
 
                     <Viewer3DAnalysisPanel activeMode={viewer3DAnalysisMode} items={viewer3DAnalysisItems} selectedItem={selectedViewer3DAnalysisItem} selectedTargetId={selectedViewer3DAnalysisTargetId} onDelete={handleViewer3DAnalysisTargetDelete} onModeChange={handleViewer3DAnalysisModeChange} onSelect={handleViewer3DAnalysisTargetSelect} onUpdate={handleViewer3DAnalysisTargetUpdate}/>
-                  </div>) : (<div className="AssetCameraPanel AssetCameraPanel__container-19 grid min-h-0 flex-1 place-items-center p-3 [container-type:size]">
-                    <div className={cn("AssetCameraPanel AssetCameraPanel__container-20 relative h-[min(100cqw,100cqh)] w-[min(100cqw,100cqh)] touch-none overflow-hidden rounded-md border border-cyan-200/25 bg-neutral-950 shadow-[0_0_42px_rgba(34,211,238,0.2)]", isAddingAssetPart &&
+                  </div>) : (<div className="AssetCameraPanel AssetCameraPanel__container-19 grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_16rem] gap-3 overflow-hidden p-3 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)] lg:grid-rows-[minmax(0,1fr)]">
+                    <div className="AssetCameraPanel AssetCameraPanel__camera-preview-wrap-1 grid min-h-0 min-w-0 place-items-center overflow-hidden rounded-md border border-cyan-200/25 bg-neutral-950/90 p-2 [container-type:size]">
+                      <div className={cn("AssetCameraPanel AssetCameraPanel__container-20 relative h-[min(100cqw,100cqh)] w-[min(100cqw,100cqh)] touch-none overflow-hidden rounded-md border border-cyan-200/25 bg-neutral-950 shadow-[0_0_42px_rgba(34,211,238,0.2)]", isCameraSetupActive &&
                         "cursor-crosshair border-primary/70", isDraggingRoi && "cursor-move")} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerCancel={handlePointerCancel} onPointerUp={handlePointerUp}>
-                      <div className="AssetCameraPanel AssetCameraPanel__container-21 absolute inset-0 opacity-25 [background-image:linear-gradient(90deg,rgba(255,255,255,0.16)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.16)_1px,transparent_1px)] [background-size:34px_34px]"/>
-                      <CameraViewport focused={selectedCamera.id !== "default"} streamMessage={selectedCamera.streamMessage} streamState={selectedCamera.streamState} streamUrl={selectedCamera.streamUrl}>
-                        <DetectionOverlays parts={assetParts} draftPoints={draftPoints} draftRoi={draftRoi} isDraftVisible={isAddingAssetPart} selectedPartId={selectedAssetPartId}/>
-                      </CameraViewport>
+                        <div className="AssetCameraPanel AssetCameraPanel__container-21 absolute inset-0 opacity-25 [background-image:linear-gradient(90deg,rgba(255,255,255,0.16)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.16)_1px,transparent_1px)] [background-size:34px_34px]"/>
+                        <CameraViewport focused={selectedCamera.id !== "default"} imageUrl={selectedCamera.presentationImageUrl} streamMessage={selectedCamera.streamMessage} streamState={selectedCamera.streamState} streamUrl={selectedCamera.streamUrl}>
+                          <DetectionOverlays parts={cameraAssetParts} draftPoints={draftPoints} draftRoi={draftRoi} isDraftVisible={isCameraSetupActive} selectedPartId={selectedAssetPartId}/>
+                        </CameraViewport>
+                      </div>
                     </div>
+
+                    <CameraInterestAreaPanel activeMode={cameraSetupMode} canSave={canSave} draftName={draftName} draftPoints={draftPoints} draftRoi={draftRoi} draftThresholds={draftThresholds} items={cameraAssetParts} partStates={assetPartStates} selectedPart={selectedCameraAssetPart} selectedPartState={selectedCameraAssetPartState} selectedPartId={selectedAssetPartId} selectionMode={selectionMode} onCancelDraft={handleCancel} onDelete={onDeleteAssetPart} onDraftNameChange={setDraftName} onDraftThresholdChange={handleDraftThresholdChange} onModeChange={handleCameraSetupModeChange} onSave={handleSave} onSelect={handleCameraAssetPartSelect} onUpdate={onUpdateAssetPart}/>
                   </div>)}
               </div>
             </div>, document.body)
@@ -862,89 +911,185 @@ function IconButton({ disabled, icon: Icon, label, onClick, showLabel = false, v
       {showLabel ? (<span className="IconButton IconButton__label-1">{label}</span>) : (<Icon className="IconButton IconButton__icon-1 h-3.5 w-3.5" aria-hidden="true"/>)}
     </button>);
 }
-function DetectionSetupDialog({ canSave, assetParts, draftName, draftPoints, draftRoi, draftThresholds, isDraggingRoi, selectedPartId, selectedCamera, selectionMode, onCancel, onDraftNameChange, onDraftThresholdChange, onPointerCancel, onPointerDown, onPointerMove, onPointerUp, onSave, onSelectionModeChange, }) {
+function buildPresentationCameraFeeds(cameraFeeds) {
+    const incomingFeeds = cameraFeeds?.length ? cameraFeeds : [];
+    const mergedFeeds = incomingFeeds.map((camera, index) => ({
+        ...camera,
+        label: camera.label ?? `CAM ${index + 1}`,
+        name: camera.name ?? `카메라 ${index + 1}`,
+        presentationImageUrl: camera.presentationImageUrl ?? PRESENTATION_CAMERA_IMAGE_URLS[index % PRESENTATION_CAMERA_IMAGE_URLS.length],
+        streamMessage: camera.streamMessage ?? "임시 카메라 이미지",
+        streamState: camera.streamState ?? "presentation",
+    }));
+    for (let index = mergedFeeds.length; index < defaultCameraFeeds.length; index += 1) {
+        mergedFeeds.push(defaultCameraFeeds[index]);
+    }
+    return mergedFeeds;
+}
+function buildPresentationInterestAreaItems(items) {
+    const nextItems = items.map((item, index) => ({
+        ...item,
+        presentationImageUrl: item.presentationImageUrl ?? PRESENTATION_INTEREST_AREA_IMAGES[index % PRESENTATION_INTEREST_AREA_IMAGES.length],
+    }));
+    for (let index = nextItems.length; index < defaultPresentationInterestAreas.length; index += 1) {
+        nextItems.push(defaultPresentationInterestAreas[index]);
+    }
+    return nextItems;
+}
+function CameraInterestAreaPanel({ activeMode, canSave, draftName, draftPoints, draftRoi, draftThresholds, items, onCancelDraft, onDelete, onDraftNameChange, onDraftThresholdChange, onModeChange, onSave, onSelect, onUpdate, partStates, selectedPart, selectedPartState, selectedPartId, selectionMode, }) {
+    const presentationItems = buildPresentationInterestAreaItems(items);
     const draftScopeLabel = selectionMode === "area"
         ? draftRoi
             ? `${Math.round(draftRoi.width)}×${Math.round(draftRoi.height)}%`
             : "ROI 미지정"
         : `${draftPoints.length}개 포인트`;
-    return (<div className="AssetCameraPanel AssetCameraPanel__setup-dialog-overlay-1 fixed inset-0 z-[90] grid place-items-center bg-black/55 p-3 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="감지 데이터 설정">
-      <div className="AssetCameraPanel AssetCameraPanel__setup-dialog-1 grid h-[min(86dvh,48rem)] w-[min(72rem,calc(100dvw-1.5rem))] min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-md border border-border bg-card text-card-foreground shadow-2xl">
-        <div className="AssetCameraPanel AssetCameraPanel__setup-header-1 flex h-11 min-w-0 items-center justify-between gap-3 border-b border-border px-3">
-          <div className="AssetCameraPanel AssetCameraPanel__setup-title-1 flex min-w-0 items-center gap-2">
-            <SquareDashedMousePointer className="AssetCameraPanel AssetCameraPanel__setup-icon-1 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true"/>
-            <div className="AssetCameraPanel AssetCameraPanel__setup-title-copy-1 min-w-0">
-              <h2 className="AssetCameraPanel AssetCameraPanel__setup-heading-1 truncate text-sm font-semibold">
-                감지 데이터 설정
-              </h2>
-              <p className="AssetCameraPanel AssetCameraPanel__setup-text-1 truncate text-[11px] text-muted-foreground">
-                {selectedCamera.label} · {draftScopeLabel}
-              </p>
-            </div>
-          </div>
-          <button type="button" className="AssetCameraPanel AssetCameraPanel__setup-close-1 grid h-8 w-8 shrink-0 place-items-center rounded-md border border-border bg-background text-muted-foreground transition hover:bg-accent hover:text-foreground" onClick={onCancel} title="닫기">
-            <X className="AssetCameraPanel AssetCameraPanel__setup-icon-2 h-4 w-4" aria-hidden="true"/>
-          </button>
-        </div>
-
-        <div className="AssetCameraPanel AssetCameraPanel__setup-body-1 grid min-h-0 min-w-0 gap-3 p-3 md:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)]">
-          <div className="AssetCameraPanel AssetCameraPanel__setup-stream-1 grid min-h-0 min-w-0 place-items-center overflow-hidden rounded-md border border-border bg-neutral-950/90 p-2 [container-type:size]">
-            <div className={cn("AssetCameraPanel AssetCameraPanel__setup-stream-frame-1 relative h-[min(100cqw,100cqh)] w-[min(100cqw,100cqh)] touch-none overflow-hidden rounded-md border border-primary/60 bg-neutral-950 shadow-[0_0_42px_rgba(34,211,238,0.2)]", "cursor-crosshair", isDraggingRoi && "cursor-move")} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerCancel={onPointerCancel} onPointerUp={onPointerUp}>
-              <div className="AssetCameraPanel AssetCameraPanel__setup-stream-grid-1 absolute inset-0 opacity-25 [background-image:linear-gradient(90deg,rgba(255,255,255,0.16)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.16)_1px,transparent_1px)] [background-size:34px_34px]"/>
-              <CameraViewport focused={selectedCamera.id !== "default"} streamMessage={selectedCamera.streamMessage} streamState={selectedCamera.streamState} streamUrl={selectedCamera.streamUrl}>
-                <DetectionOverlays parts={assetParts} draftPoints={draftPoints} draftRoi={draftRoi} isDraftVisible selectedPartId={selectedPartId}/>
-              </CameraViewport>
-            </div>
+    const modeLabel = activeMode === "area"
+        ? "영역"
+        : activeMode === "points"
+            ? "포인트"
+            : "탐색";
+    return (<aside className="CameraInterestAreaPanel CameraInterestAreaPanel__aside-1 flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-md border border-border bg-card p-2 text-card-foreground">
+      <div className="CameraInterestAreaPanel CameraInterestAreaPanel__stack-1 grid min-h-0 gap-2 overflow-y-auto pr-1">
+        <ControlSection icon={SquareDashedMousePointer} title="관심 영역">
+          <div className="CameraInterestAreaPanel CameraInterestAreaPanel__modes-1 grid grid-cols-3 gap-1.5" role="group" aria-label="카메라 관심 영역 추가">
+            <ModeButton active={!activeMode} icon={RotateCcw} label="탐색" onClick={() => onModeChange(undefined)}/>
+            <ModeButton active={activeMode === "points"} icon={MousePointer2} label="포인트" onClick={() => onModeChange("points")}/>
+            <ModeButton active={activeMode === "area"} icon={SquareDashedMousePointer} label="영역" onClick={() => onModeChange("area")}/>
           </div>
 
-          <aside className="AssetCameraPanel AssetCameraPanel__setup-side-1 flex min-h-0 min-w-0 flex-col gap-3 overflow-hidden rounded-md border border-border bg-background p-3">
-            <label className="AssetCameraPanel AssetCameraPanel__setup-field-1 grid min-w-0 gap-1">
-              <span className="AssetCameraPanel AssetCameraPanel__setup-label-1 text-[11px] font-semibold text-muted-foreground">
+          <div className="CameraInterestAreaPanel CameraInterestAreaPanel__status-1 grid grid-cols-2 gap-1.5">
+            <DetectionSetupStatusRow label="대상" value={`${items.length}개`}/>
+            <DetectionSetupStatusRow label="모드" value={modeLabel}/>
+          </div>
+        </ControlSection>
+
+        <ControlSection icon={Camera} title="관심 영역 리스트">
+          <div className="CameraInterestAreaPanel CameraInterestAreaPanel__list-1 grid gap-1.5">
+            {presentationItems.map((item) => {
+            const itemState = partStates.find((partState) => partState.partId === item.id);
+            return (<button key={item.id} type="button" className={cn("CameraInterestAreaPanel CameraInterestAreaPanel__item-1 grid min-w-0 grid-cols-[3.75rem_minmax(0,1fr)] items-center gap-2 rounded-md border bg-card px-2 py-2 text-left transition hover:bg-accent", item.id === selectedPartId
+                    ? "border-primary"
+                    : "border-border")} onClick={() => {
+                        if (!item.presentationOnly) {
+                            onSelect(item.id);
+                        }
+                    }}>
+                  <img alt={`${item.name} 임시 카메라 이미지`} className="CameraInterestAreaPanel CameraInterestAreaPanel__item-image-1 h-12 w-full rounded-sm object-cover" src={item.presentationImageUrl}/>
+                  <span className="CameraInterestAreaPanel CameraInterestAreaPanel__item-body-1 grid min-w-0 gap-1">
+                    <span className="CameraInterestAreaPanel CameraInterestAreaPanel__item-title-1 flex min-w-0 items-center justify-between gap-2">
+                      <span className="min-w-0 truncate text-xs font-semibold">
+                        {item.name}
+                      </span>
+                      <span className="shrink-0 rounded-sm border border-border bg-background px-1 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                        {getCameraPartModeLabel(item)}
+                      </span>
+                    </span>
+                    <span className="CameraInterestAreaPanel CameraInterestAreaPanel__item-value-1 truncate font-mono text-[11px] text-muted-foreground">
+                      최고 {itemState?.temperatureMax ?? 0}℃ · Peak{" "}
+                      {itemState?.ultrasoundPeakDb ?? 0} dB
+                    </span>
+                  </span>
+                </button>);
+        })}
+          </div>
+        </ControlSection>
+
+        {activeMode ? (<ControlSection icon={MousePointer2} title="새 관심 영역">
+            <label className="CameraInterestAreaPanel CameraInterestAreaPanel__field-1 grid min-w-0 gap-1">
+              <span className="CameraInterestAreaPanel CameraInterestAreaPanel__label-1 text-[10px] font-semibold text-muted-foreground">
                 이름
               </span>
-              <input className="AssetCameraPanel AssetCameraPanel__setup-input-1 h-9 min-w-0 rounded-md border border-border bg-card px-2 text-sm font-semibold outline-none" value={draftName} onChange={(event) => onDraftNameChange(event.target.value)}/>
+              <input className="CameraInterestAreaPanel CameraInterestAreaPanel__input-1 h-8 min-w-0 rounded-md border border-border bg-card px-2 text-xs font-semibold outline-none focus:border-primary" value={draftName} onChange={(event) => onDraftNameChange(event.target.value)}/>
             </label>
 
-            <div className="AssetCameraPanel AssetCameraPanel__setup-group-1 grid gap-1" role="group" aria-label="지정 방식">
-              <span className="AssetCameraPanel AssetCameraPanel__setup-label-2 text-[11px] font-semibold text-muted-foreground">
-                지정 방식
-              </span>
-              <div className="AssetCameraPanel AssetCameraPanel__setup-modes-1 grid grid-cols-2 gap-1.5">
-                <ModeButton active={selectionMode === "area"} icon={SquareDashedMousePointer} label="영역" onClick={() => onSelectionModeChange("area")}/>
-                <ModeButton active={selectionMode === "points"} icon={MousePointer2} label="포인트" onClick={() => onSelectionModeChange("points")}/>
-              </div>
+            <div className="CameraInterestAreaPanel CameraInterestAreaPanel__thresholds-1 grid grid-cols-2 gap-1.5">
+              <ThresholdField label="온도" suffix="℃" value={draftThresholds.temperature} onChange={(temperature) => onDraftThresholdChange({
+                ...draftThresholds,
+                temperature,
+            })}/>
+              <ThresholdField label="초음파" suffix="dB" value={draftThresholds.ultrasoundDb} onChange={(ultrasoundDb) => onDraftThresholdChange({
+                ...draftThresholds,
+                ultrasoundDb,
+            })}/>
             </div>
 
-            <div className="AssetCameraPanel AssetCameraPanel__setup-group-2 grid gap-1" role="group" aria-label="임계치">
-              <span className="AssetCameraPanel AssetCameraPanel__setup-label-3 text-[11px] font-semibold text-muted-foreground">
-                임계치
-              </span>
-              <div className="AssetCameraPanel AssetCameraPanel__setup-thresholds-1 grid grid-cols-2 gap-1.5">
-                <ThresholdField label="온도" suffix="℃" value={draftThresholds.temperature} onChange={(temperature) => onDraftThresholdChange({
-            ...draftThresholds,
-            temperature,
-        })}/>
-                <ThresholdField label="초음파" suffix="dB" value={draftThresholds.ultrasoundDb} onChange={(ultrasoundDb) => onDraftThresholdChange({
-            ...draftThresholds,
-            ultrasoundDb,
-        })}/>
-              </div>
-            </div>
-
-            <div className="AssetCameraPanel AssetCameraPanel__setup-status-1 grid gap-1.5 rounded-md border border-border bg-card p-2">
+            <div className="CameraInterestAreaPanel CameraInterestAreaPanel__draft-status-1 grid gap-1.5">
               <DetectionSetupStatusRow label="방식" value={selectionMode === "area" ? "영역 ROI" : "포인트"}/>
               <DetectionSetupStatusRow label="지정" value={draftScopeLabel}/>
               <DetectionSetupStatusRow label="알림" value={`온도 ${draftThresholds.temperature}℃ · 초음파 ${draftThresholds.ultrasoundDb} dB`}/>
             </div>
 
-            <div className="AssetCameraPanel AssetCameraPanel__setup-actions-1 mt-auto grid grid-cols-2 gap-1.5">
-              <IconButton disabled={!canSave} icon={Check} label="저장" onClick={onSave} variant="primary"/>
-              <IconButton icon={X} label="취소" onClick={onCancel}/>
+            <div className="CameraInterestAreaPanel CameraInterestAreaPanel__actions-1 grid grid-cols-2 gap-1.5">
+              <IconButton disabled={!canSave} icon={Check} label="저장" onClick={onSave} showLabel variant="primary"/>
+              <IconButton icon={X} label="취소" onClick={onCancelDraft} showLabel/>
             </div>
-          </aside>
-        </div>
+          </ControlSection>) : null}
+
+        {!activeMode && selectedPart ? (<ControlSection icon={MousePointer2} title="선택 영역 설정">
+            <label className="CameraInterestAreaPanel CameraInterestAreaPanel__field-2 grid min-w-0 gap-1">
+              <span className="CameraInterestAreaPanel CameraInterestAreaPanel__label-2 text-[10px] font-semibold text-muted-foreground">
+                이름
+              </span>
+              <input className="CameraInterestAreaPanel CameraInterestAreaPanel__input-2 h-8 min-w-0 rounded-md border border-border bg-card px-2 text-xs font-semibold outline-none focus:border-primary" value={selectedPart.name} onChange={(event) => onUpdate({ ...selectedPart, name: event.target.value })}/>
+            </label>
+
+            <div className="CameraInterestAreaPanel CameraInterestAreaPanel__thresholds-2 grid grid-cols-2 gap-1.5">
+              <ThresholdField label="온도" suffix="℃" value={selectedPart.thresholds.temperature} onChange={(temperature) => onUpdate({
+                ...selectedPart,
+                thresholds: {
+                    ...selectedPart.thresholds,
+                    temperature,
+                },
+            })}/>
+              <ThresholdField label="초음파" suffix="dB" value={selectedPart.thresholds.ultrasoundDb} onChange={(ultrasoundDb) => onUpdate({
+                ...selectedPart,
+                thresholds: {
+                    ...selectedPart.thresholds,
+                    ultrasoundDb,
+                },
+            })}/>
+            </div>
+
+            <label className="CameraInterestAreaPanel CameraInterestAreaPanel__check-1 flex min-w-0 cursor-pointer items-center justify-between gap-2 rounded-md border border-border bg-card px-2 py-1.5">
+              <span className="CameraInterestAreaPanel CameraInterestAreaPanel__check-label-1 truncate text-[11px] font-semibold text-muted-foreground">
+                알림 연동
+              </span>
+              <input checked={selectedPart.linkedAlarm !== false} className="CameraInterestAreaPanel CameraInterestAreaPanel__check-input-1 h-4 w-4 shrink-0 accent-primary" onChange={(event) => onUpdate({
+                ...selectedPart,
+                linkedAlarm: event.target.checked,
+            })} type="checkbox"/>
+            </label>
+
+            <div className="CameraInterestAreaPanel CameraInterestAreaPanel__setting-status-1 grid gap-1.5">
+              <DetectionSetupStatusRow label="방식" value={getCameraPartModeLabel(selectedPart)}/>
+              <DetectionSetupStatusRow label="범위" value={formatCameraPartScope(selectedPart)}/>
+            </div>
+
+            <IconButton icon={X} label="삭제" onClick={() => onDelete?.(selectedPart.id)} showLabel variant="danger"/>
+          </ControlSection>) : null}
+
+        {!activeMode && selectedPartState ? (<ControlSection icon={Box} title="측정값">
+            <div className="CameraInterestAreaPanel CameraInterestAreaPanel__metrics-1 grid gap-1.5">
+              <DetectionSetupStatusRow label="최고온도" value={`${selectedPartState.temperatureMax ?? 0}℃`}/>
+              <DetectionSetupStatusRow label="평균온도" value={`${selectedPartState.temperatureAverage ?? 0}℃`}/>
+              <DetectionSetupStatusRow label="검출 dB" value={`${selectedPartState.ultrasoundPeakDb ?? 0} dB`}/>
+              <DetectionSetupStatusRow label="주파수" value={`${selectedPartState.dominantFrequencyKHz ?? 0} kHz`}/>
+            </div>
+          </ControlSection>) : null}
       </div>
-    </div>);
+    </aside>);
+}
+function getCameraPartModeLabel(part) {
+    return part.mode === "area" ? "영역" : "포인트";
+}
+function formatCameraPartScope(part) {
+    if (part.mode === "area" && part.roi) {
+        return `${roundMetric(part.roi.x)}, ${roundMetric(part.roi.y)} · ${roundMetric(part.roi.width)}×${roundMetric(part.roi.height)}%`;
+    }
+    if (part.points.length) {
+        return `${part.points.length}개 · ${part.points.map((point) => `(${roundMetric(point.x)}, ${roundMetric(point.y)})`).join(" ")}`;
+    }
+    return "미지정";
 }
 function DetectionSetupStatusRow({ label, value, }) {
     return (<div className="DetectionSetupStatusRow DetectionSetupStatusRow__row-1 flex min-w-0 items-center justify-between gap-2 rounded-sm border border-border/60 bg-background px-2 py-1.5">
@@ -967,8 +1112,9 @@ function ThresholdField({ label, onChange, suffix, value, }) {
       </span>
     </label>);
 }
-function CameraViewport({ children, focused, onOpenPreview, streamMessage = "스트림 대기", streamState = "idle", streamUrl, }) {
+function CameraViewport({ children, focused, imageUrl, onOpenPreview, streamMessage = "스트림 대기", streamState = "idle", streamUrl, }) {
     const hasStream = Boolean(streamUrl);
+    const hasImage = Boolean(imageUrl);
     return (<div className="CameraViewport CameraViewport__container-1 relative h-full min-h-0 overflow-hidden bg-white/10">
       <div className="CameraViewport CameraViewport__container-4 relative grid h-full place-items-center text-white/80">
         {onOpenPreview ? (<button type="button" className="AssetCameraPanel AssetCameraPanel__button-1 absolute right-2 top-2 z-20 grid h-8 w-8 place-items-center rounded-md border border-white/20 bg-black/45 text-white/80 backdrop-blur transition hover:bg-white/15 hover:text-white" onClick={(event) => {
@@ -977,7 +1123,7 @@ function CameraViewport({ children, focused, onOpenPreview, streamMessage = "스
             }} onPointerDown={(event) => event.stopPropagation()} title="캠 크게 보기">
             <Maximize2 className="AssetCameraPanel AssetCameraPanel__icon-2 h-4 w-4" aria-hidden="true"/>
           </button>) : null}
-        {hasStream ? (<video className="CameraViewport CameraViewport__video-1 h-full w-full object-cover" src={streamUrl ?? undefined} autoPlay muted playsInline controls={streamState !== "live"}/>) : (<div className="CameraViewport CameraViewport__container-5 grid place-items-center gap-2">
+        {hasImage ? (<img alt="임시 카메라 영상" className="CameraViewport CameraViewport__image-1 h-full w-full object-cover" src={imageUrl}/>) : hasStream ? (<video className="CameraViewport CameraViewport__video-1 h-full w-full object-cover" src={streamUrl ?? undefined} autoPlay muted playsInline controls={streamState !== "live"}/>) : (<div className="CameraViewport CameraViewport__container-5 grid place-items-center gap-2">
             <Maximize2 className={cn("CameraViewport CameraViewport__icon-1 h-6 w-6", focused && "h-7 w-7")} aria-hidden="true"/>
             <p className={cn("CameraViewport CameraViewport__text-1 font-mono text-xs", focused && "text-sm")}>
               {streamMessage}

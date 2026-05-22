@@ -233,7 +233,7 @@ function toAssetParts(parts, thresholdFallback) {
  * 파트 상태 변환
  * - 원천 테이블: asset_parts, observations, roi_values, asset_thresholds
  * - part.display_value를 sensor_type에 따라 온도 또는 초음파 현재값으로 해석합니다.
- * - SummaryPanel의 감지 데이터 카드와 AssetPartList의 판정 배지에서 사용합니다.
+ * - SummaryPanel의 관심 영역 카드와 AssetPartList의 판정 배지에서 사용합니다.
  */
 function toAssetPartStates(parts, thresholdPanel) {
     return parts.map((part, index) => {

@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { ChevronDown, MapPinned, Plus } from "lucide-react";
+import { ChevronDown, MapPinned } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { judgementClassName, judgementLabel } from "./judgement";
-export function AssetPartList({ parts, partStates, selectedPartId, onPartSelect, onStartAssetPart, }) {
+export function AssetPartList({ parts, partStates, selectedPartId, onPartSelect, }) {
     const [expandedPartId, setExpandedPartId] = useState(undefined);
     const handleRowClick = (partId) => {
         // 선택 상태 업데이트
@@ -15,18 +15,14 @@ export function AssetPartList({ parts, partStates, selectedPartId, onPartSelect,
         <div className="AssetPartList AssetPartList__container-3 flex min-w-0 items-center gap-1.5">
           <MapPinned className="AssetPartList AssetPartList__icon-1 h-3.5 w-3.5 shrink-0 text-muted-foreground"/>
           <h2 className="AssetPartList AssetPartList__title-1 truncate text-xs font-semibold">
-            감지 데이터 리스트
+            관심 영역 리스트
           </h2>
         </div>
-        <button type="button" className="AssetPartList AssetPartList__button-1 inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-primary bg-primary px-2 text-[11px] font-semibold text-primary-foreground" onClick={onStartAssetPart}>
-          <Plus className="AssetPartList AssetPartList__icon-2 h-3.5 w-3.5" aria-hidden="true"/>
-          추가
-        </button>
       </div>
 
       <ul className="AssetPartList AssetPartList__container-4 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain pr-1 [scrollbar-gutter:stable] [scrollbar-width:thin]">
         {!parts.length ? (<li className="AssetPartList AssetPartList__item-empty-1 grid min-h-24 shrink-0 place-items-center rounded-md border border-dashed border-border bg-card px-3 text-center text-[11px] text-muted-foreground">
-            추가 버튼으로 파트를 등록하면 이 목록에 표시됩니다.
+            카메라 크게 보기에서 관심 영역을 등록하면 이 목록에 표시됩니다.
           </li>) : null}
         {parts.map((part) => {
             const partState = partStates.find((state) => state.partId === part.id);

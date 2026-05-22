@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { MainLayout } from "@/app/layouts/main-layout";
 import { fetchAssetDashboard } from "@/app/monitoring/services/asset-dashboard-api";
 import { toAssetDashboardRemoteSnapshot } from "@/app/monitoring/services/asset-dashboard-adapter";
-import { buildBackendHeaderState, fetchBackendWorkflowTree, findAssetNode, findLocationNode, findSiteNode, toAssetModel, toLocationModel, toSiteModel, } from "@/app/site/utils/backend-workflow";
+import { buildBackendHeaderState, fetchBackendWorkflowTree, findAssetNode, findAssetPathNode, findLocationNode, findSiteNode, toAssetModel, toLocationModel, toSiteModel, } from "@/app/site/utils/backend-workflow";
 import { AssetDashboardPage } from "@/app/site/[site_id]/location/[locationId]/asset/[asset_id]/components/asset-dashboard-page";
 export default async function AssetPage({ params, searchParams, }) {
     const monitoringTree = await fetchBackendWorkflowTree();
@@ -13,12 +13,15 @@ export default async function AssetPage({ params, searchParams, }) {
     const assetNode = locationNode
         ? findAssetNode(locationNode, params.asset_id)
         : undefined;
-    if (!siteNode || !locationNode || !assetNode) {
+    const resolvedAssetPath = siteNode && locationNode && assetNode
+        ? { assetNode, locationNode, siteNode }
+        : findAssetPathNode(monitoringTree, params.asset_id);
+    if (!resolvedAssetPath) {
         notFound();
     }
-    const site = toSiteModel(siteNode);
-    const location = toLocationModel(siteNode, locationNode);
-    const asset = toAssetModel({ assetNode, locationNode, siteNode });
+    const site = toSiteModel(resolvedAssetPath.siteNode);
+    const location = toLocationModel(resolvedAssetPath.siteNode, resolvedAssetPath.locationNode);
+    const asset = toAssetModel(resolvedAssetPath);
     const remoteDashboard = await loadRemoteDashboard(params.asset_id);
     const dashboardAsset = applyRemoteHeaderToAsset(asset, remoteDashboard);
     const headerState = applyRemoteHeaderToHeaderState(buildBackendHeaderState({ asset: dashboardAsset, location, site }), remoteDashboard);

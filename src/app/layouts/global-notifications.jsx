@@ -1,10 +1,37 @@
 import { useLayoutEffect, useRef, useState } from "react";
+import { cn } from "@/lib/utils";
 import { NotificationCard } from "./notifications/notification-card";
 import { useNotificationSettings } from "./hooks/use-notification-settings";
 const ASSET_EVENT_BLIND_HANDLE_SELECTOR = '[data-global-notification-target="asset-event-blind-handle"], .AssetEventBlindHandle__button-1';
 /** 힌트 이동 애니메이션 지속시간 (ms) */
 const GLOBAL_NOTIFICATION_EXIT_MS = 220;
 const GLOBAL_NOTIFICATION_STACK_LIMIT = 4;
+const GLOBAL_NOTIFICATION_POSITION_CONFIG = {
+    center: {
+        cardClassName: "",
+        cardDensity: "default",
+        containerClassName: "inset-0 grid place-items-center px-3 py-6",
+        exitLayerClassName: "absolute inset-0 grid place-items-center px-3 py-6",
+        stackDirection: 1,
+        stackShellClassName: "relative grid place-items-center",
+    },
+    "bottom-right": {
+        cardClassName: "w-full min-w-0 max-w-full",
+        cardDensity: "compact",
+        containerClassName: "bottom-4 right-4 w-[min(24rem,calc(100vw-2rem))]",
+        exitLayerClassName: "absolute bottom-0 right-0 grid w-full justify-items-end",
+        stackDirection: -1,
+        stackShellClassName: "relative grid justify-items-end",
+    },
+    "bottom-right-small": {
+        cardClassName: "w-full min-w-0 max-w-full",
+        cardDensity: "small",
+        containerClassName: "bottom-4 right-4 w-[min(20rem,calc(100vw-2rem))]",
+        exitLayerClassName: "absolute bottom-0 right-0 grid w-full justify-items-end",
+        stackDirection: -1,
+        stackShellClassName: "relative grid justify-items-end",
+    },
+};
 export function GlobalNotifications({ currentPathname = "", notifications, onDismiss, onNavigateToDashboard, onOpen, }) {
     const { settings } = useNotificationSettings();
     const visibleNotifications = settings.enabled
@@ -54,22 +81,18 @@ export function GlobalNotifications({ currentPathname = "", notifications, onDis
     if (!firstVisibleNotification && !exitingNotifications.length) {
         return null;
     }
-    const positionClasses = {
-        center: "inset-0 grid place-items-center px-3 py-6",
-        "bottom-right": "bottom-4 right-4 w-96 max-w-[calc(100%-2rem)]",
-        "bottom-right-small": "bottom-4 right-4 w-80 max-w-[calc(100%-2rem)]",
-    }[settings.position];
-    return (<div className={`GlobalNotifications GlobalNotifications__container-1 pointer-events-none fixed z-50 ${positionClasses}`} aria-live="polite" aria-label="중앙 글로벌 경고 알림">
-      {firstVisibleNotification ? (<div className="GlobalNotifications GlobalNotifications__stack-shell-1 relative grid place-items-center">
-          {stackedNotifications.map(({ notification, stackIndex }) => (<NotificationCard key={notification.id} className="GlobalNotifications__stack-card-1" isInteractive={false} notification={notification} onDismiss={() => undefined} onOpen={() => undefined} style={buildStackCardStyle(stackIndex)}/>))}
-          <NotificationCard canNavigateToDashboard={canNavigateToDashboard(firstVisibleNotification, currentPathname)} key={firstVisibleNotification.id} className="GlobalNotifications__front-card-1" notification={firstVisibleNotification} onDismiss={onDismiss} onNavigateToDashboard={onNavigateToDashboard} onOpen={onOpen}/>
+    const positionConfig = GLOBAL_NOTIFICATION_POSITION_CONFIG[settings.position] ?? GLOBAL_NOTIFICATION_POSITION_CONFIG.center;
+    return (<div className={cn("GlobalNotifications GlobalNotifications__container-1 pointer-events-none fixed z-50", positionConfig.containerClassName)} aria-live="polite" aria-label="중앙 글로벌 경고 알림">
+      {firstVisibleNotification ? (<div className={cn("GlobalNotifications GlobalNotifications__stack-shell-1", positionConfig.stackShellClassName)}>
+          {stackedNotifications.map(({ notification, stackIndex }) => (<NotificationCard key={notification.id} className={cn("GlobalNotifications__stack-card-1", positionConfig.cardClassName)} density={positionConfig.cardDensity} isInteractive={false} notification={notification} onDismiss={() => undefined} onOpen={() => undefined} style={buildStackCardStyle(stackIndex, positionConfig.stackDirection)}/>))}
+          <NotificationCard canNavigateToDashboard={canNavigateToDashboard(firstVisibleNotification, currentPathname)} key={firstVisibleNotification.id} className={cn("GlobalNotifications__front-card-1", positionConfig.cardClassName)} density={positionConfig.cardDensity} notification={firstVisibleNotification} onDismiss={onDismiss} onNavigateToDashboard={onNavigateToDashboard} onOpen={onOpen}/>
         </div>) : null}
-      {exitingNotifications.map((exitingNotification) => (<ExitingNotificationCard key={exitingNotification.instanceId} exitingNotification={exitingNotification} onExitComplete={(instanceId) => {
+      {exitingNotifications.map((exitingNotification) => (<ExitingNotificationCard key={exitingNotification.instanceId} cardClassName={positionConfig.cardClassName} density={positionConfig.cardDensity} exitingNotification={exitingNotification} exitLayerClassName={positionConfig.exitLayerClassName} onExitComplete={(instanceId) => {
                 setExitingNotifications((currentNotifications) => currentNotifications.filter((notification) => notification.instanceId !== instanceId));
             }}/>))}
     </div>);
 }
-function ExitingNotificationCard({ exitingNotification, onExitComplete, }) {
+function ExitingNotificationCard({ cardClassName, density, exitingNotification, exitLayerClassName, onExitComplete, }) {
     const cardRef = useRef(null);
     const onExitCompleteRef = useRef(onExitComplete);
     const [motionStyle, setMotionStyle] = useState(() => buildFallbackExitMotionStyle());
@@ -115,23 +138,25 @@ function ExitingNotificationCard({ exitingNotification, onExitComplete, }) {
     if (exitingNotification.instant) {
         return null;
     }
-    return (<div className="GlobalNotifications GlobalNotifications__exit-layer-1 pointer-events-none absolute inset-0 z-[30] grid place-items-center px-3 py-6">
-      <NotificationCard ref={cardRef} className={isAnimating
+    return (<div className={cn("GlobalNotifications GlobalNotifications__exit-layer-1 pointer-events-none z-[30]", exitLayerClassName)}>
+      <NotificationCard ref={cardRef} className={cn(isAnimating
             ? "GlobalNotifications__exit-card-1 GlobalNotifications__exit-card--running"
-            : "GlobalNotifications__exit-card-1"} isInteractive={false} notification={exitingNotification.notification} onAnimationEnd={(event) => {
+            : "GlobalNotifications__exit-card-1", cardClassName)} density={density} isInteractive={false} notification={exitingNotification.notification} onAnimationEnd={(event) => {
             if (event.currentTarget === event.target) {
                 onExitCompleteRef.current(exitingNotification.instanceId);
             }
         }} onDismiss={() => undefined} onOpen={() => undefined} style={motionStyle}/>
     </div>);
 }
-function buildStackCardStyle(stackIndex) {
+function buildStackCardStyle(stackIndex, stackDirection = 1) {
     const cappedStackIndex = Math.min(stackIndex, GLOBAL_NOTIFICATION_STACK_LIMIT);
+    const stackOffsetY = cappedStackIndex * 14 * stackDirection;
     return {
         "--global-notification-stack-index": cappedStackIndex,
-        "--global-notification-stack-offset-y": formatPixels(cappedStackIndex * 14),
+        "--global-notification-stack-offset-y": formatPixels(stackOffsetY),
         "--global-notification-stack-opacity": Math.max(0.42, 0.78 - cappedStackIndex * 0.12),
         "--global-notification-stack-scale": Math.max(0.9, 1 - cappedStackIndex * 0.035),
+        "--global-notification-stack-origin": stackDirection < 0 ? "center bottom" : "center top",
         "--global-notification-stack-z": GLOBAL_NOTIFICATION_STACK_LIMIT - cappedStackIndex,
     };
 }
