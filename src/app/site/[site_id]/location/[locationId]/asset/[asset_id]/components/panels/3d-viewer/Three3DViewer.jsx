@@ -1,6 +1,6 @@
 "use client";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, Loader2 } from "lucide-react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { AlertTriangle, Loader2, MousePointer2, RotateCcw, SquareDashedMousePointer, } from "lucide-react";
 import * as THREE from "three";
 import { cn } from "@/lib/utils";
 import { DEFAULT_MODEL_3D_FILE, DEFAULT_VIEWER_3D_CONFIG, } from "./constants";
@@ -11,9 +11,16 @@ import { useThreeCamera } from "./hooks/useThreeCamera";
 import { useThreeLighting } from "./hooks/useThreeLighting";
 import { useThreeModel } from "./hooks/useThreeModel";
 import { useThreeScene } from "./hooks/useThreeScene";
+import { useThreeCameraVisualization } from "./hooks/useThreeCameraVisualization";
+import { CameraPreviewOverlay } from "./components/CameraPreviewOverlay";
+import { getCameraPreset } from "./constants/cameraPresets";
 const EMPTY_ANALYSIS_TARGETS = [];
-export function Three3DViewer({ activeAnalysisMode, allowOptionBar = true, analysisSummary, analysisTargets = EMPTY_ANALYSIS_TARGETS, className, config, initialConfig = DEFAULT_VIEWER_3D_CONFIG, modelFile, onAnalysisTargetCreate, onAnalysisTargetSelect, onConfigChange, onModelFileChange, selectedAnalysisTargetId, }) {
+export function Three3DViewer({ activeAnalysisMode, allowOptionBar = true, analysisSummary, analysisTargets = EMPTY_ANALYSIS_TARGETS, className, config, initialConfig = DEFAULT_VIEWER_3D_CONFIG, modelFile, onAnalysisModeChange, onAnalysisTargetCreate, onAnalysisTargetSelect, onConfigChange, onModelFileChange, selectedAnalysisTargetId, }) {
     const containerRef = useRef(null);
+    const cameraHoverPointerRef = useRef({
+        clientPoint: null,
+        isInsideCanvas: false,
+    });
     const projectedTargetsKeyRef = useRef("");
     const raycasterRef = useRef(new THREE.Raycaster());
     const [internalConfig, setInternalConfig] = useState(initialConfig);
@@ -22,31 +29,36 @@ export function Three3DViewer({ activeAnalysisMode, allowOptionBar = true, analy
     const [projectedTargets, setProjectedTargets] = useState([]);
     const resolvedConfig = config ?? internalConfig;
     const resolvedModelFile = modelFile ?? internalModelFile;
+    const resolvedCameraVisualizationConfig = resolvedConfig.cameraVisualization ?? DEFAULT_VIEWER_3D_CONFIG.cameraVisualization;
     const { cameraRef, controlsRef, rendererRef, sceneRef } = useThreeScene(containerRef, resolvedConfig);
     const { loadState, modelRef } = useThreeModel(sceneRef, resolvedModelFile, resolvedConfig.model);
     useThreeCamera(cameraRef, controlsRef, resolvedConfig.camera, resolvedConfig.controls);
     useThreeLighting(sceneRef, resolvedConfig.lighting);
     useThreeBackground(sceneRef, resolvedConfig.background);
+    const { getCameraAtClientPoint: pickCameraAtClientPoint, setHoveredCameraId } = useThreeCameraVisualization(sceneRef, resolvedCameraVisualizationConfig);
     useEffect(() => {
         if (modelFile) {
             setInternalModelFile(modelFile);
         }
     }, [modelFile]);
-    const handleConfigChange = (nextConfig) => {
+    const handleConfigChange = useCallback((nextConfig) => {
         if (!config) {
             setInternalConfig(nextConfig);
         }
         onConfigChange?.(nextConfig);
-    };
-    const handleModelFileChange = (nextModelFile) => {
+    }, [config, onConfigChange]);
+    const handleModelFileChange = useCallback((nextModelFile) => {
         if (!modelFile) {
             setInternalModelFile(nextModelFile);
         }
         onModelFileChange?.(nextModelFile);
-    };
+    }, [modelFile, onModelFileChange]);
     const handleReset = () => {
         handleConfigChange(initialConfig);
     };
+    const handleCameraVisualizationChange = useCallback((cameraVisualization) => {
+        handleConfigChange({ ...resolvedConfig, cameraVisualization });
+    }, [handleConfigChange, resolvedConfig]);
     const showOptionBar = allowOptionBar && (resolvedConfig.controls?.showOptionBar ?? true);
     const canCreateAnalysisTarget = Boolean(activeAnalysisMode &&
         onAnalysisTargetCreate &&
@@ -55,6 +67,11 @@ export function Three3DViewer({ activeAnalysisMode, allowOptionBar = true, analy
     const selectedProjectedTarget = selectedAnalysisTargetId
         ? projectedTargets.find((target) => target.id === selectedAnalysisTargetId)
         : undefined;
+    const selectedCameraForPreview = resolvedCameraVisualizationConfig.selectedCameraId
+        ? getCameraPreset(resolvedCameraVisualizationConfig.selectedCameraId)
+        : undefined;
+    const shouldRenderEventLayer = canCreateAnalysisTarget;
+    const shouldRenderAnalysisModeToolbar = Boolean(onAnalysisModeChange);
     const analysisDragRect = useMemo(() => analysisPointerState?.mode === "area"
         ? getAnalysisDragRect(analysisPointerState, rendererRef.current?.domElement.getBoundingClientRect())
         : undefined, [analysisPointerState, rendererRef]);
@@ -105,6 +122,194 @@ export function Three3DViewer({ activeAnalysisMode, allowOptionBar = true, analy
             controlsRef.current.enabled = true;
         }
     };
+    const getCameraAtClientPoint = useCallback((clientPoint, previousCameraId) => {
+        const camera = cameraRef.current;
+        const renderer = rendererRef.current;
+        if (!camera || !renderer) {
+            return null;
+        }
+        return pickCameraAtClientPoint({
+            camera,
+            clientPoint,
+            previousCameraId,
+            renderer,
+        });
+    }, [cameraRef, pickCameraAtClientPoint, rendererRef]);
+    const switchToCamera = useCallback((cameraId) => {
+        const camera = getCameraPreset(cameraId);
+        if (!camera || !cameraRef.current || !controlsRef.current) {
+            return;
+        }
+        cameraRef.current.position.set(camera.position.x, camera.position.y, camera.position.z);
+        cameraRef.current.fov = camera.fov ?? cameraRef.current.fov;
+        cameraRef.current.updateProjectionMatrix();
+        controlsRef.current.target.set(camera.target.x, camera.target.y, camera.target.z);
+        controlsRef.current.update();
+        handleConfigChange({
+            ...resolvedConfig,
+            autoRotate: false,
+            camera: {
+                ...resolvedConfig.camera,
+                fov: camera.fov ?? resolvedConfig.camera.fov,
+                position: { ...camera.position },
+                target: { ...camera.target },
+            },
+            cameraVisualization: {
+                ...resolvedCameraVisualizationConfig,
+                enabled: true,
+                selectedCameraId: cameraId,
+                showAll: false,
+            },
+        });
+    }, [
+        cameraRef,
+        controlsRef,
+        handleConfigChange,
+        resolvedCameraVisualizationConfig,
+        resolvedConfig,
+    ]);
+    const handleCameraPreviewClose = useCallback(() => {
+        handleCameraVisualizationChange({
+            ...resolvedCameraVisualizationConfig,
+            selectedCameraId: null,
+            showAll: true,
+        });
+    }, [handleCameraVisualizationChange, resolvedCameraVisualizationConfig]);
+    useEffect(() => {
+        const renderer = rendererRef.current;
+        const canvas = renderer?.domElement;
+        if (!canvas ||
+            resolvedCameraVisualizationConfig.enabled === false ||
+            activeAnalysisMode) {
+            cameraHoverPointerRef.current.clientPoint = null;
+            cameraHoverPointerRef.current.isInsideCanvas = false;
+            setHoveredCameraId(null);
+            if (canvas) {
+                canvas.style.cursor = "";
+                canvas.dataset.pauseAutoRotate = "";
+            }
+            return;
+        }
+        let animationFrameId = 0;
+        let pointerDownCameraId = null;
+        let pointerDownClientPoint = null;
+        let currentHoveredCameraId = null;
+        const clearHoverState = () => {
+            currentHoveredCameraId = null;
+            setHoveredCameraId(null);
+            canvas.style.cursor = "";
+            canvas.dataset.pauseAutoRotate = "";
+        };
+        const applyHoverState = (cameraId) => {
+            if (currentHoveredCameraId !== cameraId) {
+                currentHoveredCameraId = cameraId;
+                setHoveredCameraId(cameraId);
+            }
+            canvas.style.cursor = cameraId ? "pointer" : "";
+            canvas.dataset.pauseAutoRotate = cameraId ? "true" : "";
+        };
+        const isPointInsideCanvas = (clientPoint) => {
+            const bounds = canvas.getBoundingClientRect();
+            return (clientPoint.x >= bounds.left &&
+                clientPoint.x <= bounds.right &&
+                clientPoint.y >= bounds.top &&
+                clientPoint.y <= bounds.bottom);
+        };
+        const updatePointerPosition = (event) => {
+            cameraHoverPointerRef.current.isInsideCanvas = true;
+            cameraHoverPointerRef.current.clientPoint = {
+                x: event.clientX,
+                y: event.clientY,
+            };
+        };
+        const evaluateHover = () => {
+            const { clientPoint, isInsideCanvas } = cameraHoverPointerRef.current;
+            if (!isInsideCanvas ||
+                !clientPoint ||
+                !isPointInsideCanvas(clientPoint)) {
+                if (currentHoveredCameraId) {
+                    clearHoverState();
+                }
+                return null;
+            }
+            const cameraId = getCameraAtClientPoint(clientPoint, currentHoveredCameraId);
+            applyHoverState(cameraId);
+            return cameraId;
+        };
+        const updateHoverFrame = () => {
+            // Camera/controls can move while the pointer is still, so hover needs a frame tick.
+            evaluateHover();
+            animationFrameId = window.requestAnimationFrame(updateHoverFrame);
+        };
+        const handlePointerEnter = (event) => {
+            updatePointerPosition(event);
+            evaluateHover();
+        };
+        const handlePointerDown = (event) => {
+            updatePointerPosition(event);
+            pointerDownCameraId = evaluateHover();
+            pointerDownClientPoint = cameraHoverPointerRef.current.clientPoint;
+        };
+        const handlePointerMove = (event) => {
+            updatePointerPosition(event);
+            evaluateHover();
+        };
+        const handlePointerLeave = () => {
+            pointerDownCameraId = null;
+            pointerDownClientPoint = null;
+            cameraHoverPointerRef.current.isInsideCanvas = false;
+            cameraHoverPointerRef.current.clientPoint = null;
+            clearHoverState();
+        };
+        const handleClick = (event) => {
+            cameraHoverPointerRef.current.isInsideCanvas = true;
+            cameraHoverPointerRef.current.clientPoint = {
+                x: event.clientX,
+                y: event.clientY,
+            };
+            const cameraId = evaluateHover();
+            const travelDistance = pointerDownClientPoint
+                ? getClientDistance(pointerDownClientPoint, {
+                    x: event.clientX,
+                    y: event.clientY,
+                })
+                : 0;
+            if (!cameraId ||
+                pointerDownCameraId !== cameraId ||
+                travelDistance > 6) {
+                return;
+            }
+            event.preventDefault();
+            event.stopPropagation();
+            switchToCamera(cameraId);
+        };
+        animationFrameId = window.requestAnimationFrame(updateHoverFrame);
+        canvas.addEventListener("pointerenter", handlePointerEnter);
+        canvas.addEventListener("pointerdown", handlePointerDown);
+        canvas.addEventListener("pointermove", handlePointerMove);
+        canvas.addEventListener("pointerleave", handlePointerLeave);
+        canvas.addEventListener("pointercancel", handlePointerLeave);
+        canvas.addEventListener("click", handleClick);
+        return () => {
+            window.cancelAnimationFrame(animationFrameId);
+            canvas.removeEventListener("pointerenter", handlePointerEnter);
+            canvas.removeEventListener("pointerdown", handlePointerDown);
+            canvas.removeEventListener("pointermove", handlePointerMove);
+            canvas.removeEventListener("pointerleave", handlePointerLeave);
+            canvas.removeEventListener("pointercancel", handlePointerLeave);
+            canvas.removeEventListener("click", handleClick);
+            canvas.style.cursor = "";
+            canvas.dataset.pauseAutoRotate = "";
+            setHoveredCameraId(null);
+        };
+    }, [
+        activeAnalysisMode,
+        getCameraAtClientPoint,
+        rendererRef,
+        resolvedCameraVisualizationConfig.enabled,
+        setHoveredCameraId,
+        switchToCamera,
+    ]);
     const handleAnalysisPointerDown = (event) => {
         if (!canCreateAnalysisTarget || !activeAnalysisMode) {
             return;
@@ -176,7 +381,9 @@ export function Three3DViewer({ activeAnalysisMode, allowOptionBar = true, analy
         <div className="Three3DViewer Three3DViewer__stage-1 relative min-h-0 min-w-0 overflow-hidden bg-neutral-950 md:min-h-[14rem]">
           <div ref={containerRef} className="Three3DViewer Three3DViewer__canvas-host-1 h-full min-h-0 w-full"/>
           <AnalysisOverlay analysisSummary={analysisSummary} analysisTargets={analysisTargets} projectedTargets={projectedTargets} selectedProjectedTarget={selectedProjectedTarget} selectedTargetId={selectedAnalysisTargetId} onSelect={onAnalysisTargetSelect}/>
-          {canCreateAnalysisTarget ? (<div className={cn("Three3DViewer Three3DViewer__analysis-capture-1 absolute inset-0 z-20 touch-none", activeAnalysisMode === "point" && "cursor-crosshair", activeAnalysisMode === "area" && "cursor-crosshair")} onPointerCancel={handleAnalysisPointerCancel} onPointerDown={handleAnalysisPointerDown} onPointerMove={handleAnalysisPointerMove} onPointerUp={handleAnalysisPointerUp}>
+          <CameraPreviewOverlay selectedCamera={selectedCameraForPreview} onClose={handleCameraPreviewClose} />
+          {shouldRenderAnalysisModeToolbar ? (<AnalysisModeToolbar activeMode={activeAnalysisMode} onChange={onAnalysisModeChange}/>) : null}
+          {shouldRenderEventLayer ? (<div className={cn("Three3DViewer Three3DViewer__analysis-capture-1 absolute inset-0 z-20 touch-none", activeAnalysisMode === "point" && "cursor-crosshair", activeAnalysisMode === "area" && "cursor-crosshair")} onPointerCancel={handleAnalysisPointerCancel} onPointerDown={handleAnalysisPointerDown} onPointerMove={handleAnalysisPointerMove} onPointerUp={handleAnalysisPointerUp}>
               {analysisDragRect ? (<div className="Three3DViewer Three3DViewer__analysis-drag-1 pointer-events-none absolute rounded-sm border border-cyan-200 bg-cyan-300/15 shadow-[0_0_18px_rgba(103,232,249,0.26)]" style={{
                     height: `${analysisDragRect.height}%`,
                     left: `${analysisDragRect.left}%`,
@@ -316,6 +523,40 @@ function AnalysisOverlay({ analysisSummary, analysisTargets, onSelect, projected
             <AnalysisMetric label="추이" value={analysisSummary.trendLabel}/>
           </div>
         </div>) : null}
+    </div>);
+}
+function AnalysisModeToolbar({ activeMode, onChange, }) {
+    const modes = [
+        {
+            icon: RotateCcw,
+            label: "탐색",
+            value: undefined,
+        },
+        {
+            icon: MousePointer2,
+            label: "포인트",
+            value: "point",
+        },
+        {
+            icon: SquareDashedMousePointer,
+            label: "영역",
+            value: "area",
+        },
+    ];
+    return (<div className="AnalysisModeToolbar AnalysisModeToolbar__root-1 pointer-events-auto absolute right-3 top-1/2 z-50 -translate-y-1/2 rounded-md border border-white/15 bg-neutral-950/80 p-1 text-white shadow-2xl backdrop-blur-md" role="toolbar" aria-label="3D 분석 마우스 모드">
+      <div className="AnalysisModeToolbar AnalysisModeToolbar__list-1 grid gap-1">
+        {modes.map(({ icon: Icon, label, value }) => {
+            const active = activeMode === value || (!activeMode && value === undefined);
+            return (<button key={label} type="button" className={cn("AnalysisModeToolbar AnalysisModeToolbar__button-1 grid h-8 w-8 place-items-center rounded-sm border text-white/75 transition hover:border-cyan-200/60 hover:bg-white/10 hover:text-white", active
+                    ? "border-cyan-200 bg-cyan-300/20 text-cyan-50 shadow-[0_0_18px_rgba(103,232,249,0.22)]"
+                    : "border-transparent")} onClick={(event) => {
+                    event.stopPropagation();
+                    onChange(value);
+                }} title={label} aria-label={label} aria-pressed={active}>
+              <Icon className="AnalysisModeToolbar AnalysisModeToolbar__icon-1 h-4 w-4" aria-hidden="true"/>
+            </button>);
+        })}
+      </div>
     </div>);
 }
 function AnalysisMetric({ label, value }) {

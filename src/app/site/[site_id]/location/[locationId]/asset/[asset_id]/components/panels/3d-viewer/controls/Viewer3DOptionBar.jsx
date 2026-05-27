@@ -2,7 +2,6 @@
 import { SlidersHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BackgroundControls } from "./BackgroundControls";
-import { CameraControls } from "./CameraControls";
 import { ControlSection, RangeField, } from "./control-fields";
 import { LightingControls } from "./LightingControls";
 import { ModelControls } from "./ModelControls";
@@ -24,7 +23,6 @@ export function Viewer3DOptionBar({ className, config, modelFile, onConfigChange
         })} step={0.1} value={controls.autoRotateSpeed ?? 0.7}/>
         </ControlSection>
 
-        <CameraControls config={config.camera} onChange={(camera) => onConfigChange({ ...config, camera })}/>
         <ModelControls config={config.model} onChange={(model) => onConfigChange({ ...config, model })}/>
         <LightingControls config={config.lighting} onChange={(lighting) => onConfigChange({ ...config, lighting })}/>
         <BackgroundControls config={config.background} onChange={(background) => onConfigChange({ ...config, background })}/>

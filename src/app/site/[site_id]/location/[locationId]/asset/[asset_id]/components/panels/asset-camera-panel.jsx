@@ -1,12 +1,14 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Camera, Check, Box, Maximize2, MousePointer2, RotateCcw, Settings2, SquareDashedMousePointer, Upload, X, } from "lucide-react";
+import { Camera, Check, Box, Maximize2, MousePointer2, RotateCcw, Settings2, SquareDashedMousePointer, Trash2, Upload, X, } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCheckLabKoreanTime } from "@/app/layouts/helpers/time-formatters";
 import { useDisplaySettings } from "@/app/layouts/hooks/use-display-settings";
 import { DEFAULT_MODEL_3D_FILE, DEFAULT_VIEWER_3D_CONFIG, Three3DViewer, Viewer3DOptionBar, } from "./3d-viewer";
+import { CameraVisualizationControls } from "./3d-viewer/controls/CameraVisualizationControls";
 import { ControlSection } from "./3d-viewer/controls/control-fields";
+import { getCameraPreset } from "./3d-viewer/constants/cameraPresets";
 import { getModelSourceName, normalizeModelTextures, withUpdatedTextureSlot, } from "./3d-viewer/utils/modelFileUtils";
 import { areAssetThresholdsEqual, buildRoi, clampNumber, findAreaPointHit, findAreaRoiHit, findPointHit, getAverage, getPointDelta, getRelativePoint, isPointInsideRoi, movePoint, moveRoi, roundMetric, roundPercent, } from "./asset-camera-geometry";
 const EMPTY_VIEWER_3D_MODEL_LABEL = "사용자 PLY 모델";
@@ -544,10 +546,10 @@ export function AssetCameraPanel({ activeCameraId, cameraFeeds = defaultCameraFe
                 </div>
                 {viewMode === "3d" ? (<div className="AssetCameraPanel AssetCameraPanel__container-19 grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_16rem] gap-3 overflow-hidden p-3 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)] lg:grid-rows-[minmax(0,1fr)]">
                     <div className="AssetCameraPanel AssetCameraPanel__viewer-wrap-1 h-full min-h-0 min-w-0">
-                      {readyViewer3DModelFile ? (<Three3DViewer activeAnalysisMode={viewer3DAnalysisMode} allowOptionBar={false} analysisSummary={selectedViewer3DAnalysisItem?.summary} analysisTargets={viewer3DAnalysisTargets} className="AssetCameraPanel AssetCameraPanel__viewer-1 h-full" config={currentViewer3DConfig} modelFile={readyViewer3DModelFile} selectedAnalysisTargetId={selectedViewer3DAnalysisTargetId} onAnalysisTargetCreate={handleViewer3DAnalysisTargetCreate} onAnalysisTargetSelect={handleViewer3DAnalysisTargetSelect} onConfigChange={handleViewer3DConfigChange} onModelFileChange={handleViewer3DModelFileChange}/>) : (<Viewer3DModelUploadPanel modelFile={currentViewer3DModelFile} onPlyFileChange={handleViewer3DPlyFileChange} onTextureFileChange={handleViewer3DTextureFileChange} onUseSample={handleUseSampleViewer3DModel}/>)}
+                      {readyViewer3DModelFile ? (<Three3DViewer activeAnalysisMode={viewer3DAnalysisMode} allowOptionBar={false} analysisSummary={selectedViewer3DAnalysisItem?.summary} analysisTargets={viewer3DAnalysisTargets} className="AssetCameraPanel AssetCameraPanel__viewer-1 h-full" config={currentViewer3DConfig} modelFile={readyViewer3DModelFile} selectedAnalysisTargetId={selectedViewer3DAnalysisTargetId} onAnalysisModeChange={handleViewer3DAnalysisModeChange} onAnalysisTargetCreate={handleViewer3DAnalysisTargetCreate} onAnalysisTargetSelect={handleViewer3DAnalysisTargetSelect} onConfigChange={handleViewer3DConfigChange} onModelFileChange={handleViewer3DModelFileChange}/>) : (<Viewer3DModelUploadPanel modelFile={currentViewer3DModelFile} onPlyFileChange={handleViewer3DPlyFileChange} onTextureFileChange={handleViewer3DTextureFileChange} onUseSample={handleUseSampleViewer3DModel}/>)}
                     </div>
 
-                    <Viewer3DAnalysisPanel activeMode={viewer3DAnalysisMode} config={currentViewer3DConfig} displaySettings={displaySettings} items={viewer3DAnalysisItems} modelFile={currentViewer3DModelFile ?? createViewer3DModelDraft()} selectedItem={selectedViewer3DAnalysisItem} selectedTargetId={selectedViewer3DAnalysisTargetId} onConfigChange={handleViewer3DConfigChange} onDelete={handleViewer3DAnalysisTargetDelete} onModeChange={handleViewer3DAnalysisModeChange} onModelFileChange={handleViewer3DModelFileChange} onSelect={handleViewer3DAnalysisTargetSelect} onUpdate={handleViewer3DAnalysisTargetUpdate}/>
+                    <Viewer3DAnalysisPanel activeMode={viewer3DAnalysisMode} config={currentViewer3DConfig} displaySettings={displaySettings} items={viewer3DAnalysisItems} modelFile={currentViewer3DModelFile ?? createViewer3DModelDraft()} selectedItem={selectedViewer3DAnalysisItem} selectedTargetId={selectedViewer3DAnalysisTargetId} onConfigChange={handleViewer3DConfigChange} onDelete={handleViewer3DAnalysisTargetDelete} onModelFileChange={handleViewer3DModelFileChange} onSelect={handleViewer3DAnalysisTargetSelect} onUpdate={handleViewer3DAnalysisTargetUpdate}/>
                   </div>) : (<div className="AssetCameraPanel AssetCameraPanel__container-19 grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_16rem] gap-3 overflow-hidden p-3 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)] lg:grid-rows-[minmax(0,1fr)]">
                     <div className="AssetCameraPanel AssetCameraPanel__camera-preview-wrap-1 grid min-h-0 min-w-0 place-items-center overflow-hidden rounded-md border border-cyan-200/25 bg-neutral-950/90 p-2 [container-type:size]">
                       <div className={cn("AssetCameraPanel AssetCameraPanel__container-20 relative h-[min(100cqw,100cqh)] w-[min(100cqw,100cqh)] touch-none overflow-hidden rounded-md border border-cyan-200/25 bg-neutral-950 shadow-[0_0_42px_rgba(34,211,238,0.2)]", isCameraSetupActive &&
@@ -611,23 +613,39 @@ function Viewer3DFilePicker({ accept, label, name, onFile, }) {
         }} type="file"/>
     </label>);
 }
-function Viewer3DAnalysisPanel({ activeMode, config, displaySettings, items, modelFile, onConfigChange, onDelete, onModeChange, onModelFileChange, onSelect, onUpdate, selectedItem, selectedTargetId, }) {
+function Viewer3DAnalysisPanel({ activeMode, config, displaySettings, items, modelFile, onConfigChange, onDelete, onModelFileChange, onSelect, onUpdate, selectedItem, selectedTargetId, }) {
     const [activePanelTab, setActivePanelTab] = useState("analysis");
     const selectedTarget = selectedItem?.target;
     const selectedSummary = selectedItem?.summary;
+    const selectedCamera = config.cameraVisualization?.selectedCameraId
+        ? getCameraPreset(config.cameraVisualization.selectedCameraId)
+        : undefined;
+    const handleResetCameraView = () => {
+        onConfigChange({
+            ...config,
+            autoRotate: DEFAULT_VIEWER_3D_CONFIG.autoRotate,
+            camera: {
+                ...DEFAULT_VIEWER_3D_CONFIG.camera,
+                position: { ...DEFAULT_VIEWER_3D_CONFIG.camera.position },
+                target: { ...DEFAULT_VIEWER_3D_CONFIG.camera.target },
+            },
+            cameraVisualization: {
+                ...config.cameraVisualization,
+                enabled: config.cameraVisualization?.enabled ?? true,
+                selectedCameraId: null,
+                showAll: true,
+            },
+        });
+    };
     return (<aside className="Viewer3DAnalysisPanel Viewer3DAnalysisPanel__aside-1 flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-md border border-border bg-card p-2 text-card-foreground">
       <div className="Viewer3DAnalysisPanel Viewer3DAnalysisPanel__tabs-1 mb-2 grid shrink-0 grid-cols-2 gap-1 rounded-md border border-border bg-background p-1" role="tablist" aria-label="3D 패널">
         <PanelTabButton active={activePanelTab === "analysis"} label="정밀 분석" onClick={() => setActivePanelTab("analysis")}/>
         <PanelTabButton active={activePanelTab === "settings"} label="설정" onClick={() => setActivePanelTab("settings")}/>
       </div>
       {activePanelTab === "analysis" ? (<div className="Viewer3DAnalysisPanel Viewer3DAnalysisPanel__stack-1 grid min-h-0 gap-2 overflow-y-auto pr-1">
-        <ControlSection icon={SquareDashedMousePointer} title="정밀 분석">
-          <div className="Viewer3DAnalysisPanel Viewer3DAnalysisPanel__modes-1 grid grid-cols-3 gap-1.5" role="group" aria-label="3D 분석 대상 추가">
-            <ModeButton active={!activeMode} icon={RotateCcw} label="탐색" onClick={() => onModeChange(undefined)}/>
-            <ModeButton active={activeMode === "point"} icon={MousePointer2} label="포인트" onClick={() => onModeChange("point")}/>
-            <ModeButton active={activeMode === "area"} icon={SquareDashedMousePointer} label="영역" onClick={() => onModeChange("area")}/>
-          </div>
+        <CameraVisualizationControls config={config.cameraVisualization} onChange={(cameraVisualization) => onConfigChange({ ...config, cameraVisualization })} onResetView={handleResetCameraView} selectedCamera={selectedCamera}/>
 
+        <ControlSection icon={SquareDashedMousePointer} title="분석 상태">
           <div className="Viewer3DAnalysisPanel Viewer3DAnalysisPanel__status-1 grid grid-cols-2 gap-1.5">
             <DetectionSetupStatusRow label="대상" value={`${items.length}개`}/>
             <DetectionSetupStatusRow label="모드" value={activeMode === "area" ? "영역" : activeMode === "point" ? "포인트" : "탐색"}/>
@@ -636,9 +654,15 @@ function Viewer3DAnalysisPanel({ activeMode, config, displaySettings, items, mod
 
         <ControlSection icon={Box} title="대상 목록">
           <div className="Viewer3DAnalysisPanel Viewer3DAnalysisPanel__list-1 grid gap-1.5">
-            {items.length ? (items.map((item) => (<button key={item.target.id} type="button" className={cn("Viewer3DAnalysisPanel Viewer3DAnalysisPanel__item-1 grid min-w-0 gap-1 rounded-md border bg-card px-2 py-2 text-left transition hover:bg-accent", item.target.id === selectedTargetId
+            {items.length ? (items.map((item) => (<div key={item.target.id} role="button" tabIndex={0} className={cn("Viewer3DAnalysisPanel Viewer3DAnalysisPanel__item-1 grid min-w-0 cursor-pointer gap-1 rounded-md border bg-card px-2 py-2 text-left transition hover:bg-accent", item.target.id === selectedTargetId
                 ? "border-primary"
-                : "border-border")} onClick={() => onSelect(item.target.id)} style={{
+                : "border-border")} onClick={() => onSelect(item.target.id)} onKeyDown={(event) => {
+                if (event.key !== "Enter" && event.key !== " ") {
+                    return;
+                }
+                event.preventDefault();
+                onSelect(item.target.id);
+            }} style={{
                 borderColor: item.target.id === selectedTargetId
                     ? item.target.color
                     : undefined,
@@ -647,15 +671,18 @@ function Viewer3DAnalysisPanel({ activeMode, config, displaySettings, items, mod
                     <span className="min-w-0 truncate text-xs font-semibold">
                       {item.target.name}
                     </span>
-                    <span className="shrink-0 rounded-sm border border-border bg-background px-1 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                      {item.target.kind === "area" ? "영역" : "포인트"}
-                    </span>
+                    <button type="button" className="Viewer3DAnalysisPanel Viewer3DAnalysisPanel__item-delete-1 grid h-5 w-5 shrink-0 place-items-center rounded-sm border border-destructive/70 bg-background text-destructive transition hover:border-destructive hover:bg-destructive/10" onClick={(event) => {
+                event.stopPropagation();
+                onDelete(item.target.id);
+            }} title="삭제" aria-label={`${item.target.name} 삭제`}>
+                      <Trash2 className="h-3 w-3" aria-hidden="true"/>
+                    </button>
                   </span>
                   <span className="Viewer3DAnalysisPanel Viewer3DAnalysisPanel__item-value-1 truncate font-mono text-[11px] text-muted-foreground">
                     최고 {item.summary.temperatureMax}℃ · Peak{" "}
                     {item.summary.ultrasoundPeakDb} dB
                   </span>
-                </button>))) : (<div className="Viewer3DAnalysisPanel Viewer3DAnalysisPanel__empty-1 rounded-md border border-dashed border-border bg-background px-2 py-3 text-center text-[11px] font-semibold text-muted-foreground">
+                </div>))) : (<div className="Viewer3DAnalysisPanel Viewer3DAnalysisPanel__empty-1 rounded-md border border-dashed border-border bg-background px-2 py-3 text-center text-[11px] font-semibold text-muted-foreground">
                 분석 대상 없음
               </div>)}
           </div>
@@ -714,7 +741,6 @@ function Viewer3DAnalysisPanel({ activeMode, config, displaySettings, items, mod
               <DetectionSetupStatusRow label="등록 시각" value={formatCreatedTime(selectedTarget.createdAt, displaySettings)}/>
             </div>
 
-            <IconButton icon={X} label="삭제" onClick={() => onDelete(selectedTarget.id)} showLabel variant="danger"/>
           </ControlSection>) : null}
 
         {selectedSummary ? (<ControlSection icon={Box} title="측정값">

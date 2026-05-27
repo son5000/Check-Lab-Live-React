@@ -34,6 +34,11 @@ export const DEFAULT_VIEWER_3D_CONFIG = {
         preset: "isometric",
         target: { x: 0, y: 0, z: 0 },
     },
+    cameraVisualization: {
+        enabled: true,
+        selectedCameraId: null,
+        showAll: true,
+    },
     controls: {
         autoRotateSpeed: 0.7,
         enableFileInputs: true,

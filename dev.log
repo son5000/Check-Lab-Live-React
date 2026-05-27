@@ -1,0 +1,1504 @@
+
+> checklab-front-react@0.1.0 dev
+> next dev --port 3000
+
+  ▲ Next.js 14.2.35
+  - Local:        http://localhost:3000
+  - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 2.7s
+ ○ Compiling / ...
+ ✓ Compiled /api/asset-dashboard/monitoring-tree in 9.2s (1870 modules)
+[CheckLab API] monitoring tree failed {
+  data: { message: 'Not Found' },
+  status: 404,
+  statusText: 'Not Found',
+  url: 'http://192.168.219.46:8000/api/v1/monitoring-tree'
+}
+[CheckLab API] native monitoring tree unavailable {
+  error: Error: Not Found
+      at requestCheckLabJson (webpack-internal:///(rsc)/./src/app/monitoring/services/checklab-api-client.js:62:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+      at async fetchMonitoringTree (webpack-internal:///(rsc)/./src/app/monitoring/services/monitoring-tree-api.js:19:18)
+      at async fetchBackendMonitoringTree (webpack-internal:///(rsc)/./src/app/monitoring/services/monitoring-tree-loader.js:13:16)
+      at async GET (webpack-internal:///(rsc)/./src/app/api/asset-dashboard/monitoring-tree/route.js:11:32)
+      at async C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:57228
+      at async eT.execute (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:46851)
+      at async eT.handle (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:58760)
+      at async doRender (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:1366:42)
+      at async cacheEntry.responseCache.get.routeKind (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:1588:28)
+      at async DevServer.renderToResponseWithComponentsImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:1496:28)
+      at async DevServer.renderPageComponent (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:1924:24)
+      at async DevServer.renderToResponseImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:1962:32)
+      at async DevServer.pipeImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:922:25)
+      at async NextNodeServer.handleCatchallRenderRequest (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\next-server.js:272:17)
+      at async DevServer.handleRequestImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:818:17)
+      at async C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\dev\next-dev-server.js:339:20
+      at async Span.traceAsyncFn (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\trace\trace.js:154:20)
+      at async DevServer.handleRequest (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\dev\next-dev-server.js:336:24)
+      at async invokeRender (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\router-server.js:179:21)
+      at async handleRequest (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\router-server.js:359:24)
+      at async requestHandlerImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\router-server.js:383:13)
+      at async Server.requestListener (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\start-server.js:141:13) {
+    data: { message: 'Not Found' },
+    status: 404,
+    statusText: 'Not Found'
+  }
+}
+[CheckLab API] global alerts success {
+  asset_id: undefined,
+  isRead: false,
+  limit: 100,
+  severity: undefined,
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/alerts?is_read=false&limit=100'
+}
+ GET / 200 in 9631ms
+[CheckLab API] global alerts success {
+  asset_id: undefined,
+  isRead: undefined,
+  limit: 200,
+  severity: undefined,
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/alerts?limit=200'
+}
+[CheckLab API] dashboard asset context success {
+  asset_id: 'asset-compressor-02',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-02/mock-dashboard'
+}
+[CheckLab API] dashboard asset context success {
+  asset_id: 'asset-compressor-01',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-01/mock-dashboard'
+}
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 200 in 4127ms
+[CheckLab API] dashboard asset context success {
+  asset_id: 'asset-compressor-02',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-02/mock-dashboard'
+}
+[CheckLab API] dashboard asset context success {
+  asset_id: 'asset-compressor-01',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-01/mock-dashboard'
+}
+ GET /api/asset-dashboard/monitoring-tree 200 in 4147ms
+[CheckLab API] asset thresholds success {
+  asset_id: 'asset-compressor-01',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-01/thresholds'
+}
+[CheckLab API] asset alerts success {
+  asset_id: 'asset-compressor-01',
+  isRead: undefined,
+  limit: 20,
+  severity: undefined,
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/alerts?asset_id=asset-compressor-01&limit=20'
+}
+[CheckLab API] asset events success {
+  asset_id: 'asset-compressor-01',
+  limit: 100,
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-01/events?limit=100'
+}
+[CheckLab API] asset dashboard success {
+  asset_id: 'asset-compressor-01',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-01/mock-dashboard'
+}
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 200 in 4349ms
+[CheckLab API] global alerts success {
+  asset_id: undefined,
+  isRead: false,
+  limit: 100,
+  severity: undefined,
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/alerts?is_read=false&limit=100'
+}
+[CheckLab API] dashboard asset context success {
+  asset_id: 'asset-compressor-02',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-02/mock-dashboard'
+}
+[CheckLab API] dashboard asset context success {
+  asset_id: 'asset-compressor-01',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-01/mock-dashboard'
+}
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 200 in 82ms
+[CheckLab API] asset dashboard success {
+  asset_id: 'asset-compressor-01',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-01/mock-dashboard'
+}
+[CheckLab API] monitoring tree failed {
+  data: { message: 'Not Found' },
+  status: 404,
+  statusText: 'Not Found',
+  url: 'http://192.168.219.46:8000/api/v1/monitoring-tree'
+}
+[CheckLab API] native monitoring tree unavailable {
+  error: Error: Not Found
+      at requestCheckLabJson (webpack-internal:///(rsc)/./src/app/monitoring/services/checklab-api-client.js:62:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+      at async fetchMonitoringTree (webpack-internal:///(rsc)/./src/app/monitoring/services/monitoring-tree-api.js:19:18)
+      at async fetchBackendMonitoringTree (webpack-internal:///(rsc)/./src/app/monitoring/services/monitoring-tree-loader.js:13:16)
+      at async GET (webpack-internal:///(rsc)/./src/app/api/asset-dashboard/monitoring-tree/route.js:11:32)
+      at async C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:57228
+      at async eT.execute (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:46851)
+      at async eT.handle (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:58760)
+      at async doRender (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:1366:42)
+      at async cacheEntry.responseCache.get.routeKind (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:1588:28)
+      at async DevServer.renderToResponseWithComponentsImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:1496:28)
+      at async DevServer.renderPageComponent (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:1924:24)
+      at async DevServer.renderToResponseImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:1962:32)
+      at async DevServer.pipeImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:922:25)
+      at async NextNodeServer.handleCatchallRenderRequest (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\next-server.js:272:17)
+      at async DevServer.handleRequestImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:818:17)
+      at async C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\dev\next-dev-server.js:339:20
+      at async Span.traceAsyncFn (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\trace\trace.js:154:20)
+      at async DevServer.handleRequest (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\dev\next-dev-server.js:336:24)
+      at async invokeRender (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\router-server.js:179:21)
+      at async handleRequest (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\router-server.js:359:24)
+      at async requestHandlerImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\router-server.js:383:13)
+      at async Server.requestListener (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\start-server.js:141:13) {
+    data: { message: 'Not Found' },
+    status: 404,
+    statusText: 'Not Found'
+  }
+}
+[CheckLab API] asset alerts success {
+  asset_id: 'asset-compressor-01',
+  isRead: undefined,
+  limit: 20,
+  severity: undefined,
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/alerts?asset_id=asset-compressor-01&limit=20'
+}
+[CheckLab API] asset thresholds success {
+  asset_id: 'asset-compressor-01',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-01/thresholds'
+}
+[CheckLab API] asset events success {
+  asset_id: 'asset-compressor-01',
+  limit: 100,
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-01/events?limit=100'
+}
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 200 in 98ms
+[CheckLab API] global alerts success {
+  asset_id: undefined,
+  isRead: undefined,
+  limit: 200,
+  severity: undefined,
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/alerts?limit=200'
+}
+[CheckLab API] dashboard asset context success {
+  asset_id: 'asset-compressor-02',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-02/mock-dashboard'
+}
+[CheckLab API] dashboard asset context success {
+  asset_id: 'asset-compressor-01',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-01/mock-dashboard'
+}
+ GET /api/asset-dashboard/monitoring-tree 200 in 148ms
+[CheckLab API] global alerts success {
+  asset_id: undefined,
+  isRead: false,
+  limit: 100,
+  severity: undefined,
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/alerts?is_read=false&limit=100'
+}
+[CheckLab API] monitoring tree failed {
+  data: { message: 'Not Found' },
+  status: 404,
+  statusText: 'Not Found',
+  url: 'http://192.168.219.46:8000/api/v1/monitoring-tree'
+}
+[CheckLab API] native monitoring tree unavailable {
+  error: Error: Not Found
+      at requestCheckLabJson (webpack-internal:///(rsc)/./src/app/monitoring/services/checklab-api-client.js:62:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+      at async fetchMonitoringTree (webpack-internal:///(rsc)/./src/app/monitoring/services/monitoring-tree-api.js:19:18)
+      at async fetchBackendMonitoringTree (webpack-internal:///(rsc)/./src/app/monitoring/services/monitoring-tree-loader.js:13:16)
+      at async GET (webpack-internal:///(rsc)/./src/app/api/asset-dashboard/monitoring-tree/route.js:11:32)
+      at async C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:57228
+      at async eT.execute (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:46851)
+      at async eT.handle (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:58760)
+      at async doRender (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:1366:42)
+      at async cacheEntry.responseCache.get.routeKind (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:1588:28)
+      at async DevServer.renderToResponseWithComponentsImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:1496:28)
+      at async DevServer.renderPageComponent (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:1924:24)
+      at async DevServer.renderToResponseImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:1962:32)
+      at async DevServer.pipeImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:922:25)
+      at async NextNodeServer.handleCatchallRenderRequest (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\next-server.js:272:17)
+      at async DevServer.handleRequestImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:818:17)
+      at async C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\dev\next-dev-server.js:339:20
+      at async Span.traceAsyncFn (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\trace\trace.js:154:20)
+      at async DevServer.handleRequest (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\dev\next-dev-server.js:336:24)
+      at async invokeRender (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\router-server.js:179:21)
+      at async handleRequest (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\router-server.js:359:24)
+      at async requestHandlerImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\router-server.js:383:13)
+      at async Server.requestListener (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\start-server.js:141:13) {
+    data: { message: 'Not Found' },
+    status: 404,
+    statusText: 'Not Found'
+  }
+}
+[CheckLab API] asset alerts success {
+  asset_id: 'asset-compressor-01',
+  isRead: undefined,
+  limit: 20,
+  severity: undefined,
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/alerts?asset_id=asset-compressor-01&limit=20'
+}
+[CheckLab API] asset thresholds success {
+  asset_id: 'asset-compressor-01',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-01/thresholds'
+}
+[CheckLab API] asset events success {
+  asset_id: 'asset-compressor-01',
+  limit: 100,
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-01/events?limit=100'
+}
+[CheckLab API] global alerts success {
+  asset_id: undefined,
+  isRead: undefined,
+  limit: 200,
+  severity: undefined,
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/alerts?limit=200'
+}
+[CheckLab API] asset dashboard success {
+  asset_id: 'asset-compressor-01',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-01/mock-dashboard'
+}
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 200 in 107ms
+[CheckLab API] dashboard asset context success {
+  asset_id: 'asset-compressor-01',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-01/mock-dashboard'
+}
+[CheckLab API] dashboard asset context success {
+  asset_id: 'asset-compressor-02',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-02/mock-dashboard'
+}
+[CheckLab API] dashboard asset context success {
+  asset_id: 'asset-compressor-02',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-02/mock-dashboard'
+}
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 200 in 128ms
+[CheckLab API] dashboard asset context success {
+  asset_id: 'asset-compressor-01',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-01/mock-dashboard'
+}
+ GET /api/asset-dashboard/monitoring-tree 200 in 129ms
+[CheckLab API] global alerts success {
+  asset_id: undefined,
+  isRead: false,
+  limit: 100,
+  severity: undefined,
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/alerts?is_read=false&limit=100'
+}
+[CheckLab API] monitoring tree failed {
+  data: { message: 'Not Found' },
+  status: 404,
+  statusText: 'Not Found',
+  url: 'http://192.168.219.46:8000/api/v1/monitoring-tree'
+}
+[CheckLab API] native monitoring tree unavailable {
+  error: Error: Not Found
+      at requestCheckLabJson (webpack-internal:///(rsc)/./src/app/monitoring/services/checklab-api-client.js:62:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+      at async fetchMonitoringTree (webpack-internal:///(rsc)/./src/app/monitoring/services/monitoring-tree-api.js:19:18)
+      at async fetchBackendMonitoringTree (webpack-internal:///(rsc)/./src/app/monitoring/services/monitoring-tree-loader.js:13:16)
+      at async GET (webpack-internal:///(rsc)/./src/app/api/asset-dashboard/monitoring-tree/route.js:11:32)
+      at async C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:57228
+      at async eT.execute (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:46851)
+      at async eT.handle (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:58760)
+      at async doRender (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:1366:42)
+      at async cacheEntry.responseCache.get.routeKind (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:1588:28)
+      at async DevServer.renderToResponseWithComponentsImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:1496:28)
+      at async DevServer.renderPageComponent (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:1924:24)
+      at async DevServer.renderToResponseImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:1962:32)
+      at async DevServer.pipeImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:922:25)
+      at async NextNodeServer.handleCatchallRenderRequest (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\next-server.js:272:17)
+      at async DevServer.handleRequestImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:818:17)
+      at async C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\dev\next-dev-server.js:339:20
+      at async Span.traceAsyncFn (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\trace\trace.js:154:20)
+      at async DevServer.handleRequest (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\dev\next-dev-server.js:336:24)
+      at async invokeRender (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\router-server.js:179:21)
+      at async handleRequest (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\router-server.js:359:24)
+      at async requestHandlerImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\router-server.js:383:13)
+      at async Server.requestListener (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\start-server.js:141:13) {
+    data: { message: 'Not Found' },
+    status: 404,
+    statusText: 'Not Found'
+  }
+}
+[CheckLab API] dashboard asset context success {
+  asset_id: 'asset-compressor-01',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-01/mock-dashboard'
+}
+[CheckLab API] global alerts success {
+  asset_id: undefined,
+  isRead: undefined,
+  limit: 200,
+  severity: undefined,
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/alerts?limit=200'
+}
+[CheckLab API] asset alerts success {
+  asset_id: 'asset-compressor-01',
+  isRead: undefined,
+  limit: 20,
+  severity: undefined,
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/alerts?asset_id=asset-compressor-01&limit=20'
+}
+[CheckLab API] asset thresholds success {
+  asset_id: 'asset-compressor-01',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-01/thresholds'
+}
+[CheckLab API] asset events success {
+  asset_id: 'asset-compressor-01',
+  limit: 100,
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-01/events?limit=100'
+}
+[CheckLab API] asset dashboard success {
+  asset_id: 'asset-compressor-01',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-01/mock-dashboard'
+}
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 200 in 113ms
+[CheckLab API] dashboard asset context success {
+  asset_id: 'asset-compressor-02',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-02/mock-dashboard'
+}
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 200 in 122ms
+[CheckLab API] dashboard asset context success {
+  asset_id: 'asset-compressor-01',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-01/mock-dashboard'
+}
+[CheckLab API] dashboard asset context success {
+  asset_id: 'asset-compressor-02',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-02/mock-dashboard'
+}
+ GET /api/asset-dashboard/monitoring-tree 200 in 127ms
+[CheckLab API] monitoring tree failed {
+  data: { message: 'Not Found' },
+  status: 404,
+  statusText: 'Not Found',
+  url: 'http://192.168.219.46:8000/api/v1/monitoring-tree'
+}
+[CheckLab API] native monitoring tree unavailable {
+  error: Error: Not Found
+      at requestCheckLabJson (webpack-internal:///(rsc)/./src/app/monitoring/services/checklab-api-client.js:62:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+      at async fetchMonitoringTree (webpack-internal:///(rsc)/./src/app/monitoring/services/monitoring-tree-api.js:19:18)
+      at async fetchBackendMonitoringTree (webpack-internal:///(rsc)/./src/app/monitoring/services/monitoring-tree-loader.js:13:16)
+      at async GET (webpack-internal:///(rsc)/./src/app/api/asset-dashboard/monitoring-tree/route.js:11:32)
+      at async C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:57228
+      at async eT.execute (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:46851)
+      at async eT.handle (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:58760)
+      at async doRender (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:1366:42)
+      at async cacheEntry.responseCache.get.routeKind (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:1588:28)
+      at async DevServer.renderToResponseWithComponentsImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:1496:28)
+      at async DevServer.renderPageComponent (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:1924:24)
+      at async DevServer.renderToResponseImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:1962:32)
+      at async DevServer.pipeImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:922:25)
+      at async NextNodeServer.handleCatchallRenderRequest (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\next-server.js:272:17)
+      at async DevServer.handleRequestImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:818:17)
+      at async C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\dev\next-dev-server.js:339:20
+      at async Span.traceAsyncFn (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\trace\trace.js:154:20)
+      at async DevServer.handleRequest (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\dev\next-dev-server.js:336:24)
+      at async invokeRender (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\router-server.js:179:21)
+      at async handleRequest (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\router-server.js:359:24)
+      at async requestHandlerImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\router-server.js:383:13)
+      at async Server.requestListener (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\start-server.js:141:13) {
+    data: { message: 'Not Found' },
+    status: 404,
+    statusText: 'Not Found'
+  }
+}
+[CheckLab API] global alerts success {
+  asset_id: undefined,
+  isRead: false,
+  limit: 100,
+  severity: undefined,
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/alerts?is_read=false&limit=100'
+}
+[CheckLab API] asset thresholds success {
+  asset_id: 'asset-compressor-01',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-01/thresholds'
+}
+[CheckLab API] asset events success {
+  asset_id: 'asset-compressor-01',
+  limit: 100,
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-01/events?limit=100'
+}
+[CheckLab API] asset alerts success {
+  asset_id: 'asset-compressor-01',
+  isRead: undefined,
+  limit: 20,
+  severity: undefined,
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/alerts?asset_id=asset-compressor-01&limit=20'
+}
+[CheckLab API] global alerts success {
+  asset_id: undefined,
+  isRead: undefined,
+  limit: 200,
+  severity: undefined,
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/alerts?limit=200'
+}
+[CheckLab API] dashboard asset context success {
+  asset_id: 'asset-compressor-01',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-01/mock-dashboard'
+}
+[CheckLab API] asset dashboard success {
+  asset_id: 'asset-compressor-01',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-01/mock-dashboard'
+}
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 200 in 112ms
+[CheckLab API] dashboard asset context success {
+  asset_id: 'asset-compressor-02',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-02/mock-dashboard'
+}
+[CheckLab API] dashboard asset context success {
+  asset_id: 'asset-compressor-02',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-02/mock-dashboard'
+}
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 200 in 129ms
+[CheckLab API] dashboard asset context success {
+  asset_id: 'asset-compressor-01',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-01/mock-dashboard'
+}
+ GET /api/asset-dashboard/monitoring-tree 200 in 129ms
+[CheckLab API] global alerts success {
+  asset_id: undefined,
+  isRead: false,
+  limit: 100,
+  severity: undefined,
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/alerts?is_read=false&limit=100'
+}
+[CheckLab API] dashboard asset context success {
+  asset_id: 'asset-compressor-02',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-02/mock-dashboard'
+}
+[CheckLab API] dashboard asset context success {
+  asset_id: 'asset-compressor-01',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-01/mock-dashboard'
+}
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 200 in 67ms
+[CheckLab API] monitoring tree failed {
+  data: { message: 'Not Found' },
+  status: 404,
+  statusText: 'Not Found',
+  url: 'http://192.168.219.46:8000/api/v1/monitoring-tree'
+}
+[CheckLab API] native monitoring tree unavailable {
+  error: Error: Not Found
+      at requestCheckLabJson (webpack-internal:///(rsc)/./src/app/monitoring/services/checklab-api-client.js:62:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+      at async fetchMonitoringTree (webpack-internal:///(rsc)/./src/app/monitoring/services/monitoring-tree-api.js:19:18)
+      at async fetchBackendMonitoringTree (webpack-internal:///(rsc)/./src/app/monitoring/services/monitoring-tree-loader.js:13:16)
+      at async GET (webpack-internal:///(rsc)/./src/app/api/asset-dashboard/monitoring-tree/route.js:11:32)
+      at async C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:57228
+      at async eT.execute (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:46851)
+      at async eT.handle (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:58760)
+      at async doRender (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:1366:42)
+      at async cacheEntry.responseCache.get.routeKind (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:1588:28)
+      at async DevServer.renderToResponseWithComponentsImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:1496:28)
+      at async DevServer.renderPageComponent (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:1924:24)
+      at async DevServer.renderToResponseImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:1962:32)
+      at async DevServer.pipeImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:922:25)
+      at async NextNodeServer.handleCatchallRenderRequest (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\next-server.js:272:17)
+      at async DevServer.handleRequestImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:818:17)
+      at async C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\dev\next-dev-server.js:339:20
+      at async Span.traceAsyncFn (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\trace\trace.js:154:20)
+      at async DevServer.handleRequest (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\dev\next-dev-server.js:336:24)
+      at async invokeRender (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\router-server.js:179:21)
+      at async handleRequest (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\router-server.js:359:24)
+      at async requestHandlerImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\router-server.js:383:13)
+      at async Server.requestListener (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\start-server.js:141:13) {
+    data: { message: 'Not Found' },
+    status: 404,
+    statusText: 'Not Found'
+  }
+}
+[CheckLab API] asset events success {
+  asset_id: 'asset-compressor-01',
+  limit: 100,
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-01/events?limit=100'
+}
+[CheckLab API] asset alerts success {
+  asset_id: 'asset-compressor-01',
+  isRead: undefined,
+  limit: 20,
+  severity: undefined,
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/alerts?asset_id=asset-compressor-01&limit=20'
+}
+[CheckLab API] asset thresholds success {
+  asset_id: 'asset-compressor-01',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-01/thresholds'
+}
+[CheckLab API] asset dashboard success {
+  asset_id: 'asset-compressor-01',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-01/mock-dashboard'
+}
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 200 in 88ms
+[CheckLab API] global alerts success {
+  asset_id: undefined,
+  isRead: undefined,
+  limit: 200,
+  severity: undefined,
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/alerts?limit=200'
+}
+[CheckLab API] dashboard asset context success {
+  asset_id: 'asset-compressor-02',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-02/mock-dashboard'
+}
+[CheckLab API] dashboard asset context success {
+  asset_id: 'asset-compressor-01',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-01/mock-dashboard'
+}
+ GET /api/asset-dashboard/monitoring-tree 200 in 111ms
+ ⨯ Failed to generate static paths for /api/asset-dashboard/[asset_id]:
+Error: ENOENT: no such file or directory, open 'C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\build-manifest.json'
+    at readFileSync (node:fs:449:20)
+    at loadManifest (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\load-manifest.js:36:52)
+    at loadManifestWithRetries (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\load-components.js:40:51)
+    at runNextTicks (node:internal/process/task_queues:60:5)
+    at listOnTimeout (node:internal/timers:545:9)
+    at process.processTimers (node:internal/timers:519:7)
+    at async Promise.all (index 0)
+    at async loadComponentsImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\load-components.js:84:100)
+    at async Object.loadStaticPaths (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\dev\static-paths-worker.js:23:24) {
+  type: 'Error',
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\.next\\build-manifest.json'
+}
+[CheckLab API] global alerts success {
+  asset_id: undefined,
+  isRead: false,
+  limit: 100,
+  severity: undefined,
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/alerts?is_read=false&limit=100'
+}
+[CheckLab API] dashboard asset context success {
+  asset_id: 'asset-compressor-02',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-02/mock-dashboard'
+}
+[CheckLab API] monitoring tree failed {
+  data: { message: 'Not Found' },
+  status: 404,
+  statusText: 'Not Found',
+  url: 'http://192.168.219.46:8000/api/v1/monitoring-tree'
+}
+[CheckLab API] native monitoring tree unavailable {
+  error: Error: Not Found
+      at requestCheckLabJson (webpack-internal:///(rsc)/./src/app/monitoring/services/checklab-api-client.js:62:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+      at async fetchMonitoringTree (webpack-internal:///(rsc)/./src/app/monitoring/services/monitoring-tree-api.js:19:18)
+      at async fetchBackendMonitoringTree (webpack-internal:///(rsc)/./src/app/monitoring/services/monitoring-tree-loader.js:13:16)
+      at async GET (webpack-internal:///(rsc)/./src/app/api/asset-dashboard/monitoring-tree/route.js:11:32)
+      at async C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:57228
+      at async eT.execute (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:46851)
+      at async eT.handle (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:58760)
+      at async doRender (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:1366:42)
+      at async cacheEntry.responseCache.get.routeKind (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:1588:28)
+      at async DevServer.renderToResponseWithComponentsImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:1496:28)
+      at async DevServer.renderPageComponent (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:1924:24)
+      at async DevServer.renderToResponseImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:1962:32)
+      at async DevServer.pipeImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:922:25)
+      at async NextNodeServer.handleCatchallRenderRequest (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\next-server.js:272:17)
+      at async DevServer.handleRequestImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:818:17)
+      at async C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\dev\next-dev-server.js:339:20
+      at async Span.traceAsyncFn (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\trace\trace.js:154:20)
+      at async DevServer.handleRequest (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\dev\next-dev-server.js:336:24)
+      at async invokeRender (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\router-server.js:179:21)
+      at async handleRequest (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\router-server.js:359:24)
+      at async requestHandlerImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\router-server.js:383:13)
+      at async Server.requestListener (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\start-server.js:141:13) {
+    data: { message: 'Not Found' },
+    status: 404,
+    statusText: 'Not Found'
+  }
+}
+[CheckLab API] dashboard asset context success {
+  asset_id: 'asset-compressor-01',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-01/mock-dashboard'
+}
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 200 in 70ms
+[CheckLab API] global alerts success {
+  asset_id: undefined,
+  isRead: undefined,
+  limit: 200,
+  severity: undefined,
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/alerts?limit=200'
+}
+[CheckLab API] dashboard asset context success {
+  asset_id: 'asset-compressor-02',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-02/mock-dashboard'
+}
+[CheckLab API] dashboard asset context success {
+  asset_id: 'asset-compressor-01',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-01/mock-dashboard'
+}
+ GET /api/asset-dashboard/monitoring-tree 200 in 90ms
+ ⨯ Error: ENOENT: no such file or directory, open 'C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\build-manifest.json'
+    at readFileSync (node:fs:449:20)
+    at loadManifest (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\load-manifest.js:36:52)
+    at loadManifestWithRetries (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\load-components.js:40:51)
+    at runNextTicks (node:internal/process/task_queues:60:5)
+    at listOnTimeout (node:internal/timers:545:9)
+    at process.processTimers (node:internal/timers:519:7)
+    at async Promise.all (index 0)
+    at async loadComponentsImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\load-components.js:84:100)
+    at async Object.loadStaticPaths (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\dev\static-paths-worker.js:23:24) {
+  type: 'Error',
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\.next\\build-manifest.json',
+  page: '/api/asset-dashboard/asset-compressor-01'
+}
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 2.5s (2079 modules)
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 500 in 3371ms
+ ⨯ Error: Cannot find module './8948.js'
+Require stack:
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\pages\_document.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\require.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\load-components.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\build\utils.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\dev\hot-middleware.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\dev\hot-reloader-webpack.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\router-utils\setup-dev-bundler.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\router-server.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\start-server.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1212:15)
+    at C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\require-hook.js:55:36
+    at Module._load (node:internal/modules/cjs/loader:1043:27)
+    at Module.require (node:internal/modules/cjs/loader:1298:19)
+    at mod.require (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\require-hook.js:65:28)
+    at require (node:internal/modules/helpers:182:18)
+    at __webpack_require__.f.require (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js:198:28)
+    at C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js:111:40
+    at Array.reduce (<anonymous>)
+    at __webpack_require__.e (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js:110:67)
+    at Array.map (<anonymous>)
+    at __webpack_require__.X (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js:162:22)
+    at C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\app\api\asset-dashboard\alerts\route.js:1:7797
+    at Object.<anonymous> (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\app\api\asset-dashboard\alerts\route.js:1:7840)
+    at Module._compile (node:internal/modules/cjs/loader:1529:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1613:10)
+    at Module.load (node:internal/modules/cjs/loader:1275:32)
+    at Module._load (node:internal/modules/cjs/loader:1096:12)
+    at Module.require (node:internal/modules/cjs/loader:1298:19)
+    at mod.require (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\require-hook.js:65:28)
+    at require (node:internal/modules/helpers:182:18)
+    at requirePage (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\require.js:109:84)
+    at C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\load-components.js:103:84
+    at async loadComponentsImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\load-components.js:103:26)
+    at async DevServer.findPageComponentsImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\next-server.js:714:36)
+    at async DevServer.findPageComponents (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\dev\next-dev-server.js:577:20)
+    at async DevServer.renderPageComponent (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:1910:24)
+    at async DevServer.renderToResponseImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:1962:32)
+    at async DevServer.pipeImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:922:25)
+    at async NextNodeServer.handleCatchallRenderRequest (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\next-server.js:272:17)
+    at async DevServer.handleRequestImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:818:17)
+    at async C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\dev\next-dev-server.js:339:20
+    at async Span.traceAsyncFn (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\trace\trace.js:154:20)
+    at async DevServer.handleRequest (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\dev\next-dev-server.js:336:24)
+    at async invokeRender (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\router-server.js:179:21)
+    at async handleRequest (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\router-server.js:359:24)
+    at async requestHandlerImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\router-server.js:383:13)
+    at async Server.requestListener (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\start-server.js:141:13) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\.next\\server\\webpack-runtime.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\.next\\server\\pages\\_document.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\require.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\load-components.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\build\\utils.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\dev\\hot-middleware.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\dev\\hot-reloader-webpack.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\lib\\router-utils\\setup-dev-bundler.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\lib\\router-server.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\lib\\start-server.js'
+  ],
+  page: '/api/asset-dashboard/alerts'
+}
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 500 in 61ms
+ ⨯ Error: Cannot find module './8948.js'
+Require stack:
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\pages\_document.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\require.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\load-components.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\build\utils.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\dev\hot-middleware.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\dev\hot-reloader-webpack.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\router-utils\setup-dev-bundler.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\router-server.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\start-server.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1212:15)
+    at C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\require-hook.js:55:36
+    at Module._load (node:internal/modules/cjs/loader:1043:27)
+    at Module.require (node:internal/modules/cjs/loader:1298:19)
+    at mod.require (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\require-hook.js:65:28)
+    at require (node:internal/modules/helpers:182:18)
+    at __webpack_require__.f.require (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js:198:28)
+    at C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js:111:40
+    at Array.reduce (<anonymous>)
+    at __webpack_require__.e (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js:110:67)
+    at Array.map (<anonymous>)
+    at __webpack_require__.X (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js:162:22)
+    at C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\app\api\asset-dashboard\[asset_id]\route.js:1:4911
+    at Object.<anonymous> (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\app\api\asset-dashboard\[asset_id]\route.js:1:4959)
+    at Module._compile (node:internal/modules/cjs/loader:1529:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1613:10)
+    at Module.load (node:internal/modules/cjs/loader:1275:32)
+    at Module._load (node:internal/modules/cjs/loader:1096:12)
+    at Module.require (node:internal/modules/cjs/loader:1298:19)
+    at mod.require (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\require-hook.js:65:28)
+    at require (node:internal/modules/helpers:182:18)
+    at requirePage (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\require.js:109:84)
+    at C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\load-components.js:103:84
+    at async loadComponentsImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\load-components.js:103:26)
+    at async DevServer.findPageComponentsImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\next-server.js:714:36)
+    at async DevServer.findPageComponents (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\dev\next-dev-server.js:577:20)
+    at async DevServer.renderPageComponent (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:1910:24)
+    at async DevServer.renderToResponseImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:1962:32)
+    at async DevServer.pipeImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:922:25)
+    at async NextNodeServer.handleCatchallRenderRequest (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\next-server.js:272:17)
+    at async DevServer.handleRequestImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:818:17)
+    at async C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\dev\next-dev-server.js:339:20
+    at async Span.traceAsyncFn (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\trace\trace.js:154:20)
+    at async DevServer.handleRequest (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\dev\next-dev-server.js:336:24)
+    at async invokeRender (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\router-server.js:179:21)
+    at async handleRequest (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\router-server.js:359:24)
+    at async requestHandlerImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\router-server.js:383:13)
+    at async Server.requestListener (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\start-server.js:141:13) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\.next\\server\\webpack-runtime.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\.next\\server\\pages\\_document.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\require.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\load-components.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\build\\utils.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\dev\\hot-middleware.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\dev\\hot-reloader-webpack.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\lib\\router-utils\\setup-dev-bundler.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\lib\\router-server.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\lib\\start-server.js'
+  ],
+  page: '/api/asset-dashboard/asset-compressor-01'
+}
+ ⨯ Error: Cannot find module './8948.js'
+Require stack:
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\pages\_document.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\require.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\load-components.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\build\utils.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\dev\hot-middleware.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\dev\hot-reloader-webpack.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\router-utils\setup-dev-bundler.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\router-server.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\start-server.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1212:15)
+    at C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\require-hook.js:55:36
+    at Module._load (node:internal/modules/cjs/loader:1043:27)
+    at Module.require (node:internal/modules/cjs/loader:1298:19)
+    at mod.require (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\require-hook.js:65:28)
+    at require (node:internal/modules/helpers:182:18)
+    at __webpack_require__.f.require (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js:198:28)
+    at C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js:111:40
+    at Array.reduce (<anonymous>)
+    at __webpack_require__.e (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js:110:67)
+    at Array.map (<anonymous>)
+    at __webpack_require__.X (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js:162:22)
+    at C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\app\api\asset-dashboard\monitoring-tree\route.js:1:1532
+    at Object.<anonymous> (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\app\api\asset-dashboard\monitoring-tree\route.js:1:1580)
+    at Module._compile (node:internal/modules/cjs/loader:1529:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1613:10)
+    at Module.load (node:internal/modules/cjs/loader:1275:32)
+    at Module._load (node:internal/modules/cjs/loader:1096:12)
+    at Module.require (node:internal/modules/cjs/loader:1298:19)
+    at mod.require (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\require-hook.js:65:28)
+    at require (node:internal/modules/helpers:182:18)
+    at requirePage (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\require.js:109:84)
+    at C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\load-components.js:103:84
+    at async loadComponentsImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\load-components.js:103:26)
+    at async DevServer.findPageComponentsImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\next-server.js:714:36)
+    at async DevServer.findPageComponents (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\dev\next-dev-server.js:577:20)
+    at async DevServer.renderPageComponent (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:1910:24)
+    at async DevServer.renderToResponseImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:1962:32)
+    at async DevServer.pipeImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:922:25)
+    at async NextNodeServer.handleCatchallRenderRequest (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\next-server.js:272:17)
+    at async DevServer.handleRequestImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\base-server.js:818:17)
+    at async C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\dev\next-dev-server.js:339:20
+    at async Span.traceAsyncFn (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\trace\trace.js:154:20)
+    at async DevServer.handleRequest (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\dev\next-dev-server.js:336:24)
+    at async invokeRender (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\router-server.js:179:21)
+    at async handleRequest (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\router-server.js:359:24)
+    at async requestHandlerImpl (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\router-server.js:383:13)
+    at async Server.requestListener (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\lib\start-server.js:141:13) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\.next\\server\\webpack-runtime.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\.next\\server\\pages\\_document.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\require.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\load-components.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\build\\utils.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\dev\\hot-middleware.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\dev\\hot-reloader-webpack.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\lib\\router-utils\\setup-dev-bundler.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\lib\\router-server.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\lib\\start-server.js'
+  ],
+  page: '/api/asset-dashboard/monitoring-tree'
+}
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 500 in 82ms
+ GET /api/asset-dashboard/monitoring-tree 500 in 85ms
+ ○ Compiling /_not-found ...
+ ✓ Compiled /_not-found in 541ms (1075 modules)
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 762ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 771ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 768ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 89ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 95ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 98ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 90ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 90ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 87ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 88ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 86ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 88ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 79ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 80ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 79ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 80ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 85ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 88ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 74ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 78ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 94ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 80ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 92ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 90ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 80ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 82ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 93ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 81ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 79ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 79ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 84ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 89ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 91ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 69ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 73ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 103ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 84ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 82ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 83ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 75ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 83ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 89ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 76ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 77ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 87ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 70ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 73ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 150ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 70ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 77ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 91ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 76ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 75ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 76ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 74ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 76ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 80ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 71ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 76ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 89ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 80ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 78ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 79ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 77ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 78ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 80ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 68ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 71ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 123ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 73ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 76ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 90ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 89ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 87ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 88ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 66ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 71ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 122ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 74ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 74ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 73ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 67ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 72ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 90ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 65ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 69ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 101ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 64ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 69ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 138ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 69ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 74ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 78ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 70ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 93ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 98ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 86ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 87ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 85ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 76ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 75ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 76ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 74ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 74ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 89ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 71ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 73ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 92ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 76ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 74ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 90ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 70ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 76ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 77ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 76ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 75ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 76ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 76ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 74ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 76ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 68ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 71ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 77ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 70ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 74ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 79ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 67ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 70ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 102ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 66ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 69ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 71ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 73ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 71ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 73ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 66ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 70ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 91ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 82ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 84ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 90ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 68ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 74ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 104ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 71ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 71ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 73ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 68ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 74ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 78ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 64ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 67ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 123ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 64ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 66ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 88ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 95ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 94ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 96ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 73ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 72ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 73ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 69ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 72ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 74ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 70ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 73ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 91ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 71ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 75ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 91ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 67ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 75ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 79ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 63ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 95ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 96ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 72ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 77ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 80ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 102ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 105ms
+ GET /api/asset-dashboard/monitoring-tree 404 in 113ms
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 69ms
+ ○ Compiling /site/[site_id]/location/[locationId]/asset/[asset_id] ...
+ ✓ Compiled /site/[site_id]/location/[locationId]/asset/[asset_id] in 5.4s (2244 modules)
+ GET /api/asset-dashboard/asset-compressor-01?language=ko&timeFormat=24h 404 in 5130ms
+ GET /api/asset-dashboard/alerts?limit=100&is_read=false 404 in 4000ms
+ ⨯ Error: Cannot find module './vendor-chunks/@swc.js'
+Require stack:
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\app\site\[site_id]\location\[locationId]\asset\[asset_id]\page.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\require.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\load-components.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\build\utils.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\dev\static-paths-worker.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\compiled\jest-worker\processChild.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1212:15)
+    at C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\require-hook.js:55:36
+    at Module._load (node:internal/modules/cjs/loader:1043:27)
+    at Module.require (node:internal/modules/cjs/loader:1298:19)
+    at mod.require (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\require-hook.js:65:28)
+    at require (node:internal/modules/helpers:182:18)
+    at __webpack_require__.f.require (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js:198:28)
+    at C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js:111:40
+    at Array.reduce (<anonymous>)
+    at __webpack_require__.e (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js:110:67) {
+  type: 'Error',
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\.next\\server\\webpack-runtime.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\.next\\server\\app\\site\\[site_id]\\location\\[locationId]\\asset\\[asset_id]\\page.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\require.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\load-components.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\build\\utils.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\dev\\static-paths-worker.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\compiled\\jest-worker\\processChild.js'
+  ],
+  page: '/site/compression-process/location/compression-process-machine-room-1f/asset/asset-compressor-01'
+}
+ ✓ Compiled /_error in 452ms (2246 modules)
+ GET /site/compression-process/location/compression-process-machine-room-1f/asset/asset-compressor-01 500 in 6612ms
+ ⨯ Error: Cannot find module './vendor-chunks/@swc.js'
+Require stack:
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\app\site\[site_id]\location\[locationId]\asset\[asset_id]\page.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\require.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\load-components.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\build\utils.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\dev\static-paths-worker.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\compiled\jest-worker\processChild.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1212:15)
+    at C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\require-hook.js:55:36
+    at Module._load (node:internal/modules/cjs/loader:1043:27)
+    at Module.require (node:internal/modules/cjs/loader:1298:19)
+    at mod.require (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\require-hook.js:65:28)
+    at require (node:internal/modules/helpers:182:18)
+    at __webpack_require__.f.require (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js:198:28)
+    at C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js:111:40
+    at Array.reduce (<anonymous>)
+    at __webpack_require__.e (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js:110:67) {
+  type: 'Error',
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\.next\\server\\webpack-runtime.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\.next\\server\\app\\site\\[site_id]\\location\\[locationId]\\asset\\[asset_id]\\page.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\require.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\load-components.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\build\\utils.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\dev\\static-paths-worker.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\compiled\\jest-worker\\processChild.js'
+  ],
+  page: '/site/compression-process/location/compression-process-machine-room-1f/asset/asset-compressor-01'
+}
+ GET /site/compression-process/location/compression-process-machine-room-1f/asset/asset-compressor-01 500 in 504ms
+ ⨯ Error: Cannot find module './vendor-chunks/@swc.js'
+Require stack:
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\app\site\[site_id]\location\[locationId]\asset\[asset_id]\page.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\require.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\load-components.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\build\utils.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\dev\static-paths-worker.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\compiled\jest-worker\processChild.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1212:15)
+    at C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\require-hook.js:55:36
+    at Module._load (node:internal/modules/cjs/loader:1043:27)
+    at Module.require (node:internal/modules/cjs/loader:1298:19)
+    at mod.require (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\require-hook.js:65:28)
+    at require (node:internal/modules/helpers:182:18)
+    at __webpack_require__.f.require (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js:198:28)
+    at C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js:111:40
+    at Array.reduce (<anonymous>)
+    at __webpack_require__.e (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js:110:67) {
+  type: 'Error',
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\.next\\server\\webpack-runtime.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\.next\\server\\app\\site\\[site_id]\\location\\[locationId]\\asset\\[asset_id]\\page.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\require.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\load-components.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\build\\utils.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\dev\\static-paths-worker.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\compiled\\jest-worker\\processChild.js'
+  ],
+  page: '/site/compression-process/location/compression-process-machine-room-1f/asset/asset-compressor-01'
+}
+ GET /site/compression-process/location/compression-process-machine-room-1f/asset/asset-compressor-01 500 in 379ms
+ ⨯ Error: Cannot find module './vendor-chunks/@swc.js'
+Require stack:
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\app\site\[site_id]\location\[locationId]\asset\[asset_id]\page.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\require.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\load-components.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\build\utils.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\dev\static-paths-worker.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\compiled\jest-worker\processChild.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1212:15)
+    at C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\require-hook.js:55:36
+    at Module._load (node:internal/modules/cjs/loader:1043:27)
+    at Module.require (node:internal/modules/cjs/loader:1298:19)
+    at mod.require (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\require-hook.js:65:28)
+    at require (node:internal/modules/helpers:182:18)
+    at __webpack_require__.f.require (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js:198:28)
+    at C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js:111:40
+    at Array.reduce (<anonymous>)
+    at __webpack_require__.e (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js:110:67) {
+  type: 'Error',
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\.next\\server\\webpack-runtime.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\.next\\server\\app\\site\\[site_id]\\location\\[locationId]\\asset\\[asset_id]\\page.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\require.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\load-components.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\build\\utils.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\dev\\static-paths-worker.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\compiled\\jest-worker\\processChild.js'
+  ],
+  page: '/site/compression-process/location/compression-process-machine-room-1f/asset/asset-compressor-01'
+}
+ GET /site/compression-process/location/compression-process-machine-room-1f/asset/asset-compressor-01 500 in 384ms
+ ⨯ Error: Cannot find module './vendor-chunks/@swc.js'
+Require stack:
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\app\site\[site_id]\location\[locationId]\asset\[asset_id]\page.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\require.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\load-components.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\build\utils.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\dev\static-paths-worker.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\compiled\jest-worker\processChild.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1212:15)
+    at C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\require-hook.js:55:36
+    at Module._load (node:internal/modules/cjs/loader:1043:27)
+    at Module.require (node:internal/modules/cjs/loader:1298:19)
+    at mod.require (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\require-hook.js:65:28)
+    at require (node:internal/modules/helpers:182:18)
+    at __webpack_require__.f.require (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js:198:28)
+    at C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js:111:40
+    at Array.reduce (<anonymous>)
+    at __webpack_require__.e (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js:110:67) {
+  type: 'Error',
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\.next\\server\\webpack-runtime.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\.next\\server\\app\\site\\[site_id]\\location\\[locationId]\\asset\\[asset_id]\\page.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\require.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\load-components.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\build\\utils.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\dev\\static-paths-worker.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\compiled\\jest-worker\\processChild.js'
+  ],
+  page: '/site/compression-process/location/compression-process-machine-room-1f/asset/asset-compressor-01'
+}
+ GET /site/compression-process/location/compression-process-machine-room-1f/asset/asset-compressor-01 500 in 382ms
+ ⨯ Error: Cannot find module './vendor-chunks/@swc.js'
+Require stack:
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\app\site\[site_id]\location\[locationId]\asset\[asset_id]\page.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\require.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\load-components.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\build\utils.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\dev\static-paths-worker.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\compiled\jest-worker\processChild.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1212:15)
+    at C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\require-hook.js:55:36
+    at Module._load (node:internal/modules/cjs/loader:1043:27)
+    at Module.require (node:internal/modules/cjs/loader:1298:19)
+    at mod.require (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\require-hook.js:65:28)
+    at require (node:internal/modules/helpers:182:18)
+    at __webpack_require__.f.require (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js:198:28)
+    at C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js:111:40
+    at Array.reduce (<anonymous>)
+    at __webpack_require__.e (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js:110:67) {
+  type: 'Error',
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\.next\\server\\webpack-runtime.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\.next\\server\\app\\site\\[site_id]\\location\\[locationId]\\asset\\[asset_id]\\page.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\require.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\load-components.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\build\\utils.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\dev\\static-paths-worker.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\compiled\\jest-worker\\processChild.js'
+  ],
+  page: '/site/compression-process/location/compression-process-machine-room-1f/asset/asset-compressor-01'
+}
+ GET /site/compression-process/location/compression-process-machine-room-1f/asset/asset-compressor-01 500 in 526ms
+ ⨯ Error: Cannot find module './vendor-chunks/@swc.js'
+Require stack:
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\app\site\[site_id]\location\[locationId]\asset\[asset_id]\page.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\require.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\load-components.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\build\utils.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\dev\static-paths-worker.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\compiled\jest-worker\processChild.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1212:15)
+    at C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\require-hook.js:55:36
+    at Module._load (node:internal/modules/cjs/loader:1043:27)
+    at Module.require (node:internal/modules/cjs/loader:1298:19)
+    at mod.require (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\require-hook.js:65:28)
+    at require (node:internal/modules/helpers:182:18)
+    at __webpack_require__.f.require (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js:198:28)
+    at C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js:111:40
+    at Array.reduce (<anonymous>)
+    at __webpack_require__.e (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js:110:67) {
+  type: 'Error',
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\.next\\server\\webpack-runtime.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\.next\\server\\app\\site\\[site_id]\\location\\[locationId]\\asset\\[asset_id]\\page.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\require.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\load-components.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\build\\utils.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\dev\\static-paths-worker.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\compiled\\jest-worker\\processChild.js'
+  ],
+  page: '/site/compression-process/location/compression-process-machine-room-1f/asset/asset-compressor-01'
+}
+ GET /site/compression-process/location/compression-process-machine-room-1f/asset/asset-compressor-01 500 in 428ms
+ GET /site/compression-process/location/compression-process-machine-room-1f/asset/asset-compressor-01 200 in 114ms
+ ⨯ Error: Cannot find module './vendor-chunks/@swc.js'
+Require stack:
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\app\site\[site_id]\location\[locationId]\asset\[asset_id]\page.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\require.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\load-components.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\build\utils.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\dev\static-paths-worker.js
+- C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\compiled\jest-worker\processChild.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1212:15)
+    at C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\require-hook.js:55:36
+    at Module._load (node:internal/modules/cjs/loader:1043:27)
+    at Module.require (node:internal/modules/cjs/loader:1298:19)
+    at mod.require (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\node_modules\next\dist\server\require-hook.js:65:28)
+    at require (node:internal/modules/helpers:182:18)
+    at __webpack_require__.f.require (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js:198:28)
+    at C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js:111:40
+    at Array.reduce (<anonymous>)
+    at __webpack_require__.e (C:\Users\user\vscode project\CheckLabLive\checklab-front-react\.next\server\webpack-runtime.js:110:67) {
+  type: 'Error',
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\.next\\server\\webpack-runtime.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\.next\\server\\app\\site\\[site_id]\\location\\[locationId]\\asset\\[asset_id]\\page.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\require.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\load-components.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\build\\utils.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\server\\dev\\static-paths-worker.js',
+    'C:\\Users\\user\\vscode project\\CheckLabLive\\checklab-front-react\\node_modules\\next\\dist\\compiled\\jest-worker\\processChild.js'
+  ],
+  page: '/site/compression-process/location/compression-process-machine-room-1f/asset/asset-compressor-01'
+}
+ ✓ Compiled / in 207ms (1088 modules)
+ GET / 200 in 419ms
+[CheckLab API] monitoring tree failed {
+  data: { message: 'Not Found' },
+  status: 404,
+  statusText: 'Not Found',
+  url: 'http://192.168.219.46:8000/api/v1/monitoring-tree'
+}
+[CheckLab API] native monitoring tree unavailable {
+  error: Error: Not Found
+      at requestCheckLabJson (webpack-internal:///(rsc)/./src/app/monitoring/services/checklab-api-client.js:62:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+      at async fetchMonitoringTree (webpack-internal:///(rsc)/./src/app/monitoring/services/monitoring-tree-api.js:19:18)
+      at async fetchBackendMonitoringTree (webpack-internal:///(rsc)/./src/app/monitoring/services/monitoring-tree-loader.js:13:16)
+      at async Home (webpack-internal:///(rsc)/./src/app/page.jsx:29:28) {
+    data: { message: 'Not Found' },
+    status: 404,
+    statusText: 'Not Found'
+  }
+}
+[CheckLab API] global alerts success {
+  asset_id: undefined,
+  isRead: undefined,
+  limit: 200,
+  severity: undefined,
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/alerts?limit=200'
+}
+[CheckLab API] dashboard asset context success {
+  asset_id: 'asset-compressor-02',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-02/mock-dashboard'
+}
+[CheckLab API] dashboard asset context success {
+  asset_id: 'asset-compressor-01',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-01/mock-dashboard'
+}
+ GET / 200 in 120ms
+ GET /_next/static/css/app/layout.css?v=1779865951763 404 in 58ms
+ GET /_next/static/chunks/app/layout.js 404 in 60ms
+ GET /_next/static/chunks/app/page.js 404 in 60ms
+ GET /_next/static/chunks/main-app.js?v=1779865951763 404 in 59ms
+ GET /_next/static/chunks/app-pages-internals.js 404 in 59ms
+[CheckLab API] monitoring tree failed {
+  data: { message: 'Not Found' },
+  status: 404,
+  statusText: 'Not Found',
+  url: 'http://192.168.219.46:8000/api/v1/monitoring-tree'
+}
+[CheckLab API] native monitoring tree unavailable {
+  error: Error: Not Found
+      at requestCheckLabJson (webpack-internal:///(rsc)/./src/app/monitoring/services/checklab-api-client.js:62:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+      at async fetchMonitoringTree (webpack-internal:///(rsc)/./src/app/monitoring/services/monitoring-tree-api.js:19:18)
+      at async fetchBackendMonitoringTree (webpack-internal:///(rsc)/./src/app/monitoring/services/monitoring-tree-loader.js:13:16)
+      at async Home (webpack-internal:///(rsc)/./src/app/page.jsx:29:28) {
+    data: { message: 'Not Found' },
+    status: 404,
+    statusText: 'Not Found'
+  }
+}
+[CheckLab API] global alerts success {
+  asset_id: undefined,
+  isRead: undefined,
+  limit: 200,
+  severity: undefined,
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/alerts?limit=200'
+}
+[CheckLab API] dashboard asset context success {
+  asset_id: 'asset-compressor-01',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-01/mock-dashboard'
+}
+[CheckLab API] dashboard asset context success {
+  asset_id: 'asset-compressor-02',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-02/mock-dashboard'
+}
+ GET / 200 in 97ms
+ GET /_next/static/css/app/layout.css?v=1779865953409 404 in 58ms
+ GET /_next/static/chunks/app-pages-internals.js 404 in 56ms
+ GET /_next/static/chunks/main-app.js?v=1779865953409 404 in 57ms
+ GET /_next/static/chunks/app/layout.js 404 in 55ms
+ GET /_next/static/chunks/app/page.js 404 in 55ms
+[CheckLab API] monitoring tree failed {
+  data: { message: 'Not Found' },
+  status: 404,
+  statusText: 'Not Found',
+  url: 'http://192.168.219.46:8000/api/v1/monitoring-tree'
+}
+[CheckLab API] native monitoring tree unavailable {
+  error: Error: Not Found
+      at requestCheckLabJson (webpack-internal:///(rsc)/./src/app/monitoring/services/checklab-api-client.js:62:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+      at async fetchMonitoringTree (webpack-internal:///(rsc)/./src/app/monitoring/services/monitoring-tree-api.js:19:18)
+      at async fetchBackendMonitoringTree (webpack-internal:///(rsc)/./src/app/monitoring/services/monitoring-tree-loader.js:13:16)
+      at async Home (webpack-internal:///(rsc)/./src/app/page.jsx:29:28) {
+    data: { message: 'Not Found' },
+    status: 404,
+    statusText: 'Not Found'
+  }
+}
+[CheckLab API] global alerts success {
+  asset_id: undefined,
+  isRead: undefined,
+  limit: 200,
+  severity: undefined,
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/alerts?limit=200'
+}
+[CheckLab API] dashboard asset context success {
+  asset_id: 'asset-compressor-02',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-02/mock-dashboard'
+}
+[CheckLab API] dashboard asset context success {
+  asset_id: 'asset-compressor-01',
+  status: 200,
+  url: 'http://192.168.219.46:8000/api/v1/assets/asset-compressor-01/mock-dashboard'
+}
+ GET / 200 in 147ms
+ GET /_next/static/css/app/layout.css?v=1779865966168 404 in 31ms
+ GET /_next/static/chunks/main-app.js?v=1779865966168 404 in 49ms
+ GET /_next/static/chunks/app/layout.js 404 in 47ms
+ GET /_next/static/chunks/app-pages-internals.js 404 in 49ms
+ GET /_next/static/chunks/app/page.js 404 in 46ms
+ GET / 200 in 42ms
+ GET /_next/static/css/app/layout.css?v=1779866022995 404 in 66ms
+ GET / 200 in 67ms
+ GET /_next/static/css/app/layout.css?v=1779866033394 404 in 46ms
+[?25h

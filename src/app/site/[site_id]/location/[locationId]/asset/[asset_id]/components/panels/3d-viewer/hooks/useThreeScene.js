@@ -78,7 +78,10 @@ export function useThreeScene(containerRef, config) {
         window.addEventListener("resize", scheduleResize);
         const animate = () => {
             const animationConfig = animationConfigRef.current;
-            controls.autoRotate = animationConfig.autoRotate;
+            controls.autoRotate =
+                renderer.domElement.dataset.pauseAutoRotate === "true"
+                    ? false
+                    : animationConfig.autoRotate;
             controls.autoRotateSpeed = animationConfig.autoRotateSpeed;
             controls.update();
             renderer.render(scene, camera);
