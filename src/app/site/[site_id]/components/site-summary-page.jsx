@@ -115,16 +115,16 @@ export function SiteSummaryPage({ site, locations, assets }) {
           </div>
           <div className="SiteSummaryPage SiteSummaryPage__container-4 mt-3 grid gap-2 sm:grid-cols-4">
             <SummaryMetric icon={MapPin} label="위치" value={`${locationCount}개`} />
-            <SummaryMetric icon={Gauge} label="설비" value={`${assetCount}대`} />
+            <SummaryMetric icon={Gauge} label="설비" value={assetCount} />
             <SummaryMetric
               icon={AlertTriangle}
               label="주요 알림"
-              value={`${site.alertCount}건`}
+              value={site.alertCount}
             />
             <SummaryMetric
               icon={Building2}
               label="관찰 설비"
-              value={`${warningAssetCount}대`}
+              value={warningAssetCount}
             />
           </div>
         </section>
@@ -270,7 +270,7 @@ export function SiteSummaryPage({ site, locations, assets }) {
               {site.alertCount > 0 ? (
                 <div className="SiteSummaryPage SiteSummaryPage__alert-summary-1 rounded-md border border-border bg-background px-3 py-2">
                   <p className="truncate text-sm font-semibold">
-                    백엔드 알림 집계 {site.alertCount}건
+                    {`백엔드 알림 집계 ${site.alertCount}건`}
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     알림 상세 목록 API가 연결되면 이 영역에 실제 알림 행을 표시합니다.

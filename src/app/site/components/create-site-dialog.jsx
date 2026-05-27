@@ -256,10 +256,7 @@ export function CreateSiteDialog({
 function SiteCreateStep({ site, onSiteChange }) {
   return (
     <div className="CreateSiteDialog grid max-w-2xl gap-5">
-      <StepHeading
-        title="1. 공정 정보"
-        description="공정명만 입력하면 다음 단계로 이동할 수 있습니다."
-      />
+      <StepHeading title="1. 공정 정보" />
       <TextField
         label="공정명 *"
         onChange={(value) =>
@@ -299,10 +296,7 @@ function LocationCreateStep({
 }) {
   return (
     <div className="CreateSiteDialog grid max-w-2xl gap-5">
-      <StepHeading
-        title="2. 위치 등록"
-        description="위치명만 필수입니다. 여러 위치를 추가한 뒤 설비 단계로 이동할 수 있습니다."
-      />
+      <StepHeading title="2. 위치 등록" />
       <DraftLocationList
         locations={locations}
         onRemoveLocation={onRemoveLocation}
@@ -372,17 +366,14 @@ function AssetCreateStep({
 
   return (
     <div className="CreateSiteDialog grid max-w-2xl gap-5">
-      <StepHeading
-        title="3. 설비 등록"
-        description="설비명만 필수입니다. 위치가 여러 개이면 먼저 하위 위치를 선택하세요."
-      />
+      <StepHeading title="3. 설비 등록" />
       <DraftAssetList
         assets={assets}
         locations={locations}
         onRemoveAsset={onRemoveAsset}
       />
       <label className="CreateSiteDialog grid gap-2 text-sm font-semibold text-muted-foreground">
-        하위 위치
+        위치
         <select
           className="CreateSiteDialog h-10 min-w-0 rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground outline-none transition focus:border-cyan-300/60 disabled:cursor-not-allowed disabled:opacity-50"
           disabled={!locations.length}
@@ -578,7 +569,7 @@ function DraftAssetList({ assets, locations, onRemoveAsset }) {
                 {index + 1}. {asset.name}
               </p>
               <p className="CreateSiteDialog truncate text-xs text-muted-foreground">
-                하위 위치: {locationNameByKey[asset._locationKey] ?? "미지정"}
+                위치: {locationNameByKey[asset._locationKey] ?? "미지정"}
               </p>
             </div>
             <button
@@ -607,7 +598,7 @@ function CreateSummaryStep({ isAssetSkipped, isLocationSkipped, previewSite }) {
     : [["등록 여부", "건너뜀"]];
   const assetRows = previewSite.locations.flatMap((location) =>
     location.assets.map((asset) => [
-      `${location.name || "위치"} 하위`,
+      `${location.name || "위치"}`,
       [
         asset.name,
         asset.asset_code ? `코드 ${asset.asset_code}` : "",

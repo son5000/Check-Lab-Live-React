@@ -1,9 +1,11 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Camera, Check, Box, Maximize2, MousePointer2, RotateCcw, SquareDashedMousePointer, Upload, X, } from "lucide-react";
+import { Camera, Check, Box, Maximize2, MousePointer2, RotateCcw, Settings2, SquareDashedMousePointer, Upload, X, } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { DEFAULT_MODEL_3D_FILE, DEFAULT_VIEWER_3D_CONFIG, Three3DViewer, } from "./3d-viewer";
+import { formatCheckLabKoreanTime } from "@/app/layouts/helpers/time-formatters";
+import { useDisplaySettings } from "@/app/layouts/hooks/use-display-settings";
+import { DEFAULT_MODEL_3D_FILE, DEFAULT_VIEWER_3D_CONFIG, Three3DViewer, Viewer3DOptionBar, } from "./3d-viewer";
 import { ControlSection } from "./3d-viewer/controls/control-fields";
 import { getModelSourceName, normalizeModelTextures, withUpdatedTextureSlot, } from "./3d-viewer/utils/modelFileUtils";
 import { areAssetThresholdsEqual, buildRoi, clampNumber, findAreaPointHit, findAreaRoiHit, findPointHit, getAverage, getPointDelta, getRelativePoint, isPointInsideRoi, movePoint, moveRoi, roundMetric, roundPercent, } from "./asset-camera-geometry";
@@ -26,6 +28,9 @@ const PRESENTATION_INTEREST_AREA_IMAGES = [
     "/cam/cam_sample_3.PNG",
     "/cam/cam_sample_4.PNG",
 ];
+const CAMERA_ASSET_PART_PREVIEW_SIZE = 480;
+const CAMERA_AREA_PREVIEW_MARGIN_RATIO = 0.12;
+const CAMERA_POINT_PREVIEW_RADIUS_PERCENT = 15;
 const defaultCameraFeeds = PRESENTATION_CAMERA_IMAGE_URLS.map((presentationImageUrl, index) => ({
     id: `cam-${index + 1}`,
     label: `CAM ${index + 1}`,
@@ -51,7 +56,8 @@ const defaultPresentationInterestAreas = [
         presentationOnly: true,
     },
 ];
-export function AssetCameraPanel({ activeCameraId, cameraFeeds = defaultCameraFeeds, defaultAssetThresholds, assetParts, assetPartStates = [], assetThresholds, selectedAssetPartId, onCameraSelect, onCreateAssetPart, onDeleteAssetPart, onSelectAssetPart, onUpdateAssetPart, initialViewMode = "3d", onViewer3DConfigChange, onViewer3DModelFileChange, temperatureData = [], ultrasonicData = [], viewer3DConfig, viewer3DModelFile, }) {
+export function AssetCameraPanel({ activeCameraId, cameraFeeds = defaultCameraFeeds, defaultAssetThresholds, assetParts, assetPartStates = [], assetThresholds, selectedAssetPartId, cameraSetupRequestId = 0, onCameraSelect, onCreateAssetPart, onDeleteAssetPart, onSelectAssetPart, onUpdateAssetPart, initialViewMode = "camera", onViewer3DConfigChange, onViewer3DModelFileChange, temperatureData = [], ultrasonicData = [], viewer3DConfig, viewer3DModelFile, }) {
+    const { settings: displaySettings } = useDisplaySettings();
     const availableCameraFeeds = useMemo(() => buildPresentationCameraFeeds(cameraFeeds), [cameraFeeds]);
     const selectedCamera = useMemo(() => availableCameraFeeds.find((camera) => camera.id === activeCameraId) ??
         availableCameraFeeds[0], [activeCameraId, availableCameraFeeds]);
@@ -66,6 +72,7 @@ export function AssetCameraPanel({ activeCameraId, cameraFeeds = defaultCameraFe
     const [draftPoints, setDraftPoints] = useState([]);
     const [dragInteraction, setDragInteraction] = useState();
     const dragInteractionRef = useRef();
+    const previousCameraSetupRequestIdRef = useRef(cameraSetupRequestId);
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
     const [canRenderPreviewPortal, setCanRenderPreviewPortal] = useState(false);
     const [viewMode, setViewMode] = useState(initialViewMode);
@@ -162,6 +169,27 @@ export function AssetCameraPanel({ activeCameraId, cameraFeeds = defaultCameraFe
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
     }, [isPreviewOpen]);
+    useEffect(() => {
+        if (previousCameraSetupRequestIdRef.current === cameraSetupRequestId) {
+            return;
+        }
+        previousCameraSetupRequestIdRef.current = cameraSetupRequestId;
+        if (!cameraSetupRequestId) {
+            return;
+        }
+        dragInteractionRef.current = undefined;
+        setDragInteraction(undefined);
+        setViewer3DAnalysisMode(undefined);
+        setViewMode("camera");
+        setIsPreviewOpen(true);
+        setCameraSetupMode("area");
+        setSelectionMode("area");
+        setDraftThresholds(activeAssetThresholds);
+        setAreDraftThresholdsDirty(false);
+        setDraftRoi(undefined);
+        setDraftPoints([]);
+        onSelectAssetPart(undefined);
+    }, [activeAssetThresholds, cameraSetupRequestId, onSelectAssetPart]);
     const startDragInteraction = (interaction) => {
         dragInteractionRef.current = interaction;
         setDragInteraction(interaction);
@@ -413,20 +441,35 @@ export function AssetCameraPanel({ activeCameraId, cameraFeeds = defaultCameraFe
             onSelectAssetPart(undefined);
         }
     };
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!canSave) {
             return;
         }
-        onCreateAssetPart({
+        const nextPart = {
             id: `interest-area-${Date.now()}`,
             linkedAlarm: true,
             mode: selectionMode,
             name: draftName.trim(),
-            points: selectionMode === "points" ? draftPoints : [],
-            roi: selectionMode === "area" ? draftRoi : undefined,
+            points: selectionMode === "points"
+                ? draftPoints.map((point) => ({ ...point }))
+                : [],
+            roi: selectionMode === "area" && draftRoi ? { ...draftRoi } : undefined,
             source: "camera",
             thresholds: draftThresholds,
+        };
+        const preview = await captureCameraAssetPartPreview({
+            imageUrl: selectedCamera.presentationImageUrl,
+            mode: selectionMode,
+            points: nextPart.points,
+            roi: nextPart.roi,
         });
+        onCreateAssetPart(preview
+            ? {
+                ...nextPart,
+                previewCropRect: preview.cropRect,
+                previewImageDataUrl: preview.dataUrl,
+            }
+            : nextPart);
         setCameraSetupMode(undefined);
         resetDraft(activeAssetThresholds);
     };
@@ -501,10 +544,10 @@ export function AssetCameraPanel({ activeCameraId, cameraFeeds = defaultCameraFe
                 </div>
                 {viewMode === "3d" ? (<div className="AssetCameraPanel AssetCameraPanel__container-19 grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_16rem] gap-3 overflow-hidden p-3 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)] lg:grid-rows-[minmax(0,1fr)]">
                     <div className="AssetCameraPanel AssetCameraPanel__viewer-wrap-1 h-full min-h-0 min-w-0">
-                      {readyViewer3DModelFile ? (<Three3DViewer activeAnalysisMode={viewer3DAnalysisMode} allowOptionBar analysisSummary={selectedViewer3DAnalysisItem?.summary} analysisTargets={viewer3DAnalysisTargets} className="AssetCameraPanel AssetCameraPanel__viewer-1 h-full" config={currentViewer3DConfig} modelFile={readyViewer3DModelFile} selectedAnalysisTargetId={selectedViewer3DAnalysisTargetId} onAnalysisTargetCreate={handleViewer3DAnalysisTargetCreate} onAnalysisTargetSelect={handleViewer3DAnalysisTargetSelect} onConfigChange={handleViewer3DConfigChange} onModelFileChange={handleViewer3DModelFileChange}/>) : (<Viewer3DModelUploadPanel modelFile={currentViewer3DModelFile} onPlyFileChange={handleViewer3DPlyFileChange} onTextureFileChange={handleViewer3DTextureFileChange} onUseSample={handleUseSampleViewer3DModel}/>)}
+                      {readyViewer3DModelFile ? (<Three3DViewer activeAnalysisMode={viewer3DAnalysisMode} allowOptionBar={false} analysisSummary={selectedViewer3DAnalysisItem?.summary} analysisTargets={viewer3DAnalysisTargets} className="AssetCameraPanel AssetCameraPanel__viewer-1 h-full" config={currentViewer3DConfig} modelFile={readyViewer3DModelFile} selectedAnalysisTargetId={selectedViewer3DAnalysisTargetId} onAnalysisTargetCreate={handleViewer3DAnalysisTargetCreate} onAnalysisTargetSelect={handleViewer3DAnalysisTargetSelect} onConfigChange={handleViewer3DConfigChange} onModelFileChange={handleViewer3DModelFileChange}/>) : (<Viewer3DModelUploadPanel modelFile={currentViewer3DModelFile} onPlyFileChange={handleViewer3DPlyFileChange} onTextureFileChange={handleViewer3DTextureFileChange} onUseSample={handleUseSampleViewer3DModel}/>)}
                     </div>
 
-                    <Viewer3DAnalysisPanel activeMode={viewer3DAnalysisMode} items={viewer3DAnalysisItems} selectedItem={selectedViewer3DAnalysisItem} selectedTargetId={selectedViewer3DAnalysisTargetId} onDelete={handleViewer3DAnalysisTargetDelete} onModeChange={handleViewer3DAnalysisModeChange} onSelect={handleViewer3DAnalysisTargetSelect} onUpdate={handleViewer3DAnalysisTargetUpdate}/>
+                    <Viewer3DAnalysisPanel activeMode={viewer3DAnalysisMode} config={currentViewer3DConfig} displaySettings={displaySettings} items={viewer3DAnalysisItems} modelFile={currentViewer3DModelFile ?? createViewer3DModelDraft()} selectedItem={selectedViewer3DAnalysisItem} selectedTargetId={selectedViewer3DAnalysisTargetId} onConfigChange={handleViewer3DConfigChange} onDelete={handleViewer3DAnalysisTargetDelete} onModeChange={handleViewer3DAnalysisModeChange} onModelFileChange={handleViewer3DModelFileChange} onSelect={handleViewer3DAnalysisTargetSelect} onUpdate={handleViewer3DAnalysisTargetUpdate}/>
                   </div>) : (<div className="AssetCameraPanel AssetCameraPanel__container-19 grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_16rem] gap-3 overflow-hidden p-3 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)] lg:grid-rows-[minmax(0,1fr)]">
                     <div className="AssetCameraPanel AssetCameraPanel__camera-preview-wrap-1 grid min-h-0 min-w-0 place-items-center overflow-hidden rounded-md border border-cyan-200/25 bg-neutral-950/90 p-2 [container-type:size]">
                       <div className={cn("AssetCameraPanel AssetCameraPanel__container-20 relative h-[min(100cqw,100cqh)] w-[min(100cqw,100cqh)] touch-none overflow-hidden rounded-md border border-cyan-200/25 bg-neutral-950 shadow-[0_0_42px_rgba(34,211,238,0.2)]", isCameraSetupActive &&
@@ -568,11 +611,16 @@ function Viewer3DFilePicker({ accept, label, name, onFile, }) {
         }} type="file"/>
     </label>);
 }
-function Viewer3DAnalysisPanel({ activeMode, items, onDelete, onModeChange, onSelect, onUpdate, selectedItem, selectedTargetId, }) {
+function Viewer3DAnalysisPanel({ activeMode, config, displaySettings, items, modelFile, onConfigChange, onDelete, onModeChange, onModelFileChange, onSelect, onUpdate, selectedItem, selectedTargetId, }) {
+    const [activePanelTab, setActivePanelTab] = useState("analysis");
     const selectedTarget = selectedItem?.target;
     const selectedSummary = selectedItem?.summary;
     return (<aside className="Viewer3DAnalysisPanel Viewer3DAnalysisPanel__aside-1 flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-md border border-border bg-card p-2 text-card-foreground">
-      <div className="Viewer3DAnalysisPanel Viewer3DAnalysisPanel__stack-1 grid min-h-0 gap-2 overflow-y-auto pr-1">
+      <div className="Viewer3DAnalysisPanel Viewer3DAnalysisPanel__tabs-1 mb-2 grid shrink-0 grid-cols-2 gap-1 rounded-md border border-border bg-background p-1" role="tablist" aria-label="3D 패널">
+        <PanelTabButton active={activePanelTab === "analysis"} label="정밀 분석" onClick={() => setActivePanelTab("analysis")}/>
+        <PanelTabButton active={activePanelTab === "settings"} label="설정" onClick={() => setActivePanelTab("settings")}/>
+      </div>
+      {activePanelTab === "analysis" ? (<div className="Viewer3DAnalysisPanel Viewer3DAnalysisPanel__stack-1 grid min-h-0 gap-2 overflow-y-auto pr-1">
         <ControlSection icon={SquareDashedMousePointer} title="정밀 분석">
           <div className="Viewer3DAnalysisPanel Viewer3DAnalysisPanel__modes-1 grid grid-cols-3 gap-1.5" role="group" aria-label="3D 분석 대상 추가">
             <ModeButton active={!activeMode} icon={RotateCcw} label="탐색" onClick={() => onModeChange(undefined)}/>
@@ -663,7 +711,7 @@ function Viewer3DAnalysisPanel({ activeMode, items, onDelete, onModeChange, onSe
 
             <div className="Viewer3DAnalysisPanel Viewer3DAnalysisPanel__setting-status-1 grid gap-1.5">
               <DetectionSetupStatusRow label="좌표" value={formatViewer3DVector(selectedTarget.worldPosition)}/>
-              <DetectionSetupStatusRow label="등록" value={formatCreatedTime(selectedTarget.createdAt)}/>
+              <DetectionSetupStatusRow label="등록 시각" value={formatCreatedTime(selectedTarget.createdAt, displaySettings)}/>
             </div>
 
             <IconButton icon={X} label="삭제" onClick={() => onDelete(selectedTarget.id)} showLabel variant="danger"/>
@@ -679,8 +727,13 @@ function Viewer3DAnalysisPanel({ activeMode, items, onDelete, onModeChange, onSe
               <DetectionSetupStatusRow label="추이" value={selectedSummary.trendLabel}/>
             </div>
           </ControlSection>) : null}
-      </div>
+      </div>) : (<Viewer3DOptionBar className="h-full flex-1 border-0 bg-transparent p-0 md:border-0" config={config} modelFile={modelFile} onConfigChange={onConfigChange} onModelFileChange={onModelFileChange}/>)}
     </aside>);
+}
+function PanelTabButton({ active, label, onClick }) {
+    return (<button type="button" className={cn("Viewer3DAnalysisPanel Viewer3DAnalysisPanel__tab-1 h-7 rounded-sm px-2 text-[11px] font-semibold text-muted-foreground transition hover:bg-accent hover:text-foreground", active && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground")} aria-pressed={active} onClick={onClick}>
+      {label}
+    </button>);
 }
 function createViewer3DModelDraft(modelFile) {
     return {
@@ -731,6 +784,111 @@ function toAssetPartFromViewer3DAnalysisTarget(target) {
             worldArea: target.worldArea,
             worldPosition: target.worldPosition,
         },
+    };
+}
+async function captureCameraAssetPartPreview({ imageUrl, mode, points, roi, }) {
+    const cropRect = getCameraAssetPartPreviewCropRect({ mode, points, roi });
+    if (!imageUrl || !cropRect) {
+        return undefined;
+    }
+    try {
+        const image = await loadCameraPreviewImage(imageUrl);
+        const sourceCrop = getObjectCoverSourceCrop(image, cropRect);
+        const canvas = document.createElement("canvas");
+        const outputScale = CAMERA_ASSET_PART_PREVIEW_SIZE / Math.max(sourceCrop.width, sourceCrop.height);
+        const outputWidth = Math.max(1, Math.round(sourceCrop.width * outputScale));
+        const outputHeight = Math.max(1, Math.round(sourceCrop.height * outputScale));
+        canvas.width = outputWidth;
+        canvas.height = outputHeight;
+        const context = canvas.getContext("2d");
+        if (!context) {
+            return undefined;
+        }
+        context.drawImage(image, sourceCrop.x, sourceCrop.y, sourceCrop.width, sourceCrop.height, 0, 0, outputWidth, outputHeight);
+        return {
+            cropRect,
+            dataUrl: canvas.toDataURL("image/png"),
+        };
+    }
+    catch {
+        return undefined;
+    }
+}
+function loadCameraPreviewImage(imageUrl) {
+    return new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = reject;
+        image.src = imageUrl;
+        if (image.complete && image.naturalWidth > 0) {
+            resolve(image);
+        }
+    });
+}
+function getCameraAssetPartPreviewCropRect({ mode, points, roi, }) {
+    if (mode === "area" && roi) {
+        const margin = clampNumber(Math.max(roi.width, roi.height) * CAMERA_AREA_PREVIEW_MARGIN_RATIO, 2.5, 7);
+        return toBoundedPercentRect({
+            height: roi.height + margin * 2,
+            left: roi.x - margin,
+            top: roi.y - margin,
+            width: roi.width + margin * 2,
+        });
+    }
+    if (!points.length) {
+        return undefined;
+    }
+    const minX = Math.min(...points.map((point) => point.x));
+    const maxX = Math.max(...points.map((point) => point.x));
+    const minY = Math.min(...points.map((point) => point.y));
+    const maxY = Math.max(...points.map((point) => point.y));
+    const span = Math.max(maxX - minX, maxY - minY);
+    const margin = points.length > 1
+        ? clampNumber(span * 0.45, 8, 18)
+        : CAMERA_POINT_PREVIEW_RADIUS_PERCENT;
+    return toSquarePercentRect({
+        height: maxY - minY + margin * 2,
+        left: minX - margin,
+        top: minY - margin,
+        width: maxX - minX + margin * 2,
+    });
+}
+function toBoundedPercentRect(rect) {
+    const width = clampNumber(rect.width, 1, 100);
+    const height = clampNumber(rect.height, 1, 100);
+    return {
+        height,
+        left: clampNumber(rect.left, 0, 100 - width),
+        top: clampNumber(rect.top, 0, 100 - height),
+        width,
+    };
+}
+function toSquarePercentRect(rect) {
+    const side = clampNumber(Math.max(rect.width, rect.height, 18), 1, 100);
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    return toBoundedPercentRect({
+        height: side,
+        left: centerX - side / 2,
+        top: centerY - side / 2,
+        width: side,
+    });
+}
+function getObjectCoverSourceCrop(image, cropRect) {
+    const naturalWidth = image.naturalWidth || image.width;
+    const naturalHeight = image.naturalHeight || image.height;
+    const scale = Math.max(100 / naturalWidth, 100 / naturalHeight);
+    const renderedWidth = naturalWidth * scale;
+    const renderedHeight = naturalHeight * scale;
+    const offsetX = (100 - renderedWidth) / 2;
+    const offsetY = (100 - renderedHeight) / 2;
+    const sourceWidth = clampNumber(cropRect.width / scale, 1, naturalWidth);
+    const sourceHeight = clampNumber(cropRect.height / scale, 1, naturalHeight);
+    return {
+        height: sourceHeight,
+        width: sourceWidth,
+        x: clampNumber((cropRect.left - offsetX) / scale, 0, naturalWidth - sourceWidth),
+        y: clampNumber((cropRect.top - offsetY) / scale, 0, naturalHeight - sourceHeight),
     };
 }
 function getViewer3DTargetPercentRoi(target) {
@@ -877,15 +1035,8 @@ function formatTrendDelta(value, suffix) {
 function formatViewer3DVector(vector) {
     return `${roundMetric(vector.x)}, ${roundMetric(vector.y)}, ${roundMetric(vector.z)}`;
 }
-function formatCreatedTime(value) {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-        return "-";
-    }
-    return date.toLocaleTimeString("ko-KR", {
-        hour: "2-digit",
-        minute: "2-digit",
-    });
+function formatCreatedTime(value, displaySettings) {
+    return formatCheckLabKoreanTime(value, displaySettings, { includeSeconds: false }) ?? "-";
 }
 function PanelModeButton({ active, icon: Icon, label, onClick, }) {
     return (<button type="button" className={cn("PanelModeButton PanelModeButton__button-1 inline-flex h-7 min-w-[2.25rem] items-center justify-center gap-1 rounded-sm px-2 text-[11px] font-semibold text-muted-foreground transition hover:bg-accent hover:text-foreground", active && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground")} onClick={onClick} title={label}>

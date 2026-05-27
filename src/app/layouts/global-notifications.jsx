@@ -15,6 +15,14 @@ const GLOBAL_NOTIFICATION_POSITION_CONFIG = {
         stackDirection: 1,
         stackShellClassName: "relative grid place-items-center",
     },
+    top: {
+        cardClassName: "w-full min-w-0 max-w-full",
+        cardDensity: "compact",
+        containerClassName: "left-1/2 top-4 w-[min(26rem,calc(100vw-2rem))] -translate-x-1/2",
+        exitLayerClassName: "absolute left-1/2 top-0 grid w-full -translate-x-1/2 justify-items-center",
+        stackDirection: 1,
+        stackShellClassName: "relative grid justify-items-center",
+    },
     "bottom-right": {
         cardClassName: "w-full min-w-0 max-w-full",
         cardDensity: "compact",
@@ -82,7 +90,7 @@ export function GlobalNotifications({ currentPathname = "", notifications, onDis
         return null;
     }
     const positionConfig = GLOBAL_NOTIFICATION_POSITION_CONFIG[settings.position] ?? GLOBAL_NOTIFICATION_POSITION_CONFIG.center;
-    return (<div className={cn("GlobalNotifications GlobalNotifications__container-1 pointer-events-none fixed z-50", positionConfig.containerClassName)} aria-live="polite" aria-label="중앙 글로벌 경고 알림">
+    return (<div className={cn("GlobalNotifications GlobalNotifications__container-1 pointer-events-none fixed z-50", positionConfig.containerClassName)} aria-live="polite" aria-label="글로벌 경고 알림">
       {firstVisibleNotification ? (<div className={cn("GlobalNotifications GlobalNotifications__stack-shell-1", positionConfig.stackShellClassName)}>
           {stackedNotifications.map(({ notification, stackIndex }) => (<NotificationCard key={notification.id} className={cn("GlobalNotifications__stack-card-1", positionConfig.cardClassName)} density={positionConfig.cardDensity} isInteractive={false} notification={notification} onDismiss={() => undefined} onOpen={() => undefined} style={buildStackCardStyle(stackIndex, positionConfig.stackDirection)}/>))}
           <NotificationCard canNavigateToDashboard={canNavigateToDashboard(firstVisibleNotification, currentPathname)} key={firstVisibleNotification.id} className={cn("GlobalNotifications__front-card-1", positionConfig.cardClassName)} density={positionConfig.cardDensity} notification={firstVisibleNotification} onDismiss={onDismiss} onNavigateToDashboard={onNavigateToDashboard} onOpen={onOpen}/>

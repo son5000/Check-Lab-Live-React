@@ -287,7 +287,58 @@
   }
 }
 
+.MainHeader__header-1
+  :where(
+    .HeaderClock__label-1,
+    .HeaderClock__label-2,
+    .HeaderClock__label-3,
+    .HeaderClock__label-4,
+    .HeaderStatusSummary__label-1,
+    .HeaderStatusSummary__label-3,
+    .HeaderStatusSummary__label-5,
+    .HeaderStatusSummary__label-7,
+    .HeaderStatusSummary__label-8,
+    .HeaderActions__label-2
+  ) {
+  white-space: nowrap;
+}
+
+@media (min-width: 640px) and (max-width: 1023.98px) {
+  :root:lang(en) .HeaderStatusSummary__label-1 {
+    display: none;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023.98px) {
+  :root:lang(en) .HeaderClock__container-1 {
+    display: none;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1279.98px) {
+  :root:lang(en) .HeaderActions__button-2 {
+    justify-content: center;
+    padding-inline: 0;
+    width: 2.25rem;
+  }
+
+  :root:lang(en) .HeaderActions__label-2 {
+    display: none;
+  }
+}
+
+@media (min-width: 1024px) and (max-width: 1279.98px) {
+  :root:lang(en) .HeaderClock__container-1 {
+    width: 18rem;
+  }
+
+  :root:lang(en) .HeaderStatusSummary__container-3 {
+    display: none;
+  }
+}
+
 @layer components {
+
   .AssetPartList__container-4 {
     scrollbar-color: color-mix(in oklch, var(--muted-foreground) 45%, transparent) transparent;
   }

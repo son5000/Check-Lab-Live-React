@@ -2,7 +2,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import { Toaster } from "react-hot-toast";
+import { useDisplaySettings } from "./layouts/hooks/use-display-settings";
+import { useLanguageTranslator } from "./layouts/hooks/use-language-translator";
 export function Providers({ children }) {
+    const { settings } = useDisplaySettings();
+    useLanguageTranslator(settings.language);
     const [queryClient] = useState(() => new QueryClient({
         defaultOptions: {
             queries: {

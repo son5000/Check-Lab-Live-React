@@ -1,6 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { formatCheckLabKoreanDateTime, formatCheckLabKoreanTime, getCheckLabTimeValue, } from "@/app/layouts/helpers/time-formatters";
+import { useDisplaySettings } from "./use-display-settings";
 /**
  * 역할
  * - 현재 보고 있는 페이지와 무관하게 CheckLab 전체 알림을 감시하는 클라이언트 훅입니다.
@@ -18,7 +19,8 @@ import { formatCheckLabKoreanDateTime, formatCheckLabKoreanTime, getCheckLabTime
  */
 const GLOBAL_ALERT_POLL_INTERVAL_MS = 5000;
 export function useGlobalAlertMonitor() {
-    const [notifications, setNotifications] = useState([]);
+    const { settings } = useDisplaySettings();
+    const [alerts, setAlerts] = useState([]);
     useEffect(() => {
         let isMounted = true;
         const loadGlobalAlerts = async () => {
@@ -34,13 +36,13 @@ export function useGlobalAlertMonitor() {
                 }
                 const alerts = (await response.json());
                 if (isMounted) {
-                    setNotifications(toGlobalAlertNotifications(alerts));
+                    setAlerts(alerts);
                 }
             }
             catch (error) {
                 console.warn("[CheckLab API] global alert monitor failed", { error });
                 if (isMounted) {
-                    setNotifications([]);
+                    setAlerts([]);
                 }
             }
         };
@@ -51,13 +53,14 @@ export function useGlobalAlertMonitor() {
             window.clearInterval(intervalId);
         };
     }, []);
+    const notifications = useMemo(() => toGlobalAlertNotifications(alerts, settings), [alerts, settings]);
     return notifications;
 }
-function toGlobalAlertNotifications(alerts) {
+function toGlobalAlertNotifications(alerts, displaySettings) {
     const latestAlertByAsset = new Map();
     alerts
         .filter((alert) => !alert.is_read)
-        .map(toGlobalAlertNotification)
+        .map((alert) => toGlobalAlertNotification(alert, displaySettings))
         .filter((notification) => Boolean(notification))
         .forEach((notification) => {
         const dedupeKey = getNotificationDedupeKey(notification);
@@ -69,7 +72,7 @@ function toGlobalAlertNotifications(alerts) {
     });
     return Array.from(latestAlertByAsset.values()).sort(compareNotifications);
 }
-function toGlobalAlertNotification(alert) {
+function toGlobalAlertNotification(alert, displaySettings) {
     const grade = toNotificationGrade(alert.severity);
     if (!grade) {
         return null;
@@ -93,8 +96,8 @@ function toGlobalAlertNotification(alert) {
             assetName ??
             (alert.asset_id ? `CheckLab 자산 ${alert.asset_id}` : "CheckLab"),
         message: alert.message ?? "알림 메시지가 없습니다.",
-        occurredAt: formatCheckLabKoreanDateTime(alert.created_at) ??
-            formatCheckLabKoreanTime(alert.created_at) ??
+        occurredAt: formatCheckLabKoreanDateTime(alert.created_at, displaySettings) ??
+            formatCheckLabKoreanTime(alert.created_at, displaySettings) ??
             "--:--:--",
         occurredAtIso: alert.created_at ?? undefined,
         title: assetName ? `${assetName} 임계 알림` : "임계 알림",

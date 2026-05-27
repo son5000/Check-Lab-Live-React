@@ -74,13 +74,17 @@ export function toAssetModel({ assetNode, locationNode, siteNode, }) {
         lastCollectedAt: assetNode.lastCollectedAt ?? "수집 대기",
         lastInspectionDate: assetNode.lastInspectionDate,
         locationId: locationNode.id,
+        maintenanceCompany: assetNode.maintenanceCompany,
         manager: assetNode.manager,
+        managerContact: assetNode.managerContact ?? assetNode.emergencyContact,
+        managerEmail: assetNode.managerEmail,
         modelName: assetNode.modelName,
         name: assetNode.label,
         operationState: assetNode.operationState === "가동중" ||
             assetNode.operationState === "비가동"
             ? assetNode.operationState
             : undefined,
+        optionUpdatedAt: assetNode.optionUpdatedAt,
         serialNumber: assetNode.serialNumber,
         site_id: siteNode.id,
         status: assetNode.status ?? "normal",

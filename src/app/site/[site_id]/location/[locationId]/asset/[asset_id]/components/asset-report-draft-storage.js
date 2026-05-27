@@ -22,7 +22,7 @@ export function persistAssetReportDraft(assetId, draft) {
   }
 }
 
-export function readAssetReportDraft(assetId) {
+export function readAssetReportDraft(assetId, { maxAgeMs = ASSET_REPORT_DRAFT_MAX_AGE_MS } = {}) {
   if (typeof window === "undefined" || !assetId) {
     return null;
   }
@@ -39,7 +39,7 @@ export function readAssetReportDraft(assetId) {
       draft?.version === ASSET_REPORT_DRAFT_STORAGE_VERSION &&
       draft?.asset_id === assetId &&
       Number.isFinite(draft?.savedAt) &&
-      Date.now() - draft.savedAt <= ASSET_REPORT_DRAFT_MAX_AGE_MS;
+      Date.now() - draft.savedAt <= maxAgeMs;
 
     if (!isValidDraft) {
       window.localStorage.removeItem(storageKey);
@@ -70,14 +70,24 @@ function createStoredReportDraft(assetId, draft) {
 function stripReportDraftPreviewImages(draft) {
   return {
     ...draft,
-    assetParts: draft.assetParts?.map((part) => ({
-      ...part,
-      viewer3DTarget: part.viewer3DTarget
-        ? {
-            ...part.viewer3DTarget,
-            previewImageDataUrl: undefined,
-          }
-        : part.viewer3DTarget,
-    })),
+    assetParts: stripAssetPartPreviewImages(draft.assetParts),
+    remoteDashboard: draft.remoteDashboard
+      ? {
+          ...draft.remoteDashboard,
+          initialAssetParts: stripAssetPartPreviewImages(draft.remoteDashboard.initialAssetParts),
+        }
+      : draft.remoteDashboard,
   };
+}
+
+function stripAssetPartPreviewImages(assetParts) {
+  return assetParts?.map((part) => ({
+    ...part,
+    viewer3DTarget: part.viewer3DTarget
+      ? {
+          ...part.viewer3DTarget,
+          previewImageDataUrl: undefined,
+        }
+      : part.viewer3DTarget,
+  }));
 }

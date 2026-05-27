@@ -3,9 +3,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { BellRing, ChevronLeft, FileText, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { createDisplaySettingsSearchParams } from "@/app/layouts/helpers/display-settings";
 import { formatCheckLabKoreanDateTime } from "@/app/layouts/helpers/time-formatters";
 import { useDashboardHeaderStateController } from "@/app/layouts/hooks/use-dashboard-header-state";
 import { useDashboardNotificationsController } from "@/app/layouts/hooks/use-dashboard-notifications";
+import { useDisplaySettings } from "@/app/layouts/hooks/use-display-settings";
 import { AssetCameraPanel } from "./panels/asset-camera-panel";
 import { AssetEventLogPanel, } from "./panels/asset-event-log-panel";
 import { persistAssetReportDraft } from "./asset-report-draft-storage";
@@ -36,26 +38,40 @@ const SMOOTHED_TREND_VALUE_KEYS = [
     "peakFrequency",
     "spread",
 ];
+const USE_REMOTE_ASSET_PARTS = false;
 const OPEN_ASSET_EVENT_DETAIL_EVENT = "checklab:open-asset-event";
 export function AssetDashboardPage({ asset_id, asset, initialEventId, site, location, remoteDashboard, }) {
+    const { settings: displaySettings } = useDisplaySettings();
     const { setHeaderState } = useDashboardHeaderStateController();
     const { setNotifications } = useDashboardNotificationsController();
     const [remoteSnapshot, setRemoteSnapshot] = useState(remoteDashboard ?? null);
     const initialRangeId = getSupportedTrendRangeId(remoteDashboard?.trend?.selectedRangeId);
     const [activeCameraId, setActiveCameraId] = useState("default");
+    const [cameraSetupRequestId, setCameraSetupRequestId] = useState(0);
     const [activeRangeId, setActiveRangeId] = useState(initialRangeId ?? "1m");
     const [selectedEventId, setSelectedEventId] = useState(initialEventId);
     const [isEventDrawerOpen, setIsEventDrawerOpen] = useState(Boolean(initialEventId));
-    const [assetParts, setAssetParts] = useState(() => remoteDashboard?.initialAssetParts ?? []);
+    const [assetParts, setAssetParts] = useState(() => USE_REMOTE_ASSET_PARTS
+        ? remoteDashboard?.initialAssetParts ?? []
+        : []);
     const previousRemoteAssetIdRef = useRef(remoteDashboard?.asset_id);
     const dashboardRefreshInFlightRef = useRef(false);
+    const latestSavedThresholdsRef = useRef(null);
     const [selectedAssetPartId, setSelectedAssetPartId] = useState();
     const [assetThresholds, setAssetThresholds] = useState(() => remoteDashboard?.initialThresholds ?? null);
     const [isThresholdSaving, setIsThresholdSaving] = useState(false);
     const [thresholdSaveError, setThresholdSaveError] = useState();
     const [isThresholdEditorDirty, setIsThresholdEditorDirty] = useState(false);
     const [eventTick, setEventTick] = useState(0);
-    const sample = useMemo(() => buildDashboardSample(asset, remoteSnapshot), [asset, remoteSnapshot]);
+    const sample = useMemo(() => buildDashboardSample(asset, remoteSnapshot, {
+        assetParts: USE_REMOTE_ASSET_PARTS
+            ? remoteSnapshot?.initialAssetParts ?? []
+            : assetParts,
+        assetPartStates: USE_REMOTE_ASSET_PARTS
+            ? remoteSnapshot?.initialAssetPartStates ?? []
+            : [],
+    }), [asset, assetParts, remoteSnapshot]);
+    const displaySettingsQuery = useMemo(() => createDisplaySettingsSearchParams(displaySettings).toString(), [displaySettings]);
     const defaultAssetThresholds = useMemo(() => ({
         temperature: sample.threshold.targetTemperature,
         ultrasoundDb: DEFAULT_ULTRASOUND_THRESHOLD_DB,
@@ -75,6 +91,14 @@ export function AssetDashboardPage({ asset_id, asset, initialEventId, site, loca
     useEffect(() => {
         const nextRemoteAssetId = remoteSnapshot?.asset_id;
         const isAssetChanged = previousRemoteAssetIdRef.current !== nextRemoteAssetId;
+        if (!USE_REMOTE_ASSET_PARTS) {
+            if (isAssetChanged) {
+                setAssetParts([]);
+                setSelectedAssetPartId(undefined);
+            }
+            previousRemoteAssetIdRef.current = nextRemoteAssetId;
+            return;
+        }
         const remoteAssetParts = remoteSnapshot?.initialAssetParts ?? [];
         setAssetParts((currentParts) => isAssetChanged
             ? remoteAssetParts
@@ -136,12 +160,21 @@ export function AssetDashboardPage({ asset_id, asset, initialEventId, site, loca
             }
             dashboardRefreshInFlightRef.current = true;
             try {
-                const response = await fetch(`/api/asset-dashboard/${encodeURIComponent(asset_id)}`, { cache: "no-store" });
+                const response = await fetch(`/api/asset-dashboard/${encodeURIComponent(asset_id)}?${displaySettingsQuery}`, { cache: "no-store" });
                 if (!response.ok) {
                     throw new Error("Failed to refresh asset dashboard.");
                 }
-                const snapshot = (await response.json());
+                let snapshot = (await response.json());
                 if (!isCancelled) {
+                    const latestSavedThresholds = latestSavedThresholdsRef.current;
+                    if (latestSavedThresholds) {
+                        if (areAssetThresholdsEqual(snapshot?.initialThresholds, latestSavedThresholds)) {
+                            latestSavedThresholdsRef.current = null;
+                        }
+                        else {
+                            snapshot = applyAssetThresholdsToSnapshot(snapshot, latestSavedThresholds);
+                        }
+                    }
                     setRemoteSnapshot(snapshot);
                 }
             }
@@ -158,7 +191,7 @@ export function AssetDashboardPage({ asset_id, asset, initialEventId, site, loca
             isCancelled = true;
             window.clearInterval(intervalId);
         };
-    }, [asset_id]);
+    }, [asset_id, displaySettingsQuery]);
     useEffect(() => {
         const intervalId = window.setInterval(() => {
             setEventTick((currentTick) => currentTick + 1);
@@ -168,18 +201,9 @@ export function AssetDashboardPage({ asset_id, asset, initialEventId, site, loca
     const temperatureSummary = useMemo(() => getAssetTemperatureSummary(sample), [sample]);
     const changedCoordinates = useMemo(() => extractChangedTemperatureCoordinates(sample.temperatureParts, sample.threshold.changeDetectionDelta), [sample]);
     const ultrasoundSummary = useMemo(() => getUltrasoundSummary(sample.ultrasoundDetections), [sample.ultrasoundDetections]);
-    const assetPartStates = useMemo(() => mergeAssetPartStates(buildAssetPartStates(assetParts, sample), remoteSnapshot?.initialAssetPartStates), [assetParts, remoteSnapshot?.initialAssetPartStates, sample]);
-    const reportDraft = useMemo(() => ({
-        assetPartStates,
-        assetParts,
-        assetThresholds,
-    }), [assetPartStates, assetParts, assetThresholds]);
-    const persistCurrentReportDraft = useCallback(() => {
-        persistAssetReportDraft(asset_id, reportDraft);
-    }, [asset_id, reportDraft]);
-    useEffect(() => {
-        persistCurrentReportDraft();
-    }, [persistCurrentReportDraft]);
+    const assetPartStates = useMemo(() => USE_REMOTE_ASSET_PARTS
+        ? mergeAssetPartStates(buildAssetPartStates(assetParts, sample), remoteSnapshot?.initialAssetPartStates)
+        : buildAssetPartStates(assetParts, sample), [assetParts, remoteSnapshot?.initialAssetPartStates, sample]);
     const requestPreview = useMemo(() => buildUltrasoundDetectionRequest(sample.asset.id, changedCoordinates), [changedCoordinates, sample.asset.id]);
     const activeRange = assetTrendRanges.find((range) => range.id === activeRangeId) ??
         assetTrendRanges[0];
@@ -265,11 +289,12 @@ export function AssetDashboardPage({ asset_id, asset, initialEventId, site, loca
     ]);
     const globalNotifications = useMemo(() => buildGlobalNotifications({
         asset_id,
+        displaySettings,
         events,
         location,
         site,
         sample,
-    }), [asset_id, events, location, site, sample]);
+    }), [asset_id, displaySettings, events, location, site, sample]);
     const reportHref = `/site/${encodeURIComponent(site.site_id)}/location/${encodeURIComponent(location.id)}/asset/${encodeURIComponent(asset_id)}/report`;
     const unresolvedAlarmCount = globalNotifications.length;
     const chartReferenceThresholds = assetThresholds ?? defaultAssetThresholds;
@@ -291,6 +316,51 @@ export function AssetDashboardPage({ asset_id, asset, initialEventId, site, loca
                 stroke: "var(--asset-ultrasound-maximum-stroke)",
             },
         ];
+    const reportDraft = useMemo(() => ({
+        assetPartStates,
+        assetParts,
+        assetThresholds,
+        remoteDashboard: buildReportRemoteDashboardSnapshot({
+            activeRangeId,
+            assetJudgement,
+            assetPartStates,
+            assetParts,
+            assetThresholds,
+            averageTemperature,
+            chartTemperatureReferenceLines,
+            chartUltrasonicReferenceLines,
+            liveUltrasoundMax,
+            remoteSnapshot,
+            sample,
+            temperatureData,
+            temperatureMax,
+            temperatureMin,
+            ultrasoundAverageDb,
+            ultrasoundDetectionCount,
+            ultrasonicData,
+        }),
+    }), [
+        activeRangeId,
+        assetJudgement,
+        assetPartStates,
+        assetParts,
+        assetThresholds,
+        averageTemperature,
+        chartTemperatureReferenceLines,
+        chartUltrasonicReferenceLines,
+        liveUltrasoundMax,
+        remoteSnapshot,
+        sample,
+        temperatureData,
+        temperatureMax,
+        temperatureMin,
+        ultrasoundAverageDb,
+        ultrasoundDetectionCount,
+        ultrasonicData,
+    ]);
+    const persistCurrentReportDraft = useCallback(() => {
+        persistAssetReportDraft(asset_id, reportDraft);
+    }, [asset_id, reportDraft]);
     const handleCreateAssetPart = (part) => {
         setAssetParts((currentParts) => [part, ...currentParts]);
         setSelectedAssetPartId(part.id);
@@ -308,20 +378,26 @@ export function AssetDashboardPage({ asset_id, asset, initialEventId, site, loca
     const handleSelectAssetPart = (partId) => {
         setSelectedAssetPartId(partId);
     };
+    const handleOpenCameraInterestAreaCreator = useCallback(() => {
+        setCameraSetupRequestId((currentRequestId) => currentRequestId + 1);
+    }, []);
     const handleAssetThresholdSave = useCallback(async (nextThresholds) => {
+        const previousThresholds = assetThresholds ?? defaultAssetThresholds;
+        const applyResolvedThresholds = (resolvedThresholds) => {
+            latestSavedThresholdsRef.current = resolvedThresholds;
+            setAssetThresholds(resolvedThresholds);
+            if (resolvedThresholds) {
+                setAssetParts((currentParts) => syncAssetPartsWithAssetThresholds(currentParts, previousThresholds, resolvedThresholds));
+            }
+            setRemoteSnapshot((currentSnapshot) => applyAssetThresholdsToSnapshot(currentSnapshot, resolvedThresholds));
+        };
         setThresholdSaveError(undefined);
         if (!nextThresholds) {
-            setAssetThresholds(null);
-            setRemoteSnapshot((currentSnapshot) => currentSnapshot
-                ? { ...currentSnapshot, initialThresholds: null }
-                : currentSnapshot);
+            applyResolvedThresholds(null);
             return;
         }
         if (!asset_id) {
-            setAssetThresholds(nextThresholds);
-            setRemoteSnapshot((currentSnapshot) => currentSnapshot
-                ? { ...currentSnapshot, initialThresholds: nextThresholds }
-                : currentSnapshot);
+            applyResolvedThresholds(nextThresholds);
             return;
         }
         setIsThresholdSaving(true);
@@ -336,10 +412,7 @@ export function AssetDashboardPage({ asset_id, asset, initialEventId, site, loca
             }
             const savedThresholds = (await response.json());
             const resolvedThresholds = savedThresholds ?? nextThresholds;
-            setAssetThresholds(resolvedThresholds);
-            setRemoteSnapshot((currentSnapshot) => currentSnapshot
-                ? { ...currentSnapshot, initialThresholds: resolvedThresholds }
-                : currentSnapshot);
+            applyResolvedThresholds(resolvedThresholds);
         }
         catch (error) {
             console.warn("Failed to save asset thresholds.", error);
@@ -349,7 +422,7 @@ export function AssetDashboardPage({ asset_id, asset, initialEventId, site, loca
         finally {
             setIsThresholdSaving(false);
         }
-    }, [asset_id]);
+    }, [assetThresholds, asset_id, defaultAssetThresholds]);
     const handleEventRead = useCallback(async (event) => {
         const alertId = event.alertId ?? event.id;
         if (!alertId || event.source !== "asset-threshold") {
@@ -390,11 +463,11 @@ export function AssetDashboardPage({ asset_id, asset, initialEventId, site, loca
         </DashboardArea>
 
         <DashboardArea className="AssetDashboardPage__area-camera">
-          <AssetCameraPanel activeCameraId={activeCameraId} cameraFeeds={remoteSnapshot?.cameraFeeds} defaultAssetThresholds={defaultAssetThresholds} assetParts={assetParts} assetPartStates={assetPartStates} selectedAssetPartId={selectedAssetPartId} assetThresholds={assetThresholds} onCameraSelect={setActiveCameraId} onCreateAssetPart={handleCreateAssetPart} onDeleteAssetPart={handleDeleteAssetPart} onSelectAssetPart={setSelectedAssetPartId} onUpdateAssetPart={handleUpdateAssetPart} temperatureData={temperatureData} ultrasonicData={ultrasonicData} variant="stream"/>
+          <AssetCameraPanel activeCameraId={activeCameraId} cameraFeeds={remoteSnapshot?.cameraFeeds} defaultAssetThresholds={defaultAssetThresholds} assetParts={assetParts} assetPartStates={assetPartStates} selectedAssetPartId={selectedAssetPartId} assetThresholds={assetThresholds} cameraSetupRequestId={cameraSetupRequestId} onCameraSelect={setActiveCameraId} onCreateAssetPart={handleCreateAssetPart} onDeleteAssetPart={handleDeleteAssetPart} onSelectAssetPart={setSelectedAssetPartId} onUpdateAssetPart={handleUpdateAssetPart} temperatureData={temperatureData} ultrasonicData={ultrasonicData} variant="stream"/>
         </DashboardArea>
 
         <DashboardArea className="AssetDashboardPage__area-metrics">
-          <AssetSummaryPanel averageTemperature={averageTemperature} assetParts={assetParts} assetPartStates={assetPartStates} assetThresholds={assetThresholds} assetJudgement={assetJudgement} asset={sample.asset} isThresholdSaving={isThresholdSaving} temperatureMax={temperatureMax} temperatureMin={temperatureMin} thresholdSaveError={thresholdSaveError} ultrasoundAverageDb={ultrasoundAverageDb} ultrasoundDetectionCount={ultrasoundDetectionCount} ultrasoundMax={liveUltrasoundMax} selectedAssetPartId={selectedAssetPartId} onAssetPartSelect={handleSelectAssetPart} onAssetThresholdSave={handleAssetThresholdSave} onThresholdEditorDirtyChange={setIsThresholdEditorDirty} variant="metrics"/>
+          <AssetSummaryPanel averageTemperature={averageTemperature} assetParts={assetParts} assetPartStates={assetPartStates} assetThresholds={assetThresholds} assetJudgement={assetJudgement} asset={sample.asset} isThresholdSaving={isThresholdSaving} temperatureMax={temperatureMax} temperatureMin={temperatureMin} thresholdSaveError={thresholdSaveError} ultrasoundAverageDb={ultrasoundAverageDb} ultrasoundDetectionCount={ultrasoundDetectionCount} ultrasoundMax={liveUltrasoundMax} selectedAssetPartId={selectedAssetPartId} onAssetPartSelect={handleSelectAssetPart} onAssetThresholdSave={handleAssetThresholdSave} onThresholdEditorDirtyChange={setIsThresholdEditorDirty} onCameraInterestAreaCreate={handleOpenCameraInterestAreaCreator} variant="metrics"/>
         </DashboardArea>
 
         <DashboardArea className="AssetDashboardPage__area-trends">
@@ -402,7 +475,7 @@ export function AssetDashboardPage({ asset_id, asset, initialEventId, site, loca
         </DashboardArea>
 
         <DashboardArea className="AssetDashboardPage__area-detection">
-          <AssetSummaryPanel averageTemperature={averageTemperature} assetParts={assetParts} assetPartStates={assetPartStates} assetThresholds={assetThresholds} assetJudgement={assetJudgement} asset={sample.asset} isThresholdSaving={isThresholdSaving} temperatureMax={temperatureMax} temperatureMin={temperatureMin} thresholdSaveError={thresholdSaveError} ultrasoundAverageDb={ultrasoundAverageDb} ultrasoundDetectionCount={ultrasoundDetectionCount} ultrasoundMax={liveUltrasoundMax} selectedAssetPartId={selectedAssetPartId} onAssetPartSelect={handleSelectAssetPart} onAssetThresholdSave={handleAssetThresholdSave} onThresholdEditorDirtyChange={setIsThresholdEditorDirty} variant="detection"/>
+          <AssetSummaryPanel averageTemperature={averageTemperature} assetParts={assetParts} assetPartStates={assetPartStates} assetThresholds={assetThresholds} assetJudgement={assetJudgement} asset={sample.asset} isThresholdSaving={isThresholdSaving} temperatureMax={temperatureMax} temperatureMin={temperatureMin} thresholdSaveError={thresholdSaveError} ultrasoundAverageDb={ultrasoundAverageDb} ultrasoundDetectionCount={ultrasoundDetectionCount} ultrasoundMax={liveUltrasoundMax} selectedAssetPartId={selectedAssetPartId} onAssetPartSelect={handleSelectAssetPart} onAssetThresholdSave={handleAssetThresholdSave} onThresholdEditorDirtyChange={setIsThresholdEditorDirty} onCameraInterestAreaCreate={handleOpenCameraInterestAreaCreator} variant="detection"/>
         </DashboardArea>
       </div>
 
@@ -413,6 +486,41 @@ function DashboardArea({ children, className, }) {
     return (<div className={cn("AssetDashboardPage AssetDashboardPage__area-1 grid min-h-0 min-w-0 overflow-hidden", className)}>
       {children}
     </div>);
+}
+function buildReportRemoteDashboardSnapshot({ activeRangeId, assetJudgement, assetPartStates, assetParts, assetThresholds, averageTemperature, chartTemperatureReferenceLines, chartUltrasonicReferenceLines, liveUltrasoundMax, remoteSnapshot, sample, temperatureData, temperatureMax, temperatureMin, ultrasoundAverageDb, ultrasoundDetectionCount, ultrasonicData, }) {
+    const reportJudgement = assetJudgement === "unconfigured" ? "normal" : assetJudgement;
+    return {
+        ...(remoteSnapshot ?? {}),
+        header: {
+            ...(remoteSnapshot?.header ?? {}),
+            assetName: sample.asset.name,
+            dashboardStatus: toDashboardStatus(reportJudgement),
+            lastCollectedAt: sample.asset.lastCollectedAt,
+            statusJudgement: reportJudgement,
+        },
+        initialAssetParts: assetParts,
+        initialAssetPartStates: assetPartStates,
+        initialThresholds: assetThresholds,
+        summary: {
+            ...(remoteSnapshot?.summary ?? {}),
+            averageTemperature,
+            dominantFrequencyKHz: liveUltrasoundMax.dominantFrequencyKHz,
+            frequencyBandKHz: liveUltrasoundMax.frequencyBandKHz ?? remoteSnapshot?.summary?.frequencyBandKHz,
+            temperatureMax,
+            temperatureMin,
+            ultrasoundAverageDb,
+            ultrasoundDetectionCount,
+            ultrasoundPeakDb: liveUltrasoundMax.peakDb,
+        },
+        trend: {
+            ...(remoteSnapshot?.trend ?? {}),
+            selectedRangeId: activeRangeId,
+            temperatureData: cloneTrendData(temperatureData),
+            temperatureReferenceLines: chartTemperatureReferenceLines.map((line) => ({ ...line })),
+            ultrasonicData: cloneTrendData(ultrasonicData),
+            ultrasonicReferenceLines: chartUltrasonicReferenceLines.map((line) => ({ ...line })),
+        },
+    };
 }
 function useSmoothedTrendData(targetData, resetKey) {
     const [displayData, setDisplayData] = useState(() => cloneTrendData(targetData));
@@ -629,7 +737,7 @@ function AssetStatusTitlePanel({ assetJudgement, events, location, reportHref, s
       </Link>
     </section>);
 }
-function buildDashboardSample(asset, remoteDashboard) {
+function buildDashboardSample(asset, remoteDashboard, { assetParts = remoteDashboard?.initialAssetParts ?? [], assetPartStates = remoteDashboard?.initialAssetPartStates ?? [], } = {}) {
     const threshold = remoteDashboard?.initialThresholds;
     const summary = remoteDashboard?.summary;
     const targetTemperature = threshold?.temperature ?? summary?.temperatureMax ?? 0;
@@ -640,8 +748,8 @@ function buildDashboardSample(asset, remoteDashboard) {
         asset,
         temperatureParts: buildTemperatureParts({
             averageTemperature,
-            parts: remoteDashboard?.initialAssetParts ?? [],
-            states: remoteDashboard?.initialAssetPartStates ?? [],
+            parts: assetParts,
+            states: assetPartStates,
             temperatureMax,
             temperatureMin,
         }),
@@ -651,8 +759,8 @@ function buildDashboardSample(asset, remoteDashboard) {
             targetTemperature,
         },
         ultrasoundDetections: buildUltrasoundDetections({
-            parts: remoteDashboard?.initialAssetParts ?? [],
-            states: remoteDashboard?.initialAssetPartStates ?? [],
+            parts: assetParts,
+            states: assetPartStates,
             summary,
         }),
     };
@@ -821,7 +929,10 @@ function mergeAssetPartStates(localStates, remoteStates) {
     }
     const stateByPartId = new Map(localStates.map((state) => [state.partId, state]));
     remoteStates.forEach((state) => {
-        stateByPartId.set(state.partId, state);
+        const localState = stateByPartId.get(state.partId);
+        stateByPartId.set(state.partId, localState
+            ? { ...localState, ...state, judgement: localState.judgement }
+            : state);
     });
     return Array.from(stateByPartId.values());
 }
@@ -831,6 +942,56 @@ function mergeAssetPartConfigs(remoteParts, currentParts) {
         partById.set(part.id, part);
     });
     return Array.from(partById.values());
+}
+function syncAssetPartsWithAssetThresholds(parts, previousThresholds, nextThresholds) {
+    let hasChanges = false;
+    const nextParts = parts.map((part) => {
+        if (!part.thresholds ||
+            !areAssetThresholdsEqual(part.thresholds, previousThresholds)) {
+            return part;
+        }
+        hasChanges = true;
+        return {
+            ...part,
+            thresholds: { ...nextThresholds },
+        };
+    });
+    return hasChanges ? nextParts : parts;
+}
+function applyAssetThresholdsToSnapshot(snapshot, thresholds) {
+    if (!snapshot) {
+        return snapshot;
+    }
+    return {
+        ...snapshot,
+        initialThresholds: thresholds,
+        trend: thresholds
+            ? applyAssetThresholdsToTrendSnapshot(snapshot.trend, thresholds)
+            : snapshot.trend,
+    };
+}
+function applyAssetThresholdsToTrendSnapshot(trend, thresholds) {
+    if (!trend) {
+        return trend;
+    }
+    return {
+        ...trend,
+        temperatureReferenceLines: syncThresholdReferenceLineValue(trend.temperatureReferenceLines, thresholds.temperature),
+        ultrasonicReferenceLines: syncThresholdReferenceLineValue(trend.ultrasonicReferenceLines, thresholds.ultrasoundDb),
+    };
+}
+function syncThresholdReferenceLineValue(referenceLines, value) {
+    if (!referenceLines?.length) {
+        return referenceLines;
+    }
+    const [thresholdLine, ...restLines] = referenceLines;
+    return [
+        {
+            ...thresholdLine,
+            value,
+        },
+        ...restLines,
+    ];
 }
 function mergeAssetEvents(remoteEvents, liveEvents) {
     const eventById = new Map();
@@ -1002,7 +1163,7 @@ function buildEmptyTrendData(range) {
         spread: 0,
     }));
 }
-function buildGlobalNotifications({ asset_id, events, location, site, sample, }) {
+function buildGlobalNotifications({ asset_id, displaySettings, events, location, site, sample, }) {
     const locationLabel = `${site.name} > ${location.name} > ${sample.asset.name}`;
     return events
         .filter((event) => event.globalAlert && event.grade !== "normal")
@@ -1015,7 +1176,7 @@ function buildGlobalNotifications({ asset_id, events, location, site, sample, })
         id: `global-${event.id}`,
         location: locationLabel,
         message: event.message,
-        occurredAt: formatCheckLabKoreanDateTime(event.occurredAtIso) ?? event.occurredAt,
+        occurredAt: formatCheckLabKoreanDateTime(event.occurredAtIso, displaySettings) ?? event.occurredAt,
         occurredAtIso: event.occurredAtIso,
         title: event.title,
     }));

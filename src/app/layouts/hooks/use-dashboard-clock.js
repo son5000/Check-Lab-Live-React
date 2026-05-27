@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { createDashboardDateFormatter, createDashboardTimeFormatter, } from "@/app/layouts/helpers/time-formatters";
+import { useDisplaySettings } from "./use-display-settings";
 /**
  * 역할
  * - 대시보드 헤더의 실시간 시계 상태를 관리합니다.
@@ -16,9 +17,10 @@ import { createDashboardDateFormatter, createDashboardTimeFormatter, } from "@/a
  * - 시계 반복 타이머 로직이 대시보드 레이아웃에 섞이지 않도록 분리합니다.
  */
 export function useDashboardClock() {
+    const { settings } = useDisplaySettings();
     const [now, setNow] = useState(null);
-    const dateFormatter = useMemo(() => createDashboardDateFormatter(), []);
-    const timeFormatter = useMemo(() => createDashboardTimeFormatter(), []);
+    const dateFormatter = useMemo(() => createDashboardDateFormatter(settings), [settings]);
+    const timeFormatter = useMemo(() => createDashboardTimeFormatter(settings), [settings]);
     useEffect(() => {
         setNow(new Date());
         const timerId = window.setInterval(() => {
@@ -27,7 +29,11 @@ export function useDashboardClock() {
         return () => window.clearInterval(timerId);
     }, []);
     return {
-        currentDate: now ? dateFormatter.format(now) : "날짜 확인 중",
-        currentTime: now ? timeFormatter.format(now) : "시간 확인 중",
+        currentDate: now
+            ? dateFormatter.format(now)
+            : settings.language === "en" ? "Loading date" : "날짜 확인 중",
+        currentTime: now
+            ? timeFormatter.format(now)
+            : settings.language === "en" ? "Loading time" : "시간 확인 중",
     };
 }

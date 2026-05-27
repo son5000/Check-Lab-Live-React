@@ -1,5 +1,6 @@
 "use client";
 import { SlidersHorizontal } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { BackgroundControls } from "./BackgroundControls";
 import { CameraControls } from "./CameraControls";
 import { ControlSection, RangeField, } from "./control-fields";
@@ -10,9 +11,9 @@ const TEXT = {
     animation: "\uC560\uB2C8\uBA54\uC774\uC158",
     rotationSpeed: "\uD68C\uC804 \uC18D\uB3C4",
 };
-export function Viewer3DOptionBar({ config, modelFile, onConfigChange, onModelFileChange, }) {
+export function Viewer3DOptionBar({ className, config, modelFile, onConfigChange, onModelFileChange, }) {
     const controls = config.controls ?? {};
-    return (<aside className="Viewer3DOptionBar Viewer3DOptionBar__aside-1 min-h-0 min-w-0 overflow-y-auto border-t border-border bg-card/95 p-2 md:border-l md:border-t-0">
+    return (<aside className={cn("Viewer3DOptionBar Viewer3DOptionBar__aside-1 min-h-0 min-w-0 overflow-y-auto border-t border-border bg-card/95 p-2 md:border-l md:border-t-0", className)}>
       <div className="Viewer3DOptionBar Viewer3DOptionBar__stack-1 grid gap-2">
         {controls.enableFileInputs !== false ? (<ModelFileControls modelFile={modelFile} onChange={onModelFileChange}/>) : null}
 

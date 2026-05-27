@@ -1,88 +1,111 @@
-'use client';
-import { Bell, Volume2, VolumeX } from 'lucide-react';
-export function NotificationSettingsForm({ settings, onSettingsChange, }) {
-    const handleToggleNotifications = () => {
-        onSettingsChange({ enabled: !settings.enabled });
-    };
-    const handlePositionChange = (position) => {
-        onSettingsChange({ position });
-    };
-    return (<div className="NotificationSettingsForm NotificationSettingsForm__container-1 space-y-6">
-      <div className="NotificationSettingsForm NotificationSettingsForm__section-1 border-b border-border pb-6">
+"use client";
+
+import { Bell, Volume2, VolumeX } from "lucide-react";
+
+const NOTIFICATION_POSITION_OPTIONS = [
+  {
+    description: "화면 중앙에 크게 표시합니다.",
+    label: "가운데",
+    value: "center",
+  },
+  {
+    description: "화면 상단 중앙에 표시합니다.",
+    label: "상단",
+    value: "top",
+  },
+  {
+    description: "화면 우측 하단에 표시합니다.",
+    label: "우측하단",
+    value: "bottom-right",
+  },
+  {
+    description: "우측 하단에 작은 카드로 표시합니다.",
+    label: "우측하단 작게",
+    value: "bottom-right-small",
+  },
+];
+
+export function NotificationSettingsForm({ settings, onSettingsChange }) {
+  const isEnabled = settings.enabled;
+
+  return (
+    <div className="NotificationSettingsForm NotificationSettingsForm__container-1 space-y-6">
+      <section className="NotificationSettingsForm NotificationSettingsForm__section-1 border-b border-border pb-6">
         <div className="NotificationSettingsForm NotificationSettingsForm__header-1 mb-4 flex items-center gap-3">
-          <Bell className="NotificationSettingsForm NotificationSettingsForm__icon-1 h-5 w-5 text-foreground"/>
+          <Bell className="NotificationSettingsForm NotificationSettingsForm__icon-1 h-5 w-5 text-foreground" />
           <h2 className="NotificationSettingsForm NotificationSettingsForm__title-1 text-lg font-semibold text-foreground">
             알림 설정
           </h2>
         </div>
 
-        <div className="NotificationSettingsForm NotificationSettingsForm__toggle-section-1 space-y-3">
-          <label className="NotificationSettingsForm NotificationSettingsForm__label-1 flex items-center gap-3 cursor-pointer">
-            <input type="checkbox" checked={settings.enabled} onChange={handleToggleNotifications} className="NotificationSettingsForm NotificationSettingsForm__checkbox-1 h-4 w-4 rounded border-border bg-background cursor-pointer"/>
+        <div className="NotificationSettingsForm NotificationSettingsForm__toggle-section-1 rounded-md border border-border bg-background/50 p-3">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={isEnabled}
+            onClick={() => onSettingsChange({ enabled: !isEnabled })}
+            className="NotificationSettingsForm NotificationSettingsForm__switch-1 flex w-full items-center gap-3 text-left"
+          >
+            <span
+              className={`relative h-6 w-11 shrink-0 rounded-full border transition ${
+                isEnabled
+                  ? "border-blue-600 bg-blue-600"
+                  : "border-border bg-muted"
+              }`}
+            >
+              <span
+                className={`absolute top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-white shadow transition ${
+                  isEnabled ? "left-6" : "left-1"
+                }`}
+              />
+            </span>
             <span className="NotificationSettingsForm NotificationSettingsForm__label-text-1 flex flex-col gap-1">
               <span className="text-sm font-medium text-foreground">
-                알림 활성화
+                알림 {isEnabled ? "활성화" : "비활성화"}
               </span>
               <span className="text-xs text-muted-foreground">
-                {settings.enabled ? '알림이 표시됩니다' : '알림이 비활성화됨'}
+                {isEnabled
+                  ? "전역 경고 알림을 표시합니다."
+                  : "전역 경고 알림을 숨깁니다."}
               </span>
             </span>
-            {settings.enabled ? (<Volume2 className="NotificationSettingsForm NotificationSettingsForm__status-icon-1 ml-auto h-4 w-4 text-green-600"/>) : (<VolumeX className="NotificationSettingsForm NotificationSettingsForm__status-icon-2 ml-auto h-4 w-4 text-muted-foreground"/>)}
-          </label>
+            {isEnabled ? (
+              <Volume2 className="NotificationSettingsForm NotificationSettingsForm__status-icon-1 ml-auto h-4 w-4 text-green-600" />
+            ) : (
+              <VolumeX className="NotificationSettingsForm NotificationSettingsForm__status-icon-2 ml-auto h-4 w-4 text-muted-foreground" />
+            )}
+          </button>
         </div>
-      </div>
+      </section>
 
-      {settings.enabled && (<div className="NotificationSettingsForm NotificationSettingsForm__position-section-1 space-y-3">
-          <h3 className="NotificationSettingsForm NotificationSettingsForm__position-title-1 text-sm font-semibold text-foreground">
-            알림 위치
-          </h3>
-          <p className="NotificationSettingsForm NotificationSettingsForm__description-1 text-xs text-muted-foreground">
-            알림이 화면에 표시될 위치를 선택하세요.
-          </p>
-
-          <div className="NotificationSettingsForm NotificationSettingsForm__radio-group-1 space-y-2">
-            <label className="NotificationSettingsForm NotificationSettingsForm__radio-label-1 flex items-start gap-3 p-3 rounded-md border border-border bg-background/50 cursor-pointer transition hover:bg-accent/20">
-              <input type="radio" name="position" value="center" checked={settings.position === 'center'} onChange={() => handlePositionChange('center')} className="NotificationSettingsForm NotificationSettingsForm__radio-1 h-4 w-4 mt-0.5 cursor-pointer"/>
-              <span className="NotificationSettingsForm NotificationSettingsForm__radio-content-1 flex flex-col gap-1 flex-1">
-                <span className="text-sm font-medium text-foreground">
-                  중앙 (기본)
+      <section className="NotificationSettingsForm NotificationSettingsForm__position-section-1 space-y-3">
+        <h3 className="NotificationSettingsForm NotificationSettingsForm__position-title-1 text-sm font-semibold text-foreground">
+          알림 표시 방법
+        </h3>
+        <div className="NotificationSettingsForm NotificationSettingsForm__radio-group-1 grid gap-2 sm:grid-cols-2">
+          {NOTIFICATION_POSITION_OPTIONS.map((option) => {
+            const isSelected = settings.position === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => onSettingsChange({ position: option.value })}
+                className={`rounded-md border p-3 text-left transition ${
+                  isSelected
+                    ? "border-blue-600 bg-blue-600/10 text-foreground"
+                    : "border-border bg-background/50 text-muted-foreground hover:bg-accent/20 hover:text-foreground"
+                }`}
+                aria-pressed={isSelected}
+              >
+                <span className="block text-sm font-semibold">
+                  {option.label}
                 </span>
-                <span className="text-xs text-muted-foreground">
-                  화면 중앙에 크게 표시됩니다
-                </span>
-              </span>
-            </label>
-
-            <label className="NotificationSettingsForm NotificationSettingsForm__radio-label-2 flex items-start gap-3 p-3 rounded-md border border-border bg-background/50 cursor-pointer transition hover:bg-accent/20">
-              <input type="radio" name="position" value="bottom-right" checked={settings.position === 'bottom-right'} onChange={() => handlePositionChange('bottom-right')} className="NotificationSettingsForm NotificationSettingsForm__radio-2 h-4 w-4 mt-0.5 cursor-pointer"/>
-              <span className="NotificationSettingsForm NotificationSettingsForm__radio-content-2 flex flex-col gap-1 flex-1">
-                <span className="text-sm font-medium text-foreground">
-                  우측 하단
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  화면 우측 하단에 표시됩니다
-                </span>
-              </span>
-            </label>
-
-            <label className="NotificationSettingsForm NotificationSettingsForm__radio-label-3 flex items-start gap-3 p-3 rounded-md border border-border bg-background/50 cursor-pointer transition hover:bg-accent/20">
-              <input type="radio" name="position" value="bottom-right-small" checked={settings.position === 'bottom-right-small'} onChange={() => handlePositionChange('bottom-right-small')} className="NotificationSettingsForm NotificationSettingsForm__radio-3 h-4 w-4 mt-0.5 cursor-pointer"/>
-              <span className="NotificationSettingsForm NotificationSettingsForm__radio-content-3 flex flex-col gap-1 flex-1">
-                <span className="text-sm font-medium text-foreground">
-                  우측 하단 (작게)
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  화면 우측 하단에 작게 표시됩니다
-                </span>
-              </span>
-            </label>
-          </div>
-        </div>)}
-
-      <div className="NotificationSettingsForm NotificationSettingsForm__help-section-1 rounded-md bg-muted/30 p-3">
-        <p className="text-xs text-muted-foreground">
-          💡 알림 설정은 자동으로 저장됩니다. 추후 더 다양한 설정 메뉴가 추가될 예정입니다.
-        </p>
-      </div>
-    </div>);
+                <span className="mt-1 block text-xs">{option.description}</span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+    </div>
+  );
 }

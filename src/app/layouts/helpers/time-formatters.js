@@ -1,3 +1,10 @@
+import {
+    getDisplayHourCycle,
+    getDisplayLocale,
+    readBrowserDisplaySettings,
+    sanitizeDisplaySettings,
+} from "@/app/layouts/helpers/display-settings";
+
 export const DASHBOARD_TIME_ZONE = "Asia/Seoul";
 const backendTimeOnlyPattern = /^(\d{2}):(\d{2})(?::(\d{2}))?$/;
 const backendDateOnlyPattern = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -15,8 +22,9 @@ const explicitTimeZonePattern = /(?:z|[+-]\d{2}:?\d{2})$/i;
  * 헬퍼
  * - 정렬이나 최신순 비교도 같은 파서(getCheckLabTimeValue)를 사용해야 표시 시간과 어긋나지 않습니다.
  */
-export function createDashboardDateFormatter() {
-    return new Intl.DateTimeFormat("ko-KR", {
+export function createDashboardDateFormatter(settings) {
+    const displaySettings = resolveDisplaySettings(settings);
+    return new Intl.DateTimeFormat(getDisplayLocale(displaySettings), {
         timeZone: DASHBOARD_TIME_ZONE,
         year: "numeric",
         month: "2-digit",
@@ -24,44 +32,82 @@ export function createDashboardDateFormatter() {
         weekday: "short",
     });
 }
-export function createDashboardTimeFormatter() {
-    return new Intl.DateTimeFormat("ko-KR", {
+export function createDashboardTimeFormatter(settings, options = {}) {
+    const displaySettings = resolveDisplaySettings(settings);
+    return new Intl.DateTimeFormat(getDisplayLocale(displaySettings), {
         timeZone: DASHBOARD_TIME_ZONE,
         hour: "2-digit",
         minute: "2-digit",
-        second: "2-digit",
-        hourCycle: "h23",
+        ...(options.includeSeconds === false ? {} : { second: "2-digit" }),
+        hourCycle: getDisplayHourCycle(displaySettings),
     });
 }
-const dashboardDateFormatter = createDashboardDateFormatter();
-const dashboardTimeFormatter = createDashboardTimeFormatter();
-const dashboardDateTimeFormatter = new Intl.DateTimeFormat("ko-KR", {
-    timeZone: DASHBOARD_TIME_ZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hourCycle: "h23",
-});
-export function formatCheckLabKoreanDate(value) {
-    const date = parseCheckLabUtcDate(value);
-    return date ? dashboardDateFormatter.format(date) : undefined;
+
+export function createDashboardDateTimeFormatter(settings, options = {}) {
+    const displaySettings = resolveDisplaySettings(settings);
+    return new Intl.DateTimeFormat(getDisplayLocale(displaySettings), {
+        timeZone: DASHBOARD_TIME_ZONE,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        ...(options.includeSeconds === false ? {} : { second: "2-digit" }),
+        hourCycle: getDisplayHourCycle(displaySettings),
+    });
 }
-export function formatCheckLabKoreanTime(value) {
+
+export function formatCheckLabDate(value, settings) {
     const date = parseCheckLabUtcDate(value);
-    return date ? dashboardTimeFormatter.format(date) : undefined;
+    return date ? createDashboardDateFormatter(settings).format(date) : undefined;
 }
-export function formatCheckLabKoreanDateTime(value) {
+
+export function formatCheckLabTime(value, settings, options) {
     const date = parseCheckLabUtcDate(value);
-    return date ? `${dashboardDateTimeFormatter.format(date)} KST` : undefined;
+    return date ? createDashboardTimeFormatter(settings, options).format(date) : undefined;
+}
+
+export function formatCheckLabDateTime(value, settings, options) {
+    const date = parseCheckLabUtcDate(value);
+    return date ? `${createDashboardDateTimeFormatter(settings, options).format(date)} KST` : undefined;
+}
+
+export function formatCheckLabKoreanDate(value, settings) {
+    return formatCheckLabDate(value, settings);
+}
+
+export function formatCheckLabKoreanTime(value, settings, options) {
+    return formatCheckLabTime(value, settings, options);
+}
+
+export function formatCheckLabKoreanDateTime(value, settings, options) {
+    return formatCheckLabDateTime(value, settings, options);
+}
+
+export function formatCurrentDashboardTime(settings, options) {
+    return createDashboardTimeFormatter(settings, options).format(new Date());
+}
+
+export function formatCurrentDashboardDateTime(settings, options) {
+    return createDashboardDateTimeFormatter(settings, options).format(new Date());
 }
 export function getCheckLabTimeValue(value) {
     return parseCheckLabUtcDate(value)?.getTime() ?? 0;
 }
+function resolveDisplaySettings(settings) {
+    return sanitizeDisplaySettings(settings ?? readBrowserDisplaySettings());
+}
 function parseCheckLabUtcDate(value) {
-    const trimmedValue = value?.trim();
+    if (value instanceof Date) {
+        return createValidDate(value.getTime());
+    }
+    if (typeof value === "number") {
+        return createValidDate(value);
+    }
+    if (typeof value !== "string") {
+        return null;
+    }
+    const trimmedValue = value.trim();
     if (!trimmedValue) {
         return null;
     }

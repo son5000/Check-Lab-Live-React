@@ -4,7 +4,7 @@ export { UltrasoundMetricCard, TemperatureMetricCard };
 /* ─────────────────────────────────────────────
    초음파 카드 — ARC 게이지 시각화
 ───────────────────────────────────────────── */
-function UltrasoundMetricCard({ averageDb, peakDb, dominantFrequencyKHz, frequencyBandKHz, detectionCount, threshold, isExceeded, }) {
+function UltrasoundMetricCard({ averageDb, peakDb, dominantFrequencyKHz, frequencyBandKHz, detectionCount, threshold, isExceeded, reserveHeaderActionSpace = false, }) {
     const accentColor = isExceeded
         ? "rgb(239 68 68)"
         : threshold && averageDb / threshold >= 0.82
@@ -32,7 +32,7 @@ function UltrasoundMetricCard({ averageDb, peakDb, dominantFrequencyKHz, frequen
       <div className="h-[3px] w-full shrink-0" style={{ background: accentColor, opacity: 0.7 }}/>
 
       {/* 헤더 */}
-      <div className="flex min-w-0 items-center justify-between gap-2 border-b border-border/40 px-3 py-1.5">
+      <div className={cn("flex min-w-0 items-center justify-between gap-2 border-b border-border/40 px-3 py-1.5", reserveHeaderActionSpace && "pr-10")}>
         <p className="min-w-0 truncate text-[10px] font-bold uppercase tracking-widest text-muted-foreground">초음파</p>
         <UltrasoundIcon className={cn("h-3.5 w-3.5 shrink-0 opacity-60", VALUE_METRIC_ICON_CLASS_NAME)} aria-hidden="true"/>
       </div>
@@ -56,7 +56,7 @@ function UltrasoundMetricCard({ averageDb, peakDb, dominantFrequencyKHz, frequen
 /* ─────────────────────────────────────────────
    온도 카드 — ARC 게이지 시각화
 ───────────────────────────────────────────── */
-function TemperatureMetricCard({ averageTemperature, temperatureMax, temperatureMin, threshold, isExceeded, }) {
+function TemperatureMetricCard({ averageTemperature, temperatureMax, temperatureMin, threshold, isExceeded, reserveHeaderActionSpace = false, }) {
     const accentColor = isExceeded
         ? "rgb(239 68 68)"
         : threshold && averageTemperature / threshold >= 0.82
@@ -85,7 +85,7 @@ function TemperatureMetricCard({ averageTemperature, temperatureMax, temperature
       <div className="h-[3px] w-full shrink-0" style={{ background: accentColor, opacity: 0.7 }}/>
 
       {/* 헤더 */}
-      <div className="flex min-w-0 items-center justify-between gap-2 border-b border-border/40 px-3 py-1.5">
+      <div className={cn("flex min-w-0 items-center justify-between gap-2 border-b border-border/40 px-3 py-1.5", reserveHeaderActionSpace && "pr-10")}>
         <p className="min-w-0 truncate text-[10px] font-bold uppercase tracking-widest text-muted-foreground">온도</p>
         <AvgTemperatureIcon className={cn("h-3.5 w-3.5 shrink-0 opacity-60", VALUE_METRIC_ICON_CLASS_NAME)} aria-hidden="true"/>
       </div>

@@ -1,14 +1,11 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useDisplaySettings } from "./use-display-settings";
 export function useDashboardTheme() {
-    const [themeMode, setThemeMode] = useState("dark");
+    const { settings, updateSettings } = useDisplaySettings();
+    const themeMode = settings.theme;
     const isDarkMode = themeMode === "dark";
-    useEffect(() => {
-        document.documentElement.classList.toggle("dark", isDarkMode);
-        document.documentElement.style.colorScheme = themeMode;
-    }, [isDarkMode, themeMode]);
     const handleThemeToggle = () => {
-        setThemeMode((mode) => (mode === "dark" ? "light" : "dark"));
+        updateSettings({ theme: isDarkMode ? "light" : "dark" });
     };
     return {
         isDarkMode,

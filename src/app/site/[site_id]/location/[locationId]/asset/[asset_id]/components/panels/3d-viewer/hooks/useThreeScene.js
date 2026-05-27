@@ -31,7 +31,7 @@ export function useThreeScene(containerRef, config) {
         const renderer = SceneBuilder.createRenderer(container);
         const controls = new OrbitControls(camera, renderer.domElement);
         let animationFrameId = 0;
-        let resizeTimeoutId = 0;
+        let resizeFrameId = 0;
         let lastRendererSizeKey = "";
         renderer.domElement.className = "h-full w-full";
         controls.enableDamping = true;
@@ -61,13 +61,16 @@ export function useThreeScene(containerRef, config) {
             renderer.render(scene, camera);
         };
         const scheduleResize = () => {
-            if (resizeTimeoutId) {
-                window.clearTimeout(resizeTimeoutId);
+            if (resizeFrameId) {
+                window.cancelAnimationFrame(resizeFrameId);
             }
-            resizeTimeoutId = window.setTimeout(() => {
-                resizeTimeoutId = 0;
+            resizeFrameId = window.requestAnimationFrame(() => {
                 resizeRendererToContainer();
-            }, 2000);
+                resizeFrameId = window.requestAnimationFrame(() => {
+                    resizeFrameId = 0;
+                    resizeRendererToContainer();
+                });
+            });
         };
         resizeRendererToContainer();
         const resizeObserver = new ResizeObserver(scheduleResize);
@@ -84,8 +87,8 @@ export function useThreeScene(containerRef, config) {
         animate();
         return () => {
             window.cancelAnimationFrame(animationFrameId);
-            if (resizeTimeoutId) {
-                window.clearTimeout(resizeTimeoutId);
+            if (resizeFrameId) {
+                window.cancelAnimationFrame(resizeFrameId);
             }
             window.removeEventListener("resize", scheduleResize);
             resizeObserver.disconnect();

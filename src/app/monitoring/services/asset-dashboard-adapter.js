@@ -32,25 +32,25 @@ import { getAcousticWarningThreshold, getTemperatureWarningThreshold, toAssetThr
  * - trend: 온도/초음파 추이 데이터와 임계 기준선입니다.
  * - recentEvents: 알림과 이벤트 타임라인을 합친 이벤트 로그입니다.
  */
-export function toAssetDashboardRemoteSnapshot(response) {
+export function toAssetDashboardRemoteSnapshot(response, displaySettings) {
     const summary = toSummarySnapshot(response.summary_cards ?? []);
     const initialThresholds = toAssetThresholdConfig(response.threshold_panel);
     const thresholdFallback = initialThresholds ?? toThresholdFallback(response.threshold_panel);
     const monitoredParts = response.monitored_parts ?? response.monitored_regions ?? [];
     const initialAssetParts = toAssetParts(monitoredParts, thresholdFallback);
     const initialAssetPartStates = toAssetPartStates(monitoredParts, response.threshold_panel);
-    const trend = toTrendSnapshot(response.trend_charts ?? [], response.threshold_panel);
+    const trend = toTrendSnapshot(response.trend_charts ?? [], response.threshold_panel, displaySettings);
     return {
         asset_id: response.asset_id,
         cameraFeeds: response.camera ? [toCameraFeed(response.camera)] : undefined,
         clock: {
-            currentDate: formatCheckLabKoreanDate(response.header?.latest_updated_at) ??
+            currentDate: formatCheckLabKoreanDate(response.header?.latest_updated_at, displaySettings) ??
                 response.header?.reference_date_text ??
                 undefined,
             currentTime: formatCheckLabKoreanTime(response.header?.current_time_text ??
-                response.header?.latest_updated_at) ?? undefined,
+                response.header?.latest_updated_at, displaySettings) ?? undefined,
         },
-        header: toHeaderSnapshot(response.header),
+        header: toHeaderSnapshot(response.header, displaySettings),
         initialAssetParts,
         initialAssetPartStates,
         initialThresholds,
@@ -58,7 +58,7 @@ export function toAssetDashboardRemoteSnapshot(response) {
             alerts: response.alerts,
             eventTimeline: response.event_timeline,
             recentEvents: response.recent_events,
-        }),
+        }, displaySettings),
         summary,
         trend,
     };
@@ -69,7 +69,7 @@ export function toAssetDashboardRemoteSnapshot(response) {
  * - AssetStatusTitlePanel: 설비명, 위치, 현재 상태 판정, 이벤트 판정에 사용합니다.
  * - DashboardHeader/HeaderStatusSummary: 선택 경로, 상태 라벨, 최근 수집 시각, 미해결 알림 수에 사용합니다.
  */
-function toHeaderSnapshot(header) {
+function toHeaderSnapshot(header, displaySettings) {
     if (!header) {
         return undefined;
     }
@@ -80,7 +80,7 @@ function toHeaderSnapshot(header) {
         dashboardStatus,
         eventJudgmentGrade,
         eventJudgmentLabel: header.event_judgment_label ?? undefined,
-        lastCollectedAt: formatCheckLabKoreanTime(header.current_time_text ?? header.latest_updated_at) ?? undefined,
+        lastCollectedAt: formatCheckLabKoreanTime(header.current_time_text ?? header.latest_updated_at, displaySettings) ?? undefined,
         locationLabel: header.location_label ?? undefined,
         overallStatusLabel: header.overall_status_label ?? undefined,
         path: splitBreadcrumb(header.breadcrumb),
@@ -145,7 +145,7 @@ function toSummarySnapshot(summaryCards) {
  * - 원천 테이블: observations, roi_values, asset_displays, asset_thresholds
  * - 온도/초음파 차트를 찾아 AssetTrendPanel의 라인 데이터와 임계 기준선으로 바꿉니다.
  */
-function toTrendSnapshot(trendCharts, thresholdPanel) {
+function toTrendSnapshot(trendCharts, thresholdPanel, displaySettings) {
     const acousticChart = findTrendChart(trendCharts, [
         "acoustic",
         "ultrasound",
@@ -154,17 +154,17 @@ function toTrendSnapshot(trendCharts, thresholdPanel) {
     const selectedRangeId = acousticChart?.selected_window ?? thermalChart?.selected_window ?? undefined;
     return {
         selectedRangeId,
-        temperatureData: thermalChart ? toTrendPoints(thermalChart) : undefined,
+        temperatureData: thermalChart ? toTrendPoints(thermalChart, displaySettings) : undefined,
         temperatureReferenceLines: thermalChart
-            ? toReferenceLines(thermalChart, "var(--asset-temperature-maximum-stroke)", getTemperatureWarningThreshold(thresholdPanel))
+            ? toReferenceLines(thermalChart, "var(--asset-temperature-maximum-stroke)", getTemperatureWarningThreshold(thresholdPanel), "온도 임계")
             : undefined,
-        ultrasonicData: acousticChart ? toTrendPoints(acousticChart) : undefined,
+        ultrasonicData: acousticChart ? toTrendPoints(acousticChart, displaySettings) : undefined,
         ultrasonicReferenceLines: acousticChart
-            ? toReferenceLines(acousticChart, "var(--asset-ultrasound-maximum-stroke)", getAcousticWarningThreshold(thresholdPanel))
+            ? toReferenceLines(acousticChart, "var(--asset-ultrasound-maximum-stroke)", getAcousticWarningThreshold(thresholdPanel), "초음파 임계")
             : undefined,
     };
 }
-function toTrendPoints(chart) {
+function toTrendPoints(chart, displaySettings) {
     const points = chart.points?.filter((point) => isFiniteNumber(point.value));
     if (!points?.length) {
         return [];
@@ -176,19 +176,19 @@ function toTrendPoints(chart) {
             max: value,
             min: value,
             peakFrequency: undefined,
-            time: formatCheckLabKoreanTime(point.observed_at) ??
+            time: formatCheckLabKoreanTime(point.observed_at, displaySettings) ??
                 formatTrendPointLabel(chart.selected_window, index, points.length),
         };
     });
 }
-function toReferenceLines(chart, stroke, thresholdValue) {
+function toReferenceLines(chart, stroke, thresholdValue, label) {
     const value = thresholdValue ?? chart.threshold_value;
     if (!isFiniteNumber(value)) {
         return [];
     }
     return [
         {
-            label: `${chart.metric_label ?? chart.title ?? "임계"} 임계`,
+            label,
             value,
             stroke,
         },
@@ -267,11 +267,11 @@ function toAssetPartStates(parts, thresholdPanel) {
  * - 둘 다 없으면 mock-dashboard의 recent_events를 fallback으로 사용합니다.
  * - AssetEventLogPanel, EventLogBlindDrawer, 전역 알림 목록에서 사용합니다.
  */
-function toRecentEvents({ alerts, eventTimeline, recentEvents, }) {
+function toRecentEvents({ alerts, eventTimeline, recentEvents, }, displaySettings) {
     if (alerts || eventTimeline) {
         return dedupeEventsById([
-            ...(alerts ?? []).map(toAlertEvent),
-            ...(eventTimeline ?? []).map(toTimelineEvent),
+            ...(alerts ?? []).map((alert, index) => toAlertEvent(alert, index, displaySettings)),
+            ...(eventTimeline ?? []).map((event, index) => toTimelineEvent(event, index, displaySettings)),
         ]).sort(compareEventsByTimestampDesc);
     }
     return dedupeEventsById((recentEvents ?? []).map((event, index) => {
@@ -282,7 +282,7 @@ function toRecentEvents({ alerts, eventTimeline, recentEvents, }) {
             grade,
             id: event.event_id ?? `remote-event-${index + 1}`,
             message: event.message ?? "이벤트 메시지가 없습니다.",
-            occurredAt: formatCheckLabKoreanTime(event.observed_at) ?? "--:--:--",
+            occurredAt: formatCheckLabKoreanTime(event.observed_at, displaySettings) ?? "--:--:--",
             occurredAtIso: event.observed_at ?? undefined,
             source: isAlert ? "asset-threshold" : "system",
             sourceType: event.source_type ?? undefined,
@@ -290,7 +290,7 @@ function toRecentEvents({ alerts, eventTimeline, recentEvents, }) {
         };
     })).sort(compareEventsByTimestampDesc);
 }
-function toAlertEvent(alert, index) {
+function toAlertEvent(alert, index, displaySettings) {
     const grade = toEventGrade(alert.severity);
     const id = alert.alert_id ?? `remote-alert-${index + 1}`;
     return {
@@ -301,16 +301,16 @@ function toAlertEvent(alert, index) {
         id,
         isRead: Boolean(alert.is_read),
         message: alert.message ?? "알림 메시지가 없습니다.",
-        occurredAt: formatCheckLabKoreanTime(alert.created_at) ?? "--:--:--",
+        occurredAt: formatCheckLabKoreanTime(alert.created_at, displaySettings) ?? "--:--:--",
         occurredAtIso: alert.created_at ?? undefined,
-        readAt: formatCheckLabKoreanTime(alert.read_at) ?? undefined,
+        readAt: formatCheckLabKoreanTime(alert.read_at, displaySettings) ?? undefined,
         readBy: alert.read_by ?? undefined,
         source: "asset-threshold",
         sourceType: "alert",
         title: "임계 알림",
     };
 }
-function toTimelineEvent(event, index) {
+function toTimelineEvent(event, index, displaySettings) {
     const grade = toEventGrade(event.severity);
     return {
         edgeId: event.edge_id ?? undefined,
@@ -320,9 +320,9 @@ function toTimelineEvent(event, index) {
         id: event.event_id ?? `remote-timeline-event-${index + 1}`,
         isRead: Boolean(event.is_read),
         message: event.message ?? "이벤트 메시지가 없습니다.",
-        occurredAt: formatCheckLabKoreanTime(event.observed_at) ?? "--:--:--",
+        occurredAt: formatCheckLabKoreanTime(event.observed_at, displaySettings) ?? "--:--:--",
         occurredAtIso: event.observed_at ?? undefined,
-        readAt: formatCheckLabKoreanTime(event.read_at) ?? undefined,
+        readAt: formatCheckLabKoreanTime(event.read_at, displaySettings) ?? undefined,
         readBy: event.read_by ?? undefined,
         roiId: event.roi_id ?? undefined,
         source: "system",

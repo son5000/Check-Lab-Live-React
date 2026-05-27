@@ -2,9 +2,15 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Printer } from "lucide-react";
+import { ArrowLeft, LoaderCircle, Mail, Printer } from "lucide-react";
 import * as THREE from "three";
-import { DEFAULT_MODEL_3D_FILE, DEFAULT_VIEWER_3D_CONFIG } from "./panels/3d-viewer";
+import { createDashboardDateTimeFormatter } from "@/app/layouts/helpers/time-formatters";
+import { translateText } from "@/app/layouts/helpers/localization";
+import { useDisplaySettings } from "@/app/layouts/hooks/use-display-settings";
+import {
+  DEFAULT_MODEL_3D_FILE,
+  DEFAULT_VIEWER_3D_CONFIG,
+} from "./panels/3d-viewer";
 import { ModelLoader } from "./panels/3d-viewer/modules/ModelLoader";
 import { disposeObject3D } from "./panels/3d-viewer/utils/threeDisposal";
 import { readAssetReportDraft } from "./asset-report-draft-storage";
@@ -34,13 +40,10 @@ const STATUS_LABEL = {
 const REPORT_MODEL_SNAPSHOT_WIDTH = 1400;
 const REPORT_MODEL_SNAPSHOT_MIN_HEIGHT = 480;
 const REPORT_MODEL_SNAPSHOT_MAX_HEIGHT = 720;
+const REPORT_MODEL_SNAPSHOT_CAMERA_PADDING = 0.96;
+const REPORT_MODEL_SNAPSHOT_RADIUS_DISTANCE = 1;
 const REPORT_PARTS_PER_PAGE = 4;
-const REPORT_BOOT_MAIN_STYLE = {
-  background: "#e5e7eb",
-  color: "#111827",
-  minHeight: "100vh",
-  padding: 24,
-};
+const REPORT_NAVIGATION_DRAFT_MAX_AGE_MS = 1000 * 60 * 5;
 const REPORT_BOOT_LOADER_STYLE = {
   alignItems: "center",
   background: "#e5e7eb",
@@ -63,6 +66,127 @@ const REPORT_CONTENT_READY_STYLE = {
   transition: "opacity 180ms ease-out",
   visibility: "visible",
 };
+const REPORT_EMAIL_ENDPOINT = "https://checklab.co.kr/api/reports/email";
+const REPORT_EXPORT_STYLE = `
+  html.AssetReportPageDocument,
+  body.AssetReportPageBody {
+    width: 210mm !important;
+    min-width: 210mm !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+  }
+
+  .AssetReportPage {
+    width: 210mm !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    background: #ffffff !important;
+    padding: 0 !important;
+  }
+
+  .AssetReportPage__toolbar,
+  .AssetReportPage__toolbar-message,
+  .AssetReportPage__boot-loader {
+    display: none !important;
+  }
+
+  .AssetReportPage__sheet {
+    width: 210mm !important;
+    min-width: 210mm !important;
+    max-width: 210mm !important;
+    height: 297mm !important;
+    min-height: 297mm !important;
+    max-height: 297mm !important;
+    margin: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    outline: 0 !important;
+    box-sizing: border-box !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid-page !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  .AssetReportPage__metrics-table,
+  .AssetReportPage__metrics-table--summary {
+    border: 1px solid #000000 !important;
+    border-collapse: collapse !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  .AssetReportPage__metrics-table th,
+  .AssetReportPage__metrics-table td,
+  .AssetReportPage__metrics-table--summary th,
+  .AssetReportPage__metrics-table--summary td {
+    border: 1px solid #000000 !important;
+    padding: 4px 8px !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  .AssetReportPage__metrics-table th,
+  .AssetReportPage__metrics-table--summary th {
+    background: #dbe4f0 !important;
+    color: #1e3a5f !important;
+  }
+
+  .AssetReportPage__part-table {
+    border: 1px solid #111827 !important;
+    border-collapse: collapse !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  .AssetReportPage__part-table th,
+  .AssetReportPage__part-table td {
+    border: 1px solid #111827 !important;
+    padding: 3px 6px !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  .AssetReportPage__part-table th {
+    background: #dbe4f0 !important;
+    color: #1e3a5f !important;
+  }
+
+  .AssetReportPage__panel,
+  .AssetReportPage__chart-card,
+  .AssetReportPage__part-slot {
+    border: 1px solid #6b7280 !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  .AssetReportPage__panel-header,
+  .AssetReportPage__chart-header {
+    border-bottom: 1px solid #6b7280 !important;
+    background: #f3f4f6 !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  .AssetReportPage__part-image {
+    border: 1px solid #9ca3af !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  .AssetReportPage__model-section {
+    border: 1px solid #6b7280 !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  .AssetReportPage__chart-svg {
+    border: 1px solid #6b7280 !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+`;
 
 export function AssetReportPage({
   asset,
@@ -71,28 +195,65 @@ export function AssetReportPage({
   remoteDashboard,
   site,
 }) {
-  const [reportDraft, setReportDraft] = useState(null);
+  const { settings: displaySettings } = useDisplaySettings();
+  const [reportSnapshot, setReportSnapshot] = useState(() => ({
+    generatedAt: undefined,
+    isLoaded: false,
+    remoteDashboard,
+    reportDraft: null,
+  }));
   const report = useMemo(
-    () => buildReportModel({ asset, location, remoteDashboard, reportDraft, site }),
-    [asset, location, remoteDashboard, reportDraft, site],
+    () =>
+      buildReportModel({
+        asset,
+        generatedAt: reportSnapshot.generatedAt,
+        location,
+        remoteDashboard: reportSnapshot.remoteDashboard,
+        reportDraft: reportSnapshot.reportDraft,
+        displaySettings,
+        site,
+      }),
+    [asset, displaySettings, location, reportSnapshot, site],
   );
   const partPageRows = useMemo(
-    () => (report.assetPartRows.length ? chunkRows(report.assetPartRows, REPORT_PARTS_PER_PAGE) : [[]]),
+    () =>
+      report.assetPartRows.length
+        ? chunkRows(report.assetPartRows, REPORT_PARTS_PER_PAGE)
+        : [[]],
     [report.assetPartRows],
   );
   const totalPageCount = 1 + partPageRows.length;
   const [isReportReady, setIsReportReady] = useState(false);
+  const [isSendingReportEmail, setIsSendingReportEmail] = useState(false);
+  const [reportEmailMessage, setReportEmailMessage] = useState(null);
+  const isReportContentReady = reportSnapshot.isLoaded && isReportReady;
 
   useEffect(() => {
-    setReportDraft(readAssetReportDraft(asset_id));
-  }, [asset_id]);
+    setIsReportReady(false);
+    const nextReportDraft = readAssetReportDraft(asset_id, {
+      maxAgeMs: REPORT_NAVIGATION_DRAFT_MAX_AGE_MS,
+    });
+    setReportSnapshot({
+      generatedAt: readReportSnapshotGeneratedAt(nextReportDraft),
+      isLoaded: true,
+      remoteDashboard: nextReportDraft?.remoteDashboard ?? remoteDashboard,
+      reportDraft: nextReportDraft,
+    });
+  }, [asset_id, remoteDashboard]);
 
   useEffect(() => {
+    if (!reportSnapshot.isLoaded) {
+      return undefined;
+    }
+
     let firstFrameId = 0;
     let secondFrameId = 0;
     document.documentElement.classList.add("AssetReportPageDocument");
     document.body.classList.add("AssetReportPageBody");
-    document.title = `${report.asset.name} 설비 보고서`;
+    document.title = translateText(
+      `${report.asset.name} 설비 보고서`,
+      displaySettings.language,
+    );
     firstFrameId = window.requestAnimationFrame(() => {
       secondFrameId = window.requestAnimationFrame(() => {
         setIsReportReady(true);
@@ -104,31 +265,170 @@ export function AssetReportPage({
       document.documentElement.classList.remove("AssetReportPageDocument");
       document.body.classList.remove("AssetReportPageBody");
     };
-  }, [report.asset.name]);
+  }, [displaySettings.language, report.asset.name, reportSnapshot.isLoaded]);
 
   const handlePrint = () => {
     window.print();
   };
 
+  const handleSendReportEmail = async () => {
+    if (!isReportContentReady || isSendingReportEmail) {
+      return;
+    }
+
+    const resolvedRecipientEmail = getReportRecipientEmail(report, asset);
+    const recipientEmail =
+      resolvedRecipientEmail ??
+      window.prompt(
+        translateText("담당자 이메일을 입력하세요.", displaySettings.language),
+      );
+    const normalizedRecipientEmail = recipientEmail?.trim();
+
+    if (!normalizedRecipientEmail || !isLikelyEmail(normalizedRecipientEmail)) {
+      setReportEmailMessage({
+        tone: "error",
+        text: "담당자 이메일을 확인해 주세요.",
+      });
+      return;
+    }
+
+    const html = buildCurrentReportHtmlDocument({
+      assetName: report.asset.name,
+      generatedAt: report.generatedAt,
+      language: displaySettings.language,
+    });
+
+    if (!html) {
+      setReportEmailMessage({
+        tone: "error",
+        text: "보고서 화면이 아직 준비되지 않았습니다.",
+      });
+      return;
+    }
+
+    setIsSendingReportEmail(true);
+    setReportEmailMessage(null);
+
+    try {
+      const response = await fetch(REPORT_EMAIL_ENDPOINT, {
+        body: JSON.stringify({
+          asset_id,
+          format: "pdf",
+          location_id: location.id,
+          recipient: {
+            email: normalizedRecipientEmail,
+            name: report.asset.manager ?? report.asset.assignee ?? "",
+          },
+          filename: createReportPdfFileName(report.asset.name),
+          report: {
+            generatedAt: report.generatedAt,
+            html,
+            sourceUrl: window.location.href,
+            title: translateText(
+              `${report.asset.name} 설비 보고서`,
+              displaySettings.language,
+            ),
+          },
+          site_id: site.site_id,
+          subject: `[CheckLab] ${translateText(
+            `${report.asset.name} 설비 보고서`,
+            displaySettings.language,
+          )}`,
+        }),
+        cache: "no-store",
+        headers: {
+          accept: "application/json",
+          "content-type": "application/json",
+        },
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        const errorText = await readResponseErrorText(response);
+        throw new Error(
+          errorText || `보고서 이메일 발송 요청 실패 (${response.status})`,
+        );
+      }
+
+      setReportEmailMessage({
+        tone: "success",
+        text: "담당자에게 보고서 이메일 발송을 요청했습니다.",
+      });
+    } catch (error) {
+      setReportEmailMessage({
+        tone: "error",
+        text:
+          error instanceof Error && error.message
+            ? error.message
+            : "보고서 이메일 발송에 실패했습니다.",
+      });
+    } finally {
+      setIsSendingReportEmail(false);
+    }
+  };
+
   return (
-    <main className="AssetReportPage" style={REPORT_BOOT_MAIN_STYLE}>
-      {!isReportReady ? <ReportBootLoader assetName={report.asset.name} /> : null}
-      <div style={isReportReady ? REPORT_CONTENT_READY_STYLE : REPORT_CONTENT_HIDDEN_STYLE}>
+    <main className="AssetReportPage">
+      {!isReportContentReady ? (
+        <ReportBootLoader assetName={report.asset.name} />
+      ) : null}
+      <div
+        style={
+          isReportContentReady
+            ? REPORT_CONTENT_READY_STYLE
+            : REPORT_CONTENT_HIDDEN_STYLE
+        }
+      >
         <div className="AssetReportPage__toolbar">
-          <Link className="AssetReportPage__toolbar-button" href={asset.href}>
-            <ArrowLeft aria-hidden="true" size={16} />
-            설비 상세
-          </Link>
-          <button className="AssetReportPage__toolbar-button" type="button" onClick={handlePrint}>
+          <button
+            className="AssetReportPage__toolbar-button"
+            type="button"
+            onClick={handlePrint}
+          >
             <Printer aria-hidden="true" size={16} />
             인쇄/저장
           </button>
+          <button
+            className="AssetReportPage__toolbar-button"
+            type="button"
+            disabled={!isReportContentReady || isSendingReportEmail}
+            onClick={handleSendReportEmail}
+          >
+            {isSendingReportEmail ? (
+              <LoaderCircle
+                aria-hidden="true"
+                className="AssetReportPage__toolbar-spinner"
+                size={16}
+              />
+            ) : (
+              <Mail aria-hidden="true" size={16} />
+            )}
+            {isSendingReportEmail ? "이메일 전송 중" : "담당자 이메일 발송"}
+          </button>
         </div>
+        {reportEmailMessage ? (
+          <p
+            className={`AssetReportPage__toolbar-message AssetReportPage__toolbar-message--${reportEmailMessage.tone}`}
+          >
+            {reportEmailMessage.text}
+          </p>
+        ) : null}
 
-        <section className="AssetReportPage__sheet AssetReportPage__sheet--first" aria-label="설비 보고서 1페이지">
-          <ReportModelSection asset={report.asset} generatedAt={report.generatedAt} location={location} site={site} />
+        <section
+          className="AssetReportPage__sheet AssetReportPage__sheet--first"
+          aria-label="설비 보고서 1페이지"
+        >
+          <ReportModelSection
+            asset={report.asset}
+            generatedAt={report.generatedAt}
+            location={location}
+            site={site}
+          />
           <ReportStatusSection report={report} />
-          <section className="AssetReportPage__trend-section" aria-label="설비 추이 그래프">
+          <section
+            className="AssetReportPage__trend-section"
+            aria-label="설비 추이 그래프"
+          >
             <SimpleTrendChart
               color="#1f2937"
               data={report.ultrasonicData}
@@ -164,7 +464,9 @@ export function AssetReportPage({
         ))}
       </div>
 
-      <style jsx global>{`
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
         @page {
           margin: 0;
           size: A4 portrait;
@@ -173,6 +475,7 @@ export function AssetReportPage({
         .AssetReportPageDocument,
         .AssetReportPageBody {
           height: auto !important;
+          margin: 0 !important;
           min-height: 100%;
           overflow-x: hidden !important;
           overflow-y: auto !important;
@@ -255,28 +558,65 @@ export function AssetReportPage({
           text-decoration: none;
         }
 
+        .AssetReportPage__toolbar-button:disabled {
+          cursor: not-allowed;
+          opacity: 0.62;
+        }
+
+        .AssetReportPage__toolbar-spinner {
+          animation: asset-report-spin 760ms linear infinite;
+        }
+
+        .AssetReportPage__toolbar-message {
+          width: 210mm;
+          margin: -6px auto 12px;
+          border: 1px solid #9ca3af;
+          background: #ffffff;
+          padding: 10px 12px;
+          color: #0f172a;
+          font-size: 12px;
+          font-weight: 800;
+          text-align: center;
+        }
+
+        .AssetReportPage__toolbar-message--success {
+          border-color: #10b981;
+          background: #ecfdf5;
+          color: #047857;
+        }
+
+        .AssetReportPage__toolbar-message--error {
+          border-color: #ef4444;
+          background: #fef2f2;
+          color: #b91c1c;
+        }
+
         .AssetReportPage__sheet {
           position: relative;
           width: 210mm;
           height: 297mm;
           margin: 0 auto 18px;
           break-after: page;
+          page-break-after: always;
           background: #ffffff;
           box-sizing: border-box;
           overflow: hidden;
           border: 1px solid #b8b8b8;
-          padding: 17mm 17mm 20mm;
+          padding: 13mm 14mm 16mm;
+          print-color-adjust: exact;
+          -webkit-print-color-adjust: exact;
         }
 
         .AssetReportPage__sheet:last-child {
           break-after: auto;
+          page-break-after: auto;
           margin-bottom: 0;
         }
 
         .AssetReportPage__sheet--first {
           display: grid;
-          grid-template-rows: 28fr 30fr 40fr;
-          gap: 4mm;
+          grid-template-rows: 60mm 62mm minmax(0, 1fr);
+          gap: 3mm;
         }
 
         .AssetReportPage__sheet--second {
@@ -287,9 +627,9 @@ export function AssetReportPage({
 
         .AssetReportPage__page-footer {
           position: absolute;
-          right: 17mm;
-          bottom: 6mm;
-          left: 17mm;
+          right: 14mm;
+          bottom: 5mm;
+          left: 14mm;
           color: #64748b;
           font-size: 10px;
           font-weight: 800;
@@ -398,8 +738,10 @@ export function AssetReportPage({
         .AssetReportPage__panel {
           min-height: 0;
           overflow: hidden;
-          border: 1px solid #6b7280;
-          background: #ffffff;
+          border: 1px solid #6b7280 !important;
+          background: #ffffff !important;
+          print-color-adjust: exact !important;
+          -webkit-print-color-adjust: exact !important;
         }
 
         .AssetReportPage__status-panel {
@@ -412,9 +754,11 @@ export function AssetReportPage({
           align-items: center;
           justify-content: space-between;
           gap: 8px;
-          border-bottom: 1px solid #6b7280;
-          background: #f3f4f6;
-          padding: 6px 9px;
+          border-bottom: 1px solid #6b7280 !important;
+          background: #f3f4f6 !important;
+          padding: 8px 10px;
+          print-color-adjust: exact !important;
+          -webkit-print-color-adjust: exact !important;
         }
 
         .AssetReportPage__panel-header h2 {
@@ -426,39 +770,71 @@ export function AssetReportPage({
 
         .AssetReportPage__metrics-table {
           width: 100%;
-          border-collapse: separate;
-          border-spacing: 0;
+          height: 100%;
+          border-collapse: collapse;
           table-layout: fixed;
-          border-top: 1px solid #111827;
-          border-left: 1px solid #111827;
+          border: 1px solid #000000 !important;
+          empty-cells: show;
+          print-color-adjust: exact !important;
+          -webkit-print-color-adjust: exact !important;
         }
 
         .AssetReportPage__metrics-table--summary {
-          height: auto;
+          height: 100%;
+          border: 1px solid #000000 !important;
+          border-collapse: collapse;
+          border-spacing: 0;
+          print-color-adjust: exact !important;
+          -webkit-print-color-adjust: exact !important;
+        }
+
+        .AssetReportPage__metrics-table--summary tr {
+          height: 11%;
+        }
+
+        .AssetReportPage__metrics-table--summary .AssetReportPage__metrics-table-opinion-row {
+          height: 34%;
         }
 
         .AssetReportPage__metrics-table th,
         .AssetReportPage__metrics-table td {
-          border-right: 1px solid #111827;
-          border-bottom: 1px solid #111827;
-          padding: 5px 8px;
+          box-sizing: border-box;
+          overflow: hidden;
+          border: 1px solid #000000 !important;
+          padding: 4px 8px;
+          line-height: 1.3;
+          overflow-wrap: anywhere;
           vertical-align: middle;
+          word-break: keep-all;
           text-align: center;
+          print-color-adjust: exact !important;
+          -webkit-print-color-adjust: exact !important;
         }
 
         .AssetReportPage__metrics-table th {
-          background: #dbe4f0;
-          color: #1e3a5f;
-          font-size: 11px;
+          background: #dbe4f0 !important;
+          color: #1e3a5f !important;
+          font-size: 10px;
           font-weight: 700;
           text-align: center;
+          print-color-adjust: exact !important;
+          -webkit-print-color-adjust: exact !important;
         }
 
         .AssetReportPage__metrics-table td {
-          color: #111827;
-          font-size: 11px;
+          color: #111827 !important;
+          font-size: 10px;
           font-weight: 400;
           text-align: center;
+          print-color-adjust: exact !important;
+          -webkit-print-color-adjust: exact !important;
+        }
+
+        .AssetReportPage__metrics-table--summary th,
+        .AssetReportPage__metrics-table--summary td {
+          border: 1px solid #000000 !important;
+          print-color-adjust: exact !important;
+          -webkit-print-color-adjust: exact !important;
         }
 
         .AssetReportPage__metrics-table-opinion-row th {
@@ -470,12 +846,26 @@ export function AssetReportPage({
 
         .AssetReportPage__metrics-table-opinion-row td {
           color: #334155;
-          font-size: 10px;
+          font-size: 9px;
           font-weight: 400;
-          line-height: 1.55;
+          line-height: 1.35;
           text-align: left;
           vertical-align: middle;
+        }
+
+        .AssetReportPage__opinion-text,
+        .AssetReportPage__part-opinion-text {
+          display: -webkit-box;
           overflow: hidden;
+          -webkit-box-orient: vertical;
+        }
+
+        .AssetReportPage__opinion-text {
+          -webkit-line-clamp: 3;
+        }
+
+        .AssetReportPage__part-opinion-text {
+          -webkit-line-clamp: 3;
         }
 
         .AssetReportPage__trend-section {
@@ -490,8 +880,10 @@ export function AssetReportPage({
           min-height: 0;
           grid-template-rows: auto minmax(0, 1fr);
           overflow: hidden;
-          border: 1px solid #6b7280;
-          background: #ffffff;
+          border: 1px solid #6b7280 !important;
+          background: #ffffff !important;
+          print-color-adjust: exact !important;
+          -webkit-print-color-adjust: exact !important;
         }
 
         .AssetReportPage__chart-header {
@@ -499,9 +891,11 @@ export function AssetReportPage({
           align-items: center;
           justify-content: space-between;
           gap: 8px;
-          border-bottom: 1px solid #6b7280;
-          background: #f3f4f6;
-          padding: 6px 9px;
+          border-bottom: 1px solid #6b7280 !important;
+          background: #f3f4f6 !important;
+          padding: 8px 10px;
+          print-color-adjust: exact !important;
+          -webkit-print-color-adjust: exact !important;
         }
 
         .AssetReportPage__chart-header h2 {
@@ -513,14 +907,21 @@ export function AssetReportPage({
 
         .AssetReportPage__chart-header span {
           color: #64748b;
-          font-size: 9px;
-          font-weight: 800;
+          font-size: 10px;
+          font-weight: 700;
         }
 
         .AssetReportPage__chart-svg {
           display: block;
+          min-height: 0;
           width: 100%;
           height: 100%;
+          border: 0 !important;
+          outline: 0 !important;
+          box-shadow: none !important;
+          background: #ffffff;
+          font-family: var(--font-app-sans), "Noto Sans KR", sans-serif;
+          letter-spacing: 0;
         }
 
         .AssetReportPage__page-header {
@@ -560,9 +961,11 @@ export function AssetReportPage({
           grid-template-columns: 38% minmax(0, 1fr);
           gap: 3mm;
           overflow: hidden;
-          border: 1px solid #6b7280;
-          background: #ffffff;
-          padding: 3mm;
+          border: 1px solid #6b7280 !important;
+          background: #ffffff !important;
+          padding: 4mm;
+          print-color-adjust: exact !important;
+          -webkit-print-color-adjust: exact !important;
         }
 
         .AssetReportPage__part-slot--empty {
@@ -573,8 +976,10 @@ export function AssetReportPage({
           position: relative;
           min-height: 0;
           overflow: hidden;
-          border: 1px solid #9ca3af;
-          background: #f3f4f6;
+          border: 1px solid #9ca3af !important;
+          background: #f3f4f6 !important;
+          print-color-adjust: exact !important;
+          -webkit-print-color-adjust: exact !important;
         }
 
         .AssetReportPage__part-image img {
@@ -613,56 +1018,77 @@ export function AssetReportPage({
 
         .AssetReportPage__part-table {
           width: 100%;
+          height: 100%;
           min-height: 0;
-          border-collapse: separate;
-          border-spacing: 0;
+          border-collapse: collapse;
           table-layout: fixed;
-          border-top: 1px solid #111827;
-          border-left: 1px solid #111827;
+          border: 1px solid #111827 !important;
+          empty-cells: show;
+          print-color-adjust: exact !important;
+          -webkit-print-color-adjust: exact !important;
+        }
+
+        .AssetReportPage__part-table tbody {
+          height: 100%;
+        }
+
+        .AssetReportPage__part-table tr {
+          height: 12%;
+        }
+
+        .AssetReportPage__part-table .AssetReportPage__part-opinion {
+          height: 28%;
         }
 
         .AssetReportPage__part-table th,
         .AssetReportPage__part-table td {
-          border-right: 1px solid #111827;
-          border-bottom: 1px solid #111827;
-          padding: 4px 6px;
-          font-size: 10px;
+          box-sizing: border-box;
+          overflow: hidden;
+          border: 1px solid #111827 !important;
+          padding: 3px 6px;
+          font-size: 9px;
+          line-height: 1.25;
+          overflow-wrap: anywhere;
           vertical-align: middle;
+          word-break: keep-all;
           text-align: center;
+          print-color-adjust: exact !important;
+          -webkit-print-color-adjust: exact !important;
         }
 
         .AssetReportPage__part-table th {
           width: 30%;
-          background: #dbe4f0;
-          color: #1e3a5f;
+          background: #dbe4f0 !important;
+          color: #1e3a5f !important;
           font-weight: 700;
           text-align: center;
           vertical-align: middle;
+          print-color-adjust: exact !important;
+          -webkit-print-color-adjust: exact !important;
         }
 
         .AssetReportPage__part-table td {
-          color: #111827;
+          color: #111827 !important;
           font-weight: 400;
           text-align: center;
           vertical-align: middle;
+          print-color-adjust: exact !important;
+          -webkit-print-color-adjust: exact !important;
         }
 
         .AssetReportPage__part-name-row td {
-          color: #0f172a;
-          font-size: 10px;
+          color: #0f172a !important;
+          font-size: 9px;
           font-weight: 900;
         }
 
-        .AssetReportPage__part-opinion th,
         .AssetReportPage__part-opinion td {
-          vertical-align: top;
-        }
-
-        .AssetReportPage__part-opinion td {
-          color: #334155;
-          font-size: 9px;
+          color: #334155 !important;
+          font-size: 8px;
           font-weight: 600;
-          line-height: 1.45;
+          line-height: 1.35;
+          text-align: left;
+          vertical-align: top;
         }
 
         .AssetReportPage__empty-part {
@@ -678,17 +1104,22 @@ export function AssetReportPage({
         @media print {
           html,
           body {
+            margin: 0 !important;
             width: 210mm;
+            min-width: 210mm;
+            overflow: visible !important;
             background: #ffffff !important;
           }
 
           .AssetReportPage {
+            width: 210mm !important;
             min-height: 0;
-            background: #ffffff;
-            padding: 0;
+            background: #ffffff !important;
+            padding: 0 !important;
           }
 
-          .AssetReportPage__toolbar {
+          .AssetReportPage__toolbar,
+          .AssetReportPage__toolbar-message {
             display: none;
           }
 
@@ -697,11 +1128,86 @@ export function AssetReportPage({
           }
 
           .AssetReportPage__sheet {
-            margin: 0;
-            box-shadow: none;
+            width: 210mm !important;
+            min-width: 210mm !important;
+            max-width: 210mm !important;
+            height: 297mm !important;
+            min-height: 297mm !important;
+            max-height: 297mm !important;
+            margin: 0 !important;
+            border: 0 !important;
+            box-shadow: none !important;
+            outline: 0 !important;
+            box-sizing: border-box !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid-page !important;
+            print-color-adjust: exact !important;
+            -webkit-print-color-adjust: exact !important;
+          }
+
+          .AssetReportPage__metrics-table,
+          .AssetReportPage__metrics-table--summary {
+            border: 1px solid #000000 !important;
+            border-collapse: collapse !important;
+            print-color-adjust: exact !important;
+            -webkit-print-color-adjust: exact !important;
+          }
+
+          .AssetReportPage__metrics-table th,
+          .AssetReportPage__metrics-table td,
+          .AssetReportPage__metrics-table--summary th,
+          .AssetReportPage__metrics-table--summary td {
+            border: 1px solid #000000 !important;
+            padding: 4px 8px !important;
+            print-color-adjust: exact !important;
+            -webkit-print-color-adjust: exact !important;
+          }
+
+          .AssetReportPage__metrics-table th,
+          .AssetReportPage__metrics-table--summary th {
+            background: #dbe4f0 !important;
+            color: #1e3a5f !important;
+          }
+
+          .AssetReportPage__part-table,
+          .AssetReportPage__part-table th,
+          .AssetReportPage__part-table td {
+            border: 1px solid #111827 !important;
+            border-collapse: collapse !important;
+            print-color-adjust: exact !important;
+            -webkit-print-color-adjust: exact !important;
+          }
+
+          .AssetReportPage__part-table th {
+            background: #dbe4f0 !important;
+            color: #1e3a5f !important;
+          }
+
+          .AssetReportPage__panel,
+          .AssetReportPage__chart-card,
+          .AssetReportPage__part-slot {
+            border: 1px solid #6b7280 !important;
+            print-color-adjust: exact !important;
+            -webkit-print-color-adjust: exact !important;
+          }
+
+          .AssetReportPage__panel-header,
+          .AssetReportPage__chart-header {
+            border-bottom: 1px solid #6b7280 !important;
+            background: #f3f4f6 !important;
+            print-color-adjust: exact !important;
+            -webkit-print-color-adjust: exact !important;
+          }
+
+          .AssetReportPage__part-image {
+            border: 1px solid #9ca3af !important;
+            print-color-adjust: exact !important;
+            -webkit-print-color-adjust: exact !important;
           }
         }
-      `}</style>
+      `,
+        }}
+      />
     </main>
   );
 }
@@ -729,12 +1235,18 @@ function ReportModelSection({ asset, generatedAt, location, site }) {
 
 function ReportBootLoader({ assetName }) {
   return (
-    <div className="AssetReportPage__boot-loader" style={REPORT_BOOT_LOADER_STYLE} role="status" aria-live="polite">
+    <div
+      className="AssetReportPage__boot-loader"
+      style={REPORT_BOOT_LOADER_STYLE}
+      role="status"
+      aria-live="polite"
+    >
       <div className="AssetReportPage__boot-card">
         <div className="AssetReportPage__boot-spinner" aria-hidden="true" />
         <p className="AssetReportPage__boot-title">보고서 화면 준비 중</p>
         <p className="AssetReportPage__boot-text">
-          {assetName}의 3D 모델, 수치 테이블, 추이 그래프 레이아웃을 정돈하고 있습니다.
+          {assetName}의 3D 모델, 수치 테이블, 추이 그래프 레이아웃을 정돈하고
+          있습니다.
         </p>
       </div>
     </div>
@@ -784,7 +1296,12 @@ function ReportModelSnapshot() {
         scene = new THREE.Scene();
         scene.background = new THREE.Color("#0f172a");
 
-        const camera = new THREE.PerspectiveCamera(34, width / height, 0.1, 1200);
+        const camera = new THREE.PerspectiveCamera(
+          34,
+          width / height,
+          0.1,
+          1200,
+        );
         const rendererOptions = {
           antialias: true,
           preserveDrawingBuffer: true,
@@ -803,7 +1320,10 @@ function ReportModelSnapshot() {
 
         model = await new ModelLoader().loadModel({
           ...DEFAULT_MODEL_3D_FILE,
-          textures: DEFAULT_MODEL_3D_FILE.textures?.map((texture) => ({ ...texture })) ?? [],
+          textures:
+            DEFAULT_MODEL_3D_FILE.textures?.map((texture) => ({
+              ...texture,
+            })) ?? [],
         });
 
         if (disposed) {
@@ -854,18 +1374,32 @@ function ReportModelSnapshot() {
   return (
     <div ref={containerRef} className="AssetReportPage__model-stage">
       {snapshot.status === "ready" ? (
-        <img className="AssetReportPage__model-image" src={snapshot.dataUrl} alt="" aria-hidden="true" />
+        <img
+          className="AssetReportPage__model-image"
+          src={snapshot.dataUrl}
+          alt=""
+          aria-hidden="true"
+        />
       ) : null}
       {snapshot.status === "loading" ? (
-        <div className="AssetReportPage__model-placeholder" role="status" aria-live="polite">
+        <div
+          className="AssetReportPage__model-placeholder"
+          role="status"
+          aria-live="polite"
+        >
           <div className="AssetReportPage__model-placeholder-content">
-            <div className="AssetReportPage__model-spinner" aria-hidden="true" />
+            <div
+              className="AssetReportPage__model-spinner"
+              aria-hidden="true"
+            />
             <span>3D 모델 이미지 생성 중</span>
           </div>
         </div>
       ) : null}
       {snapshot.status === "error" ? (
-        <div className="AssetReportPage__model-placeholder">3D 모델 이미지를 불러오지 못했습니다.</div>
+        <div className="AssetReportPage__model-placeholder">
+          3D 모델 이미지를 불러오지 못했습니다.
+        </div>
       ) : null}
     </div>
   );
@@ -873,12 +1407,16 @@ function ReportModelSnapshot() {
 
 function getReportModelSnapshotSize(container) {
   const bounds = container.getBoundingClientRect();
-  const aspectRatio = bounds.width > 0 && bounds.height > 0 ? bounds.width / bounds.height : 2.15;
+  const aspectRatio =
+    bounds.width > 0 && bounds.height > 0 ? bounds.width / bounds.height : 2.15;
   const height = Math.round(REPORT_MODEL_SNAPSHOT_WIDTH / aspectRatio);
 
   return {
     width: REPORT_MODEL_SNAPSHOT_WIDTH,
-    height: Math.min(Math.max(height, REPORT_MODEL_SNAPSHOT_MIN_HEIGHT), REPORT_MODEL_SNAPSHOT_MAX_HEIGHT),
+    height: Math.min(
+      Math.max(height, REPORT_MODEL_SNAPSHOT_MIN_HEIGHT),
+      REPORT_MODEL_SNAPSHOT_MAX_HEIGHT,
+    ),
   };
 }
 
@@ -888,7 +1426,8 @@ function frameReportModelSnapshotCamera(camera, model) {
   const radius = sphere.radius > 0 ? sphere.radius : 80;
   const center = sphere.center;
   const verticalFov = THREE.MathUtils.degToRad(camera.fov);
-  const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * camera.aspect);
+  const horizontalFov =
+    2 * Math.atan(Math.tan(verticalFov / 2) * camera.aspect);
   const viewDirection = new THREE.Vector3(1.08, 0.72, 1.08).normalize();
   const boxCorners = [
     new THREE.Vector3(box.min.x, box.min.y, box.min.z),
@@ -905,15 +1444,28 @@ function frameReportModelSnapshotCamera(camera, model) {
   camera.lookAt(center);
   camera.updateMatrixWorld();
 
-  const projectedCorners = boxCorners.map((corner) => corner.clone().applyMatrix4(camera.matrixWorldInverse));
-  const maxProjectedX = Math.max(...projectedCorners.map((corner) => Math.abs(corner.x)));
-  const maxProjectedY = Math.max(...projectedCorners.map((corner) => Math.abs(corner.y)));
-  const nearestDepthOffset = Math.max(0, ...projectedCorners.map((corner) => corner.z + 1));
+  const projectedCorners = boxCorners.map((corner) =>
+    corner.clone().applyMatrix4(camera.matrixWorldInverse),
+  );
+  const maxProjectedX = Math.max(
+    ...projectedCorners.map((corner) => Math.abs(corner.x)),
+  );
+  const maxProjectedY = Math.max(
+    ...projectedCorners.map((corner) => Math.abs(corner.y)),
+  );
+  const nearestDepthOffset = Math.max(
+    0,
+    ...projectedCorners.map((corner) => corner.z + 1),
+  );
   const fitDistance = Math.max(
     maxProjectedX / Math.tan(horizontalFov / 2),
     maxProjectedY / Math.tan(verticalFov / 2),
   );
-  const distance = Math.max(fitDistance + nearestDepthOffset, radius * 1.15) * 1.08;
+  const distance =
+    Math.max(
+      fitDistance + nearestDepthOffset,
+      radius * REPORT_MODEL_SNAPSHOT_RADIUS_DISTANCE,
+    ) * REPORT_MODEL_SNAPSHOT_CAMERA_PADDING;
 
   camera.position.copy(center).add(viewDirection.multiplyScalar(distance));
   camera.near = Math.max(0.1, distance - radius * 3);
@@ -926,7 +1478,10 @@ function ReportStatusSection({ report }) {
   const summaryFields = getReportStatusSummaryFields(report);
 
   return (
-    <section className="AssetReportPage__status-section" aria-label="설비 상태 및 소견">
+    <section
+      className="AssetReportPage__status-section"
+      aria-label="설비 상태 및 소견"
+    >
       <div className="AssetReportPage__panel AssetReportPage__status-panel">
         <div className="AssetReportPage__panel-header">
           <h2>설비 상태 요약</h2>
@@ -965,7 +1520,11 @@ function ReportStatusSection({ report }) {
             </tr>
             <tr className="AssetReportPage__metrics-table-opinion-row">
               <th scope="row">소견</th>
-              <td colSpan={2}>{summaryFields.opinion}</td>
+              <td colSpan={2}>
+                <span className="AssetReportPage__opinion-text">
+                  {summaryFields.opinion}
+                </span>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -975,19 +1534,22 @@ function ReportStatusSection({ report }) {
 }
 
 function getReportStatusSummaryFields(report) {
-  const metricByLabel = new Map(report.metricRows.map((row) => [row.label, row.value]));
+  const metricByLabel = new Map(
+    report.metricRows.map((row) => [row.label, row.value]),
+  );
   const ultrasoundDb = metricByLabel.get("초음파 평균 / 피크") ?? "-";
-  const frequencyKHz = metricByLabel.get("주파수 / 검출")?.split("/")[0]?.trim() ?? "-";
-  const ultrasoundWithFreq = ultrasoundDb !== "-"
-    ? `${ultrasoundDb} / ${frequencyKHz}`
-    : "-";
+  const frequencyKHz =
+    metricByLabel.get("주파수 / 검출")?.split("/")[0]?.trim() ?? "-";
+  const ultrasoundWithFreq =
+    ultrasoundDb !== "-" ? `${ultrasoundDb} / ${frequencyKHz}` : "-";
 
   return {
     assetCode: metricByLabel.get("설비 코드") ?? "-",
     assetName: metricByLabel.get("설비명") ?? "-",
     assetType: metricByLabel.get("설비 유형") ?? "-",
     lastCollectedAt: metricByLabel.get("최근 수집") ?? "-",
-    lastInspectedAt: report.asset.lastInspectedAt ?? metricByLabel.get("최근 점검일") ?? "-",
+    lastInspectedAt:
+      report.asset.lastInspectedAt ?? metricByLabel.get("최근 점검일") ?? "-",
     location: metricByLabel.get("위치") ?? "-",
     manager: report.asset.manager ?? report.asset.assignee ?? "-",
     modelName: metricByLabel.get("모델명") ?? "-",
@@ -1009,6 +1571,7 @@ function SimpleTrendChart({
   yAxisMax,
 }) {
   const chart = buildSvgChart(data, yAxisMax, referenceLines);
+  const legendItems = buildChartLegendItems({ unit, xAxis });
   const gradientId = title.includes("온도")
     ? "asset-report-temperature-fill"
     : "asset-report-ultrasound-fill";
@@ -1016,54 +1579,200 @@ function SimpleTrendChart({
     <article className="AssetReportPage__chart-card">
       <div className="AssetReportPage__chart-header">
         <h2>{title}</h2>
-        <span>
-          최근 {xAxis.max}
-          {xAxis.unit} / {unit}
-        </span>
+        <span>최근 {formatChartRangeLabel(xAxis)}</span>
       </div>
-      <svg className="AssetReportPage__chart-svg" preserveAspectRatio="none" viewBox="0 0 360 140" role="img" aria-label={title}>
+      <svg
+        className="AssetReportPage__chart-svg"
+        preserveAspectRatio="xMidYMid meet"
+        viewBox="0 0 420 144"
+        role="img"
+        aria-label={title}
+      >
         <defs>
           <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
             <stop offset="0%" stopColor={color} stopOpacity="0.28" />
             <stop offset="100%" stopColor={color} stopOpacity="0.02" />
           </linearGradient>
         </defs>
-        <rect fill="#ffffff" height="140" width="360" />
+        <rect fill="#ffffff" height="144" width="420" />
         {chart.horizontalLines.map((line) => (
-          <line key={line.y} stroke="#e2e8f0" strokeWidth="1" x1="34" x2="344" y1={line.y} y2={line.y} />
+          <line
+            key={line.y}
+            stroke="#e2e8f0"
+            strokeWidth="1"
+            x1={chart.plot.x}
+            x2={chart.plot.x + chart.plot.width}
+            y1={line.y}
+            y2={line.y}
+          />
+        ))}
+        {chart.areaPath ? (
+          <path d={chart.areaPath} fill={`url(#${gradientId})`} />
+        ) : null}
+        {chart.linePath ? (
+          <path
+            d={chart.linePath}
+            fill="none"
+            stroke={color}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2.4"
+          />
+        ) : null}
+        {chart.points.map((point, index) => (
+          <circle
+            key={`${point.x}-${index}`}
+            cx={point.x}
+            cy={point.y}
+            fill="#ffffff"
+            r="2.4"
+            stroke={color}
+            strokeWidth="1.6"
+          />
         ))}
         {referenceLines.map((line, index) => {
-          const y = chart.valueToY(line.value);
+          const referenceY = chart.valueToY(line.value);
           return (
-            <g key={`${line.label}-${index}`}>
-              <line stroke="#ef4444" strokeDasharray="4 4" strokeWidth="1.2" x1="34" x2="344" y1={y} y2={y} />
-              <text fill="#b91c1c" fontSize="8" fontWeight="800" x="248" y={Math.max(12, y - 4)}>
-                {line.label} {roundOne(line.value)}
-              </text>
-            </g>
+            <line
+              key={`${line.label}-${index}`}
+              stroke="#ef4444"
+              strokeDasharray="4 4"
+              strokeWidth="1.35"
+              x1={chart.plot.x}
+              x2={chart.plot.x + chart.plot.width}
+              y1={referenceY}
+              y2={referenceY}
+            />
           );
         })}
-        {chart.areaPath ? <path d={chart.areaPath} fill={`url(#${gradientId})`} /> : null}
-        {chart.linePath ? <path d={chart.linePath} fill="none" stroke={color} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.4" /> : null}
-        {chart.points.map((point, index) => (
-          <circle key={`${point.x}-${index}`} cx={point.x} cy={point.y} fill="#ffffff" r="2.4" stroke={color} strokeWidth="1.6" />
+        <line
+          stroke="#94a3b8"
+          strokeWidth="1"
+          x1={chart.plot.x}
+          x2={chart.plot.x + chart.plot.width}
+          y1={chart.axisY}
+          y2={chart.axisY}
+        />
+        <line
+          stroke="#94a3b8"
+          strokeWidth="1"
+          x1={chart.plot.x}
+          x2={chart.plot.x}
+          y1={chart.plot.y}
+          y2={chart.axisY}
+        />
+        {chart.yAxisLabels.map((label) => (
+          <text
+            key={label.key}
+            fill={label.variant === "threshold" ? "#b91c1c" : "#64748b"}
+            fontSize={label.variant === "threshold" ? "7.2" : "6.8"}
+            fontWeight={label.variant === "threshold" ? "700" : "600"}
+            letterSpacing="0"
+            textAnchor="end"
+            x={chart.yAxisLabelX}
+            y={label.y}
+          >
+            {label.value}
+          </text>
         ))}
-        <line stroke="#94a3b8" strokeWidth="1" x1="34" x2="344" y1="116" y2="116" />
-        <line stroke="#94a3b8" strokeWidth="1" x1="34" x2="34" y1="14" y2="116" />
-        <text fill="#64748b" fontSize="8" fontWeight="800" x="8" y="19">
-          {roundOne(chart.maxValue)}
-        </text>
-        <text fill="#64748b" fontSize="8" fontWeight="800" x="18" y="119">
-          0
-        </text>
         {xAxis.ticks.map((tick, index) => (
-          <text key={tick} fill="#64748b" fontSize="8" fontWeight="700" textAnchor="middle" x={34 + (310 * index) / Math.max(xAxis.ticks.length - 1, 1)} y="132">
+          <text
+            key={tick}
+            fill="#64748b"
+            fontSize="6.6"
+            fontWeight="600"
+            letterSpacing="0"
+            textAnchor="middle"
+            x={
+              chart.plot.x +
+              (chart.plot.width * index) / Math.max(xAxis.ticks.length - 1, 1)
+            }
+            y={chart.xTickY}
+          >
             {tick}
           </text>
         ))}
+        <g aria-hidden="true">
+          {legendItems.map((item, index) => (
+            <g
+              key={item.label}
+              transform={`translate(${64 + index * 122}, ${chart.legendY})`}
+            >
+              {item.variant === "threshold" ? (
+                <line
+                  stroke="#ef4444"
+                  strokeDasharray="4 3"
+                  strokeWidth="1.4"
+                  x1="0"
+                  x2="18"
+                  y1="-3"
+                  y2="-3"
+                />
+              ) : null}
+              <text
+                fill="#334155"
+                fontSize="9"
+                fontWeight="700"
+                letterSpacing="0"
+                x={item.variant === "threshold" ? 23 : 0}
+                y="0"
+              >
+                {item.value ? `${item.label}: ${item.value}` : item.label}
+              </text>
+            </g>
+          ))}
+        </g>
       </svg>
     </article>
   );
+}
+
+function buildChartLegendItems({ unit, xAxis }) {
+  return [
+    { label: "임계치", value: "", variant: "threshold" },
+    { label: "x", value: formatXAxisUnit(xAxis), variant: "axis" },
+    { label: "y", value: formatYAxisUnit(unit), variant: "axis" },
+  ];
+}
+
+function formatChartRangeLabel(xAxis) {
+  switch (xAxis.rangeId) {
+    case "1m":
+      return "60초";
+    case "1h":
+      return "1시간";
+    case "24h":
+      return "24시간";
+    case "7d":
+      return "7일";
+    case "30d":
+      return "30일";
+    default:
+      return `${xAxis.max}${xAxis.unit}`;
+  }
+}
+
+function formatXAxisUnit(xAxis) {
+  switch (xAxis.rangeId) {
+    case "1m":
+      return "초";
+    case "1h":
+      return "분";
+    case "24h":
+      return "시간";
+    case "7d":
+    case "30d":
+      return "일";
+    default:
+      return xAxis.unit;
+  }
+}
+
+function formatYAxisUnit(unit) {
+  if (unit === "dB") {
+    return "데시벨(dB)";
+  }
+  return `섭씨(${unit})`;
 }
 
 function ReportPartAnalysisSheet({
@@ -1079,26 +1788,32 @@ function ReportPartAnalysisSheet({
     : "0";
 
   return (
-    <section className="AssetReportPage__sheet AssetReportPage__sheet--second" aria-label={`설비 보고서 ${pageNumber}페이지`}>
+    <section
+      className="AssetReportPage__sheet AssetReportPage__sheet--second"
+      aria-label={`설비 보고서 ${pageNumber}페이지`}
+    >
       <header className="AssetReportPage__page-header">
         <div>
           <p>관심 영역 분석</p>
           <h2>{assetName}</h2>
         </div>
-        <span>{totalPartCount}개 영역 · {rangeLabel}</span>
+        <span>
+          {totalPartCount}개 영역 · {rangeLabel}
+        </span>
       </header>
       <div className="AssetReportPage__part-list">
         {rows.length ? (
-          rows.map((row, index) => (
-            <ReportPartSection key={row.part.id} index={startIndex + index} row={row} />
-          ))
+          rows.map((row) => <ReportPartSection key={row.part.id} row={row} />)
         ) : (
           <ReportEmptyPartSection />
         )}
         {Array.from({
           length: Math.max(0, REPORT_PARTS_PER_PAGE - Math.max(rows.length, 1)),
         }).map((_, index) => (
-          <div key={`empty-slot-${pageNumber}-${index}`} className="AssetReportPage__part-slot AssetReportPage__part-slot--empty" />
+          <div
+            key={`empty-slot-${pageNumber}-${index}`}
+            className="AssetReportPage__part-slot AssetReportPage__part-slot--empty"
+          />
         ))}
       </div>
       <ReportPageFooter pageNumber={pageNumber} totalPages={totalPages} />
@@ -1108,13 +1823,16 @@ function ReportPartAnalysisSheet({
 
 function ReportPageFooter({ pageNumber, totalPages }) {
   return (
-    <footer className="AssetReportPage__page-footer" aria-label={`현재 페이지 ${pageNumber} / ${totalPages}`}>
+    <footer
+      className="AssetReportPage__page-footer"
+      aria-label={`현재 페이지 ${pageNumber} / ${totalPages}`}
+    >
       - {pageNumber} -
     </footer>
   );
 }
 
-function ReportPartSection({ index, row }) {
+function ReportPartSection({ row }) {
   return (
     <article className="AssetReportPage__part-slot">
       <ReportPartImage part={row.part} />
@@ -1123,7 +1841,7 @@ function ReportPartSection({ index, row }) {
           <tbody>
             <tr className="AssetReportPage__part-name-row">
               <th scope="row">관심 영역</th>
-              <td>{index + 1}. {row.part.name}</td>
+              <td>{row.part.name}</td>
             </tr>
             {row.rows.map((item) => (
               <tr key={item.label}>
@@ -1133,7 +1851,11 @@ function ReportPartSection({ index, row }) {
             ))}
             <tr className="AssetReportPage__part-opinion">
               <th scope="row">소견</th>
-              <td>{row.opinion}</td>
+              <td>
+                <span className="AssetReportPage__part-opinion-text">
+                  {row.opinion}
+                </span>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -1151,9 +1873,14 @@ function ReportPartImage({ part }) {
       </div>
     );
   }
-  const points = part.points?.length ? part.points : [getRoiCenterPoint(part.roi)].filter(Boolean);
+  const points = part.points?.length
+    ? part.points
+    : [getRoiCenterPoint(part.roi)].filter(Boolean);
   return (
-    <div className="AssetReportPage__part-image" aria-label={`${part.name} 관심 영역 위치`}>
+    <div
+      className="AssetReportPage__part-image"
+      aria-label={`${part.name} 관심 영역 위치`}
+    >
       {part.roi ? (
         <span
           className="AssetReportPage__part-roi"
@@ -1194,18 +1921,156 @@ function chunkRows(rows, chunkSize) {
   return chunks;
 }
 
-function buildReportModel({ asset, location, remoteDashboard, reportDraft, site }) {
+function buildCurrentReportHtmlDocument({ assetName, generatedAt, language }) {
+  const sheetHtml = Array.from(
+    document.querySelectorAll(".AssetReportPage__sheet"),
+  )
+    .map((sheet) => cloneReportSheetHtml(sheet))
+    .join("\n");
+
+  if (!sheetHtml.trim()) {
+    return "";
+  }
+
+  const reportStyleText = Array.from(document.querySelectorAll("style"))
+    .map((styleElement) => styleElement.textContent ?? "")
+    .filter(
+      (styleText) =>
+        styleText.includes("AssetReportPage") || styleText.includes("@page"),
+    )
+    .join("\n");
+
+  const title = translateText(
+    `${assetName} 설비 보고서`,
+    language ?? "ko",
+  );
+
+  return `<!doctype html>
+<html class="AssetReportPageDocument" lang="${escapeHtml(language ?? "ko")}">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${escapeHtml(title)}</title>
+  <style>
+    ${reportStyleText}
+    ${REPORT_EXPORT_STYLE}
+  </style>
+</head>
+<body class="AssetReportPageBody">
+  <main class="AssetReportPage" data-generated-at="${escapeHtml(generatedAt)}">
+    ${sheetHtml}
+  </main>
+</body>
+</html>`;
+}
+
+function cloneReportSheetHtml(sheet) {
+  const clonedSheet = sheet.cloneNode(true);
+  removeNextGeneratedClassNames(clonedSheet);
+  return clonedSheet.outerHTML;
+}
+
+function removeNextGeneratedClassNames(root) {
+  [root, ...root.querySelectorAll("[class]")].forEach((element) => {
+    Array.from(element.classList).forEach((className) => {
+      if (className.startsWith("jsx-")) {
+        element.classList.remove(className);
+      }
+    });
+  });
+}
+
+function getReportRecipientEmail(report, asset) {
+  return readFirstString(
+    report.asset.managerEmail,
+    report.asset.manager_email,
+    report.asset.email,
+    report.asset.managerContactEmail,
+    asset.managerEmail,
+    asset.manager_email,
+    asset.email,
+    asset.managerContactEmail,
+  );
+}
+
+function readFirstString(...values) {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+  return undefined;
+}
+
+function isLikelyEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function createReportPdfFileName(assetName) {
+  const safeAssetName = String(assetName)
+    .trim()
+    .replace(/[\\/:*?"<>|]+/g, "-")
+    .replace(/\s+/g, "_");
+  return `${safeAssetName || "asset"}-report.pdf`;
+}
+
+async function readResponseErrorText(response) {
+  const responseText = await response.text();
+  if (!responseText) {
+    return "";
+  }
+
+  try {
+    const data = JSON.parse(responseText);
+    return (
+      readFirstString(data.message, data.detail, data.error) ?? responseText
+    );
+  } catch {
+    return responseText;
+  }
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+function readReportSnapshotGeneratedAt(reportDraft) {
+  return reportDraft?.capturedAt ?? reportDraft?.savedAt;
+}
+
+function formatReportGeneratedAt(value, displaySettings) {
+  const date = value ? new Date(value) : new Date();
+  const validDate = Number.isNaN(date.getTime()) ? new Date() : date;
+  return createDashboardDateTimeFormatter(displaySettings, {
+    includeSeconds: false,
+  }).format(validDate);
+}
+
+function buildReportModel({
+  asset,
+  generatedAt,
+  location,
+  remoteDashboard,
+  reportDraft,
+  displaySettings,
+  site,
+}) {
   const summary = remoteDashboard?.summary ?? {};
-  const thresholds = reportDraft?.assetThresholds ?? remoteDashboard?.initialThresholds ?? {
-    temperature: summary.temperatureMax ?? 0,
-    ultrasoundDb: DEFAULT_ULTRASOUND_THRESHOLD_DB,
-  };
+  const thresholds = reportDraft?.assetThresholds ??
+    remoteDashboard?.initialThresholds ?? {
+      temperature: summary.temperatureMax ?? 0,
+      ultrasoundDb: DEFAULT_ULTRASOUND_THRESHOLD_DB,
+    };
   const assetParts = Array.isArray(reportDraft?.assetParts)
     ? reportDraft.assetParts
-    : remoteDashboard?.initialAssetParts ?? [];
+    : (remoteDashboard?.initialAssetParts ?? []);
   const assetPartStates = Array.isArray(reportDraft?.assetPartStates)
     ? reportDraft.assetPartStates
-    : remoteDashboard?.initialAssetPartStates ?? [];
+    : (remoteDashboard?.initialAssetPartStates ?? []);
   const range = getReportRange(remoteDashboard?.trend?.selectedRangeId);
   const temperatureData = remoteDashboard?.trend?.temperatureData?.length
     ? remoteDashboard.trend.temperatureData
@@ -1243,13 +2108,24 @@ function buildReportModel({ asset, location, remoteDashboard, reportDraft, site 
   );
   const overallJudgement = mergeJudgements([
     remoteDashboard?.header?.statusJudgement,
-    classifyByThreshold(averageTemperature, thresholds.temperature, thresholds.temperatureCritical, 6),
-    classifyByThreshold(ultrasoundAverageDb, thresholds.ultrasoundDb, thresholds.ultrasoundCriticalDb, 6),
+    classifyByThreshold(
+      averageTemperature,
+      thresholds.temperature,
+      thresholds.temperatureCritical,
+      6,
+    ),
+    classifyByThreshold(
+      ultrasoundAverageDb,
+      thresholds.ultrasoundDb,
+      thresholds.ultrasoundCriticalDb,
+      6,
+    ),
     ...assetPartRows.map((row) => row.judgement),
   ]);
   const reportAsset = {
     ...asset,
-    lastCollectedAt: remoteDashboard?.header?.lastCollectedAt ?? asset.lastCollectedAt,
+    lastCollectedAt:
+      remoteDashboard?.header?.lastCollectedAt ?? asset.lastCollectedAt,
     name: remoteDashboard?.header?.assetName ?? asset.name,
     status: remoteDashboard?.header?.dashboardStatus ?? asset.status,
   };
@@ -1259,21 +2135,33 @@ function buildReportModel({ asset, location, remoteDashboard, reportDraft, site 
     { label: "설비 코드", value: reportAsset.assetCode ?? reportAsset.id },
     { label: "모델명", value: reportAsset.modelName ?? "미등록" },
     { label: "설비 유형", value: reportAsset.type ?? "설비" },
-    { label: "가동 상태", value: STATUS_LABEL[reportAsset.status] ?? reportAsset.status ?? "정상" },
+    {
+      label: "가동 상태",
+      value: STATUS_LABEL[reportAsset.status] ?? reportAsset.status ?? "정상",
+    },
     { label: "최근 수집", value: reportAsset.lastCollectedAt ?? "대기" },
-    { label: "온도 평균 / 최대 / 최소", value: `${roundOne(averageTemperature)}℃ / ${roundOne(temperatureMax)}℃ / ${roundOne(temperatureMin)}℃` },
-    { label: "초음파 평균 / 피크", value: `${roundOne(ultrasoundAverageDb)} dB / ${roundOne(ultrasoundPeakDb)} dB` },
-    { label: "주파수 / 검출", value: `${summary.frequencyBandKHz ?? "0-0 kHz"} / ${summary.ultrasoundDetectionCount ?? assetPartRows.length}건` },
-    { label: "임계치", value: `온도 ${roundOne(thresholds.temperature ?? 0)}℃ / 초음파 ${roundOne(thresholds.ultrasoundDb ?? 0)} dB` },
+    {
+      label: "온도 평균 / 최대 / 최소",
+      value: `${roundOne(averageTemperature)}℃ / ${roundOne(temperatureMax)}℃ / ${roundOne(temperatureMin)}℃`,
+    },
+    {
+      label: "초음파 평균 / 피크",
+      value: `${roundOne(ultrasoundAverageDb)} dB / ${roundOne(ultrasoundPeakDb)} dB`,
+    },
+    {
+      label: "주파수 / 검출",
+      value: `${summary.frequencyBandKHz ?? "0-0 kHz"} / ${summary.ultrasoundDetectionCount ?? assetPartRows.length}건`,
+    },
+    {
+      label: "임계치",
+      value: `온도 ${roundOne(thresholds.temperature ?? 0)}℃ / 초음파 ${roundOne(thresholds.ultrasoundDb ?? 0)} dB`,
+    },
   ];
 
   return {
     asset: reportAsset,
     assetPartRows,
-    generatedAt: new Intl.DateTimeFormat("ko-KR", {
-      dateStyle: "medium",
-      timeStyle: "short",
-    }).format(new Date()),
+    generatedAt: formatReportGeneratedAt(generatedAt, displaySettings),
     metricRows,
     overallJudgement,
     overallOpinions: buildOverallOpinions({
@@ -1291,33 +2179,62 @@ function buildReportModel({ asset, location, remoteDashboard, reportDraft, site 
       thresholds.temperature,
       "온도 임계",
     ),
-    temperatureYAxisMax: getTemperatureYAxisMax(temperatureMax, thresholds.temperature),
+    temperatureYAxisMax: getTemperatureYAxisMax(
+      temperatureMax,
+      thresholds.temperature,
+    ),
     ultrasonicData,
     ultrasonicReferenceLines: normalizeReferenceLines(
       remoteDashboard?.trend?.ultrasonicReferenceLines,
       thresholds.ultrasoundDb,
       "초음파 임계",
     ),
-    xAxis: RANGE_AXIS_CONFIG[range.id],
+    xAxis: { ...RANGE_AXIS_CONFIG[range.id], rangeId: range.id },
   };
 }
 
 function buildAssetPartRows(parts, states, thresholds, summary) {
   return parts.map((part, index) => {
-    const state = states.find((item) => item.partId === part.id) ?? buildFallbackPartState(part, thresholds, summary, index);
-    const judgement = state.judgement ?? mergeJudgements([
-      classifyByThreshold(state.temperatureMax, part.thresholds?.temperature ?? thresholds.temperature, part.thresholds?.temperatureCritical, 6),
-      classifyByThreshold(state.ultrasoundPeakDb, part.thresholds?.ultrasoundDb ?? thresholds.ultrasoundDb, part.thresholds?.ultrasoundCriticalDb, 6),
-    ]);
+    const state =
+      states.find((item) => item.partId === part.id) ??
+      buildFallbackPartState(part, thresholds, summary, index);
+    const judgement =
+      state.judgement ??
+      mergeJudgements([
+        classifyByThreshold(
+          state.temperatureMax,
+          part.thresholds?.temperature ?? thresholds.temperature,
+          part.thresholds?.temperatureCritical,
+          6,
+        ),
+        classifyByThreshold(
+          state.ultrasoundPeakDb,
+          part.thresholds?.ultrasoundDb ?? thresholds.ultrasoundDb,
+          part.thresholds?.ultrasoundCriticalDb,
+          6,
+        ),
+      ]);
     return {
       judgement,
       part,
       rows: [
         { label: "영역 유형", value: getAssetPartModeLabel(part) },
-        { label: "온도 평균 / 최대", value: `${roundOne(state.temperatureAverage ?? 0)}℃ / ${roundOne(state.temperatureMax ?? 0)}℃` },
-        { label: "초음파 피크", value: `${roundOne(state.ultrasoundPeakDb ?? 0)} dB` },
-        { label: "주파수", value: `${roundOne(state.dominantFrequencyKHz ?? 0)} kHz` },
-        { label: "임계치", value: `온도 ${roundOne(part.thresholds?.temperature ?? thresholds.temperature ?? 0)}℃ / 초음파 ${roundOne(part.thresholds?.ultrasoundDb ?? thresholds.ultrasoundDb ?? 0)} dB` },
+        {
+          label: "온도 평균 / 최대",
+          value: `${roundOne(state.temperatureAverage ?? 0)}℃ / ${roundOne(state.temperatureMax ?? 0)}℃`,
+        },
+        {
+          label: "초음파 피크",
+          value: `${roundOne(state.ultrasoundPeakDb ?? 0)} dB`,
+        },
+        {
+          label: "주파수",
+          value: `${roundOne(state.dominantFrequencyKHz ?? 0)} kHz`,
+        },
+        {
+          label: "임계치",
+          value: `온도 ${roundOne(part.thresholds?.temperature ?? thresholds.temperature ?? 0)}℃ / 초음파 ${roundOne(part.thresholds?.ultrasoundDb ?? thresholds.ultrasoundDb ?? 0)} dB`,
+        },
       ],
       opinion: buildPartOpinion(part, state, judgement),
     };
@@ -1330,9 +2247,18 @@ function buildFallbackPartState(part, thresholds, summary, index) {
     dominantFrequencyKHz: readNumber(summary.dominantFrequencyKHz, 40 + offset),
     judgement: "normal",
     partId: part.id,
-    temperatureAverage: Math.max(readNumber(summary.averageTemperature, thresholds.temperature - 6), 0),
-    temperatureMax: Math.max(readNumber(summary.temperatureMax, thresholds.temperature - 4), 0),
-    ultrasoundPeakDb: Math.max(readNumber(summary.ultrasoundPeakDb, thresholds.ultrasoundDb - 8), 0),
+    temperatureAverage: Math.max(
+      readNumber(summary.averageTemperature, thresholds.temperature - 6),
+      0,
+    ),
+    temperatureMax: Math.max(
+      readNumber(summary.temperatureMax, thresholds.temperature - 4),
+      0,
+    ),
+    ultrasoundPeakDb: Math.max(
+      readNumber(summary.ultrasoundPeakDb, thresholds.ultrasoundDb - 8),
+      0,
+    ),
   };
 }
 
@@ -1381,29 +2307,68 @@ function buildPartOpinion(part, state, judgement) {
 
 function buildSvgChart(data, yAxisMax, referenceLines) {
   const values = data.map((point) => readNumber(point.average, 0));
-  const referenceMax = Math.max(0, ...referenceLines.map((line) => readNumber(line.value, 0)));
+  const referenceMax = Math.max(
+    0,
+    ...referenceLines.map((line) => readNumber(line.value, 0)),
+  );
   const maxValue = Math.max(yAxisMax, referenceMax * 1.15, ...values, 1);
-  const plot = { height: 102, width: 310, x: 34, y: 14 };
-  const valueToY = (value) => plot.y + plot.height - (readNumber(value, 0) / maxValue) * plot.height;
+  const plot = { height: 88, width: 370, x: 34, y: 12 };
+  const valueToY = (value) =>
+    plot.y + plot.height - (readNumber(value, 0) / maxValue) * plot.height;
   const points = values.map((value, index) => ({
     x: plot.x + (plot.width * index) / Math.max(values.length - 1, 1),
     y: valueToY(value),
   }));
   const linePath = points.length
-    ? points.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ")
+    ? points
+        .map(
+          (point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`,
+        )
+        .join(" ")
     : "";
   const areaPath = points.length
     ? `${linePath} L ${points.at(-1).x} ${plot.y + plot.height} L ${points[0].x} ${plot.y + plot.height} Z`
     : "";
+  const yAxisLabelX = plot.x - 6;
+  const yAxisLabels = [
+    {
+      key: "max",
+      value: roundOne(maxValue),
+      variant: "axis",
+      y: plot.y + 5,
+    },
+    ...referenceLines.map((line, index) => ({
+      key: `threshold-${index}`,
+      value: roundOne(line.value),
+      variant: "threshold",
+      y: clamp(
+        valueToY(line.value) + 2.4,
+        plot.y + 9,
+        plot.y + plot.height - 4,
+      ),
+    })),
+    {
+      key: "min",
+      value: 0,
+      variant: "axis",
+      y: plot.y + plot.height + 2,
+    },
+  ];
   return {
     areaPath,
+    axisY: plot.y + plot.height,
     horizontalLines: Array.from({ length: 5 }, (_, index) => ({
       y: plot.y + (plot.height * index) / 4,
     })),
+    legendY: plot.y + plot.height + 32,
     linePath,
     maxValue,
+    plot,
     points,
     valueToY,
+    xTickY: plot.y + plot.height + 14,
+    yAxisLabelX,
+    yAxisLabels,
   };
 }
 
@@ -1446,11 +2411,25 @@ function getLatestTrendPoint(points) {
   return points.at(-1);
 }
 
-function classifyByThreshold(value, warningThreshold, criticalThreshold, cautionMargin) {
-  if (!Number.isFinite(value) || value <= 0 || !Number.isFinite(warningThreshold) || warningThreshold <= 0) {
+function classifyByThreshold(
+  value,
+  warningThreshold,
+  criticalThreshold,
+  cautionMargin,
+) {
+  if (
+    !Number.isFinite(value) ||
+    value <= 0 ||
+    !Number.isFinite(warningThreshold) ||
+    warningThreshold <= 0
+  ) {
     return "normal";
   }
-  if (Number.isFinite(criticalThreshold) && criticalThreshold > 0 && value >= criticalThreshold) {
+  if (
+    Number.isFinite(criticalThreshold) &&
+    criticalThreshold > 0 &&
+    value >= criticalThreshold
+  ) {
     return "abnormal";
   }
   if (value >= warningThreshold) {
@@ -1495,6 +2474,10 @@ function getRoiCenterPoint(roi) {
 
 function readNumber(value, fallback) {
   return Number.isFinite(value) ? value : fallback;
+}
+
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
 }
 
 function roundOne(value) {

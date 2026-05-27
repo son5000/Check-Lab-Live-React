@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import * as THREE from "three";
 import { cn } from "@/lib/utils";
@@ -192,16 +192,71 @@ export function Three3DViewer({ activeAnalysisMode, allowOptionBar = true, analy
     </div>);
 }
 function AnalysisOverlay({ analysisSummary, analysisTargets, onSelect, projectedTargets, selectedProjectedTarget, selectedTargetId, }) {
+    const calloutRef = useRef(null);
+    const rootRef = useRef(null);
+    const [overlayMetrics, setOverlayMetrics] = useState();
     const projectedTargetById = useMemo(() => new Map(projectedTargets.map((target) => [target.id, target])), [projectedTargets]);
-    const connectorPoints = selectedProjectedTarget?.visible && analysisSummary
-        ? getCalloutConnectorPoints(selectedProjectedTarget)
+    const connectorGeometry = selectedProjectedTarget?.visible && analysisSummary
+        ? getCalloutConnectorGeometry(selectedProjectedTarget, overlayMetrics)
         : undefined;
+    useLayoutEffect(() => {
+        const root = rootRef.current;
+        if (!root) {
+            return undefined;
+        }
+        let frameId = 0;
+        const updateMetrics = () => {
+            frameId = 0;
+            const rootRect = root.getBoundingClientRect();
+            const calloutRect = calloutRef.current?.getBoundingClientRect();
+            const nextMetrics = {
+                calloutRect: calloutRect
+                    ? {
+                        bottom: roundOverlayValue(calloutRect.bottom - rootRect.top),
+                        height: roundOverlayValue(calloutRect.height),
+                        left: roundOverlayValue(calloutRect.left - rootRect.left),
+                        right: roundOverlayValue(calloutRect.right - rootRect.left),
+                        top: roundOverlayValue(calloutRect.top - rootRect.top),
+                        width: roundOverlayValue(calloutRect.width),
+                    }
+                    : undefined,
+                height: roundOverlayValue(rootRect.height),
+                width: roundOverlayValue(rootRect.width),
+            };
+            setOverlayMetrics((currentMetrics) => areOverlayMetricsEqual(currentMetrics, nextMetrics)
+                ? currentMetrics
+                : nextMetrics);
+        };
+        const scheduleMetricsUpdate = () => {
+            if (frameId) {
+                window.cancelAnimationFrame(frameId);
+            }
+            frameId = window.requestAnimationFrame(updateMetrics);
+        };
+        scheduleMetricsUpdate();
+        const resizeObserver = new ResizeObserver(scheduleMetricsUpdate);
+        resizeObserver.observe(root);
+        if (calloutRef.current) {
+            resizeObserver.observe(calloutRef.current);
+        }
+        window.addEventListener("resize", scheduleMetricsUpdate);
+        return () => {
+            if (frameId) {
+                window.cancelAnimationFrame(frameId);
+            }
+            window.removeEventListener("resize", scheduleMetricsUpdate);
+            resizeObserver.disconnect();
+        };
+    }, [analysisSummary, selectedProjectedTarget?.visible, selectedTargetId]);
     if (!analysisTargets.length && !analysisSummary) {
         return null;
     }
-    return (<div className="AnalysisOverlay AnalysisOverlay__root-1 pointer-events-none absolute inset-0 z-30">
-      <svg className="AnalysisOverlay AnalysisOverlay__lines-1 absolute inset-0 h-full w-full" preserveAspectRatio="none" viewBox="0 0 100 100">
-        {connectorPoints ? (<polyline fill="none" points={connectorPoints} stroke="rgba(125, 211, 252, 0.88)" strokeDasharray="1.8 1.8" strokeLinecap="round" strokeLinejoin="round" strokeWidth="0.42" vectorEffect="non-scaling-stroke"/>) : null}
+    return (<div ref={rootRef} className="AnalysisOverlay AnalysisOverlay__root-1 pointer-events-none absolute inset-0 z-30">
+      <svg className="AnalysisOverlay AnalysisOverlay__lines-1 absolute inset-0 h-full w-full" preserveAspectRatio="none" viewBox={`0 0 ${connectorGeometry?.width ?? 1} ${connectorGeometry?.height ?? 1}`} aria-hidden="true">
+        {connectorGeometry ? (<>
+            <path d={connectorGeometry.path} fill="none" stroke="rgba(2, 6, 23, 0.68)" strokeDasharray="8 5" strokeLinecap="butt" strokeLinejoin="miter" strokeWidth="3.6" vectorEffect="non-scaling-stroke"/>
+            <path d={connectorGeometry.path} fill="none" stroke="rgba(125, 211, 252, 0.82)" strokeDasharray="8 5" strokeLinecap="butt" strokeLinejoin="miter" strokeWidth="1.55" vectorEffect="non-scaling-stroke"/>
+          </>) : null}
       </svg>
 
       {analysisTargets.map((target, index) => {
@@ -225,7 +280,7 @@ function AnalysisOverlay({ analysisSummary, analysisTargets, onSelect, projected
                         width: `${projectedTarget.rect.width}%`,
                     }} title={target.name}>
               <span className="AnalysisOverlay AnalysisOverlay__area-label-1 absolute left-1 top-1 max-w-[calc(100%-0.5rem)] truncate rounded-sm bg-black/55 px-1 py-0.5 text-[10px] font-semibold text-white">
-                {index + 1}. {target.name}
+                {target.name}
               </span>
             </button>);
             }
@@ -242,7 +297,7 @@ function AnalysisOverlay({ analysisSummary, analysisTargets, onSelect, projected
           </button>);
         })}
 
-      {selectedProjectedTarget?.visible && analysisSummary ? (<div className="AnalysisOverlay AnalysisOverlay__callout-1 absolute right-3 top-3 z-40 grid w-[min(19rem,calc(100%-1.5rem))] gap-2 rounded-md border border-cyan-200/35 bg-neutral-950/[0.78] p-3 text-white shadow-2xl backdrop-blur-md">
+      {selectedProjectedTarget?.visible && analysisSummary ? (<div ref={calloutRef} className="AnalysisOverlay AnalysisOverlay__callout-1 absolute right-3 top-3 z-40 grid w-[min(19rem,calc(100%-1.5rem))] gap-2 rounded-md border border-cyan-200/35 bg-neutral-950/[0.78] p-3 text-white shadow-2xl backdrop-blur-md">
           <div className="AnalysisOverlay AnalysisOverlay__callout-header-1 min-w-0">
             <p className="AnalysisOverlay AnalysisOverlay__callout-title-1 truncate text-xs font-semibold">
               {analysisSummary.title}
@@ -491,11 +546,98 @@ function getCenteredRect(center, width, height) {
         width,
     };
 }
-function getCalloutConnectorPoints(target) {
-    const elbowX = target.left > 72 ? 69 : 72;
-    const calloutX = 73;
-    const calloutY = 15;
-    return `${target.left},${target.top} ${elbowX},${target.top} ${calloutX},${calloutY}`;
+function getCalloutConnectorGeometry(target, overlayMetrics) {
+    if (!overlayMetrics?.width ||
+        !overlayMetrics.height ||
+        !overlayMetrics.calloutRect) {
+        return undefined;
+    }
+    const start = {
+        x: roundOverlayValue((target.left / 100) * overlayMetrics.width),
+        y: roundOverlayValue((target.top / 100) * overlayMetrics.height),
+    };
+    const anchor = getNearestRectAnchor(start, overlayMetrics.calloutRect);
+    return {
+        anchor,
+        height: overlayMetrics.height,
+        path: getConnectorPath(start, anchor),
+        start,
+        width: overlayMetrics.width,
+    };
+}
+function getNearestRectAnchor(point, rect) {
+    const padding = Math.min(18, Math.max(8, Math.min(rect.width, rect.height) * 0.12));
+    const safeLeft = rect.left + padding;
+    const safeRight = rect.right - padding;
+    const safeTop = rect.top + padding;
+    const safeBottom = rect.bottom - padding;
+    const candidates = [
+        {
+            x: rect.left,
+            y: clamp(point.y, safeTop, safeBottom),
+        },
+        {
+            x: rect.right,
+            y: clamp(point.y, safeTop, safeBottom),
+        },
+        {
+            x: clamp(point.x, safeLeft, safeRight),
+            y: rect.top,
+        },
+        {
+            x: clamp(point.x, safeLeft, safeRight),
+            y: rect.bottom,
+        },
+    ];
+    const anchor = candidates.reduce((nearest, candidate) => getPointDistance(point, candidate) < getPointDistance(point, nearest)
+        ? candidate
+        : nearest);
+    return {
+        x: roundOverlayValue(anchor.x),
+        y: roundOverlayValue(anchor.y),
+    };
+}
+function getConnectorPath(start, anchor) {
+    const elbowX = start.x + (anchor.x - start.x) * 0.55;
+    return [
+        "M",
+        roundOverlayValue(start.x),
+        roundOverlayValue(start.y),
+        "L",
+        roundOverlayValue(elbowX),
+        roundOverlayValue(start.y),
+        "L",
+        roundOverlayValue(elbowX),
+        roundOverlayValue(anchor.y),
+        "L",
+        roundOverlayValue(anchor.x),
+        roundOverlayValue(anchor.y),
+    ].join(" ");
+}
+function getPointDistance(firstPoint, secondPoint) {
+    return Math.hypot(firstPoint.x - secondPoint.x, firstPoint.y - secondPoint.y);
+}
+function areOverlayMetricsEqual(currentMetrics, nextMetrics) {
+    if (!currentMetrics) {
+        return false;
+    }
+    return currentMetrics.width === nextMetrics.width &&
+        currentMetrics.height === nextMetrics.height &&
+        areOverlayRectsEqual(currentMetrics.calloutRect, nextMetrics.calloutRect);
+}
+function areOverlayRectsEqual(currentRect, nextRect) {
+    if (!currentRect || !nextRect) {
+        return currentRect === nextRect;
+    }
+    return currentRect.bottom === nextRect.bottom &&
+        currentRect.height === nextRect.height &&
+        currentRect.left === nextRect.left &&
+        currentRect.right === nextRect.right &&
+        currentRect.top === nextRect.top &&
+        currentRect.width === nextRect.width;
+}
+function roundOverlayValue(value) {
+    return Number(value.toFixed(2));
 }
 function getProjectedTargetsKey(targets) {
     return targets

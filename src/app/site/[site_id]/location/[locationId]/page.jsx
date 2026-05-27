@@ -101,18 +101,49 @@ function toLocationModelFromDetail(location) {
 }
 function toAssetModelFromSummary(asset, monitoringTree) {
     const treeAssetNode = findAssetPathNode(monitoringTree, asset.asset_id)?.assetNode;
+    const emergencyContact = readAssetString(asset, ["emergency_contact", "emergencyContact"]) ??
+        treeAssetNode?.emergencyContact;
+    const managerContact = readAssetString(asset, ["manager_contact", "managerContact", "contact", "contact_number"]) ??
+        emergencyContact ??
+        treeAssetNode?.managerContact;
     return {
         asset_id: asset.asset_id,
+        emergencyContact,
         href: treeAssetNode?.href ??
             `/site/${encodeURIComponent(asset.site_id)}/location/${encodeURIComponent(asset.location_id)}/asset/${encodeURIComponent(asset.asset_id)}`,
         id: asset.asset_id,
-        lastCollectedAt: "수집 대기",
+        lastCollectedAt: readAssetString(asset, ["last_collected_at", "lastCollectedAt", "latest_updated_at"]) ??
+            treeAssetNode?.lastCollectedAt ??
+            "수집 대기",
+        lastInspectionDate: readAssetString(asset, ["last_inspection_date", "lastInspectionDate"]) ??
+            treeAssetNode?.lastInspectionDate,
         locationId: asset.location_id,
+        maintenanceCompany: readAssetString(asset, ["maintenance_company", "maintenanceCompany", "vendor", "maintenance_vendor"]) ??
+            treeAssetNode?.maintenanceCompany,
+        manager: readAssetString(asset, ["manager", "manager_name"]) ??
+            treeAssetNode?.manager,
+        managerContact,
+        managerEmail: readAssetString(asset, ["manager_email", "managerEmail", "email"]) ??
+            treeAssetNode?.managerEmail,
         name: asset.display_name || asset.asset_name || asset.asset_id,
+        optionUpdatedAt: readAssetString(asset, ["option_updated_at", "optionUpdatedAt", "settings_updated_at", "settingsUpdatedAt", "updated_at", "updatedAt"]) ??
+            treeAssetNode?.optionUpdatedAt,
         site_id: asset.site_id,
         status: toDashboardStatus(asset.status),
         type: asset.location_name,
     };
+}
+function readAssetString(record, keys) {
+    for (const key of keys) {
+        const value = record?.[key];
+        if (typeof value === "string" && value.trim()) {
+            return value.trim();
+        }
+        if (typeof value === "number" && Number.isFinite(value)) {
+            return String(value);
+        }
+    }
+    return undefined;
 }
 function toDashboardStatus(status) {
     return dashboardStatuses.includes(status)
