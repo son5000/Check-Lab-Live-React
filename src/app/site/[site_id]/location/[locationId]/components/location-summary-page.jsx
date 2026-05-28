@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
   ArrowRight,
-  BellRing,
   Box,
   Camera,
   Clock3,
@@ -21,21 +20,16 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { dashboardStatusClassName } from "@/app/layouts/constants/status-styles";
 import {
+  createDashboardDateTimeFormatter,
   formatCurrentDashboardDateTime,
   formatCurrentDashboardTime,
+  formatCheckLabDateTime,
 } from "@/app/layouts/helpers/time-formatters";
 import {
   createAsset as createManagedAsset,
   updateAsset as updateManagedAsset,
 } from "@/app/site/services/site-management-client";
 import { toCreateAssetPayload } from "@/app/site/components/site-builder-model";
-const dashboardStatusOptions = [
-  "normal",
-  "caution",
-  "warning",
-  "danger",
-  "error",
-];
 const statusLabel = {
   normal: "정상",
   caution: "요주의",
@@ -43,46 +37,28 @@ const statusLabel = {
   danger: "이상",
   error: "오류",
 };
-const assetTypeOptions = [
-  "회전 설비",
-  "전기 설비",
-  "배관 설비",
-  "가열 설비",
-  "냉각 설비",
-  "기타 설비",
-];
-const cameraOptions = ["CAM 1", "CAM 2", "열화상 CAM", "복합 센서"];
 const defaultDraft = {
-  alarmLinked: true,
-  cameraId: cameraOptions[0],
-  collectionCycleSec: 5,
+  cameraId: "",
   description: "",
   lastCollectedAt: "수집 대기",
   name: "",
-  status: "normal",
   temperatureThreshold: 65,
-  type: assetTypeOptions[0],
+  type: "",
   ultrasoundThresholdDb: 70,
 };
 const optionComparisonFields = [
   { key: "name", label: "설비명" },
   { key: "type", label: "설비 유형" },
-  { key: "status", label: "상태" },
   { key: "cameraId", label: "연동 카메라" },
-  { key: "collectionCycleSec", label: "수집 주기" },
   { key: "temperatureThreshold", label: "온도 임계" },
   { key: "ultrasoundThresholdDb", label: "초음파 임계" },
-  { key: "alarmLinked", label: "알림 연동" },
   { key: "manager", label: "담당자 이름" },
   { key: "managerEmail", label: "담당자 이메일" },
   { key: "managerContact", label: "담당자 연락처" },
   { key: "maintenanceCompany", label: "유지보수 업체" },
   { key: "lastInspectionDate", label: "마지막 점검일" },
-  { key: "optionUpdatedAt", label: "옵션 마지막 수정일" },
 ];
-const editableOptionFields = optionComparisonFields.filter(
-  (field) => field.key !== "optionUpdatedAt",
-);
+const editableOptionFields = optionComparisonFields;
 export function LocationSummaryPage({ site, location, assets }) {
   const initialAssets = useMemo(
     () => assets.map((asset) => toManagedAsset(asset)),
@@ -134,9 +110,6 @@ export function LocationSummaryPage({ site, location, assets }) {
   const watchCount = managedAssets.filter(
     (asset) => asset.status === "warning" || asset.status === "caution",
   ).length;
-  const alarmLinkedCount = managedAssets.filter(
-    (asset) => asset.alarmLinked,
-  ).length;
   const canRegister = draft.name.trim().length > 0;
   const handleRegisterAsset = async (event) => {
     event.preventDefault();
@@ -177,9 +150,7 @@ export function LocationSummaryPage({ site, location, assets }) {
     const nextAsset = {
       asset_id,
       id: asset_id,
-      alarmLinked: draft.alarmLinked,
-      cameraId: draft.cameraId,
-      collectionCycleSec: draft.collectionCycleSec,
+      cameraId: readCreatedAssetCameraId(response) ?? draft.cameraId.trim(),
       description: draft.description.trim(),
       href: `${location.href}/asset/${asset_id}`,
       isUserDefined: true,
@@ -193,9 +164,9 @@ export function LocationSummaryPage({ site, location, assets }) {
       name: draft.name.trim(),
       optionUpdatedAt: getCurrentDateTimeLabel(),
       site_id: site.site_id,
-      status: draft.status,
+      status: readCreatedAssetStatus(response) ?? "normal",
       temperatureThreshold: draft.temperatureThreshold,
-      type: draft.type.trim(),
+      type: draft.type.trim() || "설비",
       ultrasoundThresholdDb: draft.ultrasoundThresholdDb,
     };
     setManagedAssets((currentAssets) => [nextAsset, ...currentAssets]);
@@ -389,7 +360,7 @@ export function LocationSummaryPage({ site, location, assets }) {
               </span>
             </div>
           </div>
-          <div className="LocationSummaryPage LocationSummaryPage__container-4 mt-3 grid gap-2 sm:grid-cols-4">
+          <div className="LocationSummaryPage LocationSummaryPage__container-4 mt-3 grid gap-2 sm:grid-cols-3">
             <Metric
               icon={Cpu}
               label="하위 설비"
@@ -404,11 +375,6 @@ export function LocationSummaryPage({ site, location, assets }) {
               icon={Activity}
               label="관찰 대상"
               value={watchCount}
-            />
-            <Metric
-              icon={BellRing}
-              label="알림 연동"
-              value={alarmLinkedCount}
             />
           </div>
         </section>
@@ -453,6 +419,13 @@ export function LocationSummaryPage({ site, location, assets }) {
                   value={draft.name}
                   onChange={(name) =>
                     setDraft((current) => ({ ...current, name }))
+                  }
+                />
+                <TextField
+                  label="설비 유형"
+                  value={draft.type}
+                  onChange={(type) =>
+                    setDraft((current) => ({ ...current, type }))
                   }
                 />
                 <TextAreaField
@@ -572,7 +545,11 @@ function AssetCard({ asset, selected, onRemove, onSelect }) {
             label="최근 수집"
             value={asset.lastCollectedAt}
           />
-          <AssetOptionRow icon={Camera} label="카메라" value={asset.cameraId} />
+          <AssetOptionRow
+            icon={Camera}
+            label="카메라"
+            value={asset.cameraId || "미등록"}
+          />
           <AssetOptionRow
             icon={SlidersHorizontal}
             label="임계"
@@ -655,14 +632,19 @@ function AssetOptionPanel({
             {asset.name}
           </h2>
         </div>
-        <span
-          className={cn(
-            "LocationSummaryPage LocationSummaryPage__label-5 shrink-0 rounded-sm border px-1.5 py-0.5 text-[10px] font-semibold",
-            dashboardStatusClassName[asset.status],
-          )}
-        >
-          {statusLabel[asset.status]}
-        </span>
+        <div className="LocationSummaryPage LocationSummaryPage__container-25 flex shrink-0 flex-col items-end gap-1 text-right">
+          <span
+            className={cn(
+              "LocationSummaryPage LocationSummaryPage__label-5 rounded-sm border px-1.5 py-0.5 text-[10px] font-semibold",
+              dashboardStatusClassName[asset.status],
+            )}
+          >
+            {statusLabel[asset.status]}
+          </span>
+          <span className="LocationSummaryPage LocationSummaryPage__label-15 max-w-36 truncate text-[10px] font-medium text-muted-foreground">
+            최근 수정일 {formatOptionUpdatedAt(asset.optionUpdatedAt)}
+          </span>
+        </div>
       </div>
 
       <div className="LocationSummaryPage LocationSummaryPage__container-20 grid gap-2">
@@ -683,25 +665,47 @@ function AssetOptionPanel({
           value={optionAsset.name}
           onChange={(name) => onChange(asset.id, { name })}
         />
-        <SelectField
+        <TextField
           label="설비 유형"
           value={optionAsset.type}
-          options={assetTypeOptions}
           onChange={(type) => onChange(asset.id, { type })}
         />
-        <SelectField
-          label="상태"
-          value={optionAsset.status}
-          options={dashboardStatusOptions}
-          getOptionLabel={(status) => statusLabel[status]}
-          onChange={(status) => onChange(asset.id, { status })}
-        />
-        <SelectField
-          label="연동 카메라"
+        <CameraRegistrationField
           value={optionAsset.cameraId}
-          options={cameraOptions}
           onChange={(cameraId) => onChange(asset.id, { cameraId })}
         />
+
+        <div className="LocationSummaryPage LocationSummaryPage__container-21 grid gap-2 rounded-md border border-border bg-background p-2">
+          <div className="LocationSummaryPage LocationSummaryPage__container-26 flex min-w-0 items-center gap-1.5">
+            <SlidersHorizontal
+              className="LocationSummaryPage LocationSummaryPage__icon-12 h-3.5 w-3.5 shrink-0 text-muted-foreground"
+              aria-hidden="true"
+            />
+            <h3 className="LocationSummaryPage LocationSummaryPage__title-6 truncate text-xs font-semibold">
+              임계치
+            </h3>
+          </div>
+          <div className="LocationSummaryPage LocationSummaryPage__container-27 grid grid-cols-2 gap-2">
+            <NumberField
+              label="온도"
+              suffix="℃"
+              min={0}
+              value={optionAsset.temperatureThreshold}
+              onChange={(temperatureThreshold) =>
+                onChange(asset.id, { temperatureThreshold })
+              }
+            />
+            <NumberField
+              label="초음파"
+              suffix="dB"
+              min={0}
+              value={optionAsset.ultrasoundThresholdDb}
+              onChange={(ultrasoundThresholdDb) =>
+                onChange(asset.id, { ultrasoundThresholdDb })
+              }
+            />
+          </div>
+        </div>
 
         <div className="LocationSummaryPage LocationSummaryPage__container-23 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
           <TextField
@@ -741,55 +745,7 @@ function AssetOptionPanel({
               onChange(asset.id, { lastInspectionDate })
             }
           />
-          <ReadOnlyField
-            label="옵션 마지막 수정일"
-            value={asset.optionUpdatedAt || "기록 없음"}
-          />
         </div>
-
-        <div className="LocationSummaryPage LocationSummaryPage__container-21 grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
-          <NumberField
-            label="수집 주기"
-            suffix="초"
-            min={1}
-            value={optionAsset.collectionCycleSec}
-            onChange={(collectionCycleSec) =>
-              onChange(asset.id, { collectionCycleSec })
-            }
-          />
-          <NumberField
-            label="온도 임계"
-            suffix="℃"
-            min={0}
-            value={optionAsset.temperatureThreshold}
-            onChange={(temperatureThreshold) =>
-              onChange(asset.id, { temperatureThreshold })
-            }
-          />
-          <NumberField
-            label="초음파 임계"
-            suffix="dB"
-            min={0}
-            value={optionAsset.ultrasoundThresholdDb}
-            onChange={(ultrasoundThresholdDb) =>
-              onChange(asset.id, { ultrasoundThresholdDb })
-            }
-          />
-        </div>
-
-        <label className="LocationSummaryPage LocationSummaryPage__field-5 flex h-8 min-w-0 items-center justify-between gap-2 rounded-md border border-border bg-background px-2 text-xs font-medium">
-          <span className="LocationSummaryPage LocationSummaryPage__label-6 min-w-0 truncate">
-            알림 연동
-          </span>
-          <input
-            className="LocationSummaryPage LocationSummaryPage__checkbox-2 h-3.5 w-3.5 accent-primary"
-            type="checkbox"
-            checked={optionAsset.alarmLinked}
-            onChange={(event) =>
-              onChange(asset.id, { alarmLinked: event.target.checked })
-            }
-          />
-        </label>
 
         {hasUnsavedChanges ? (
           <button
@@ -1069,18 +1025,130 @@ function DateField({ label, onChange, value }) {
     </label>
   );
 }
-function ReadOnlyField({ label, value }) {
+
+function CameraRegistrationField({ onChange, value }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [cameraKey, setCameraKey] = useState(value ?? "");
+
+  useEffect(() => {
+    if (!isOpen) {
+      setCameraKey(value ?? "");
+    }
+  }, [isOpen, value]);
+
+  const trimmedCameraKey = cameraKey.trim();
+  const canRegisterCamera = trimmedCameraKey.length > 0;
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    if (!canRegisterCamera) {
+      return;
+    }
+    onChange(trimmedCameraKey);
+    setIsOpen(false);
+  };
+
   return (
     <div className="LocationSummaryPage LocationSummaryPage__field-8 grid min-w-0 gap-1">
       <span className="LocationSummaryPage LocationSummaryPage__label-14 truncate text-[10px] font-medium text-muted-foreground">
-        {label}
+        연동 카메라
       </span>
-      <p className="LocationSummaryPage LocationSummaryPage__readonly-1 flex h-8 min-w-0 items-center truncate rounded-md border border-border bg-muted px-2 text-xs font-semibold text-muted-foreground">
-        {value}
-      </p>
+      <div className="LocationSummaryPage LocationSummaryPage__camera-field-1 flex min-w-0 items-center gap-2 rounded-md border border-border bg-background px-2 py-1.5">
+        <Camera
+          className="LocationSummaryPage LocationSummaryPage__camera-icon-1 h-3.5 w-3.5 shrink-0 text-muted-foreground"
+          aria-hidden="true"
+        />
+        <span className="LocationSummaryPage LocationSummaryPage__camera-value-1 min-w-0 flex-1 truncate text-xs font-semibold">
+          {value || "미등록"}
+        </span>
+        <button
+          type="button"
+          className="LocationSummaryPage LocationSummaryPage__camera-button-1 inline-flex h-7 shrink-0 items-center rounded-sm border border-border bg-card px-2 text-[11px] font-semibold text-foreground transition hover:bg-accent"
+          onClick={() => setIsOpen(true)}
+        >
+          카메라 등록
+        </button>
+      </div>
+
+      {isOpen ? (
+        <div
+          className="LocationSummaryPage LocationSummaryPage__camera-overlay-1 fixed inset-0 z-[70] grid place-items-center bg-black/50 p-3 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-label="연동 카메라 등록"
+          onClick={() => setIsOpen(false)}
+        >
+          <form
+            className="LocationSummaryPage LocationSummaryPage__camera-dialog-1 w-[min(24rem,calc(100dvw-1.5rem))] rounded-md border border-border bg-card p-4 text-card-foreground shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+            onSubmit={handleSubmit}
+          >
+            <div className="LocationSummaryPage LocationSummaryPage__camera-header-1 mb-3 flex min-w-0 items-start justify-between gap-3">
+              <div className="LocationSummaryPage LocationSummaryPage__camera-copy-1 min-w-0">
+                <p className="LocationSummaryPage LocationSummaryPage__camera-eyebrow-1 truncate text-[11px] font-medium text-muted-foreground">
+                  연동 카메라
+                </p>
+                <h3 className="LocationSummaryPage LocationSummaryPage__camera-title-1 truncate text-sm font-semibold">
+                  카메라 고유 키 등록
+                </h3>
+              </div>
+              <button
+                type="button"
+                className="LocationSummaryPage LocationSummaryPage__camera-close-1 grid h-7 w-7 shrink-0 place-items-center rounded-md border border-border bg-background text-muted-foreground transition hover:bg-accent hover:text-foreground"
+                onClick={() => setIsOpen(false)}
+                title="닫기"
+              >
+                <X
+                  className="LocationSummaryPage LocationSummaryPage__camera-close-icon-1 h-3.5 w-3.5"
+                  aria-hidden="true"
+                />
+              </button>
+            </div>
+
+            <label className="LocationSummaryPage LocationSummaryPage__camera-key-field-1 grid min-w-0 gap-1">
+              <span className="LocationSummaryPage LocationSummaryPage__camera-key-label-1 truncate text-[10px] font-medium text-muted-foreground">
+                카메라 고유 키
+              </span>
+              <input
+                autoFocus
+                className="LocationSummaryPage LocationSummaryPage__camera-key-input-1 h-9 min-w-0 rounded-md border border-border bg-background px-3 font-mono text-sm font-semibold outline-none transition focus:border-primary"
+                placeholder="CAM-KEY-0001"
+                value={cameraKey}
+                onChange={(event) => setCameraKey(event.target.value)}
+              />
+            </label>
+
+            <div className="LocationSummaryPage LocationSummaryPage__camera-actions-1 mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                className="LocationSummaryPage LocationSummaryPage__camera-cancel-1 inline-flex h-8 items-center rounded-md border border-border bg-background px-3 text-xs font-semibold text-muted-foreground transition hover:bg-accent hover:text-foreground"
+                onClick={() => setIsOpen(false)}
+              >
+                취소
+              </button>
+              <button
+                type="submit"
+                className={cn(
+                  "LocationSummaryPage LocationSummaryPage__camera-submit-1 inline-flex h-8 items-center gap-1.5 rounded-md border px-3 text-xs font-semibold transition",
+                  canRegisterCamera
+                    ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
+                    : "cursor-not-allowed border-border bg-muted text-muted-foreground",
+                )}
+                disabled={!canRegisterCamera}
+              >
+                <Save
+                  className="LocationSummaryPage LocationSummaryPage__camera-submit-icon-1 h-3.5 w-3.5"
+                  aria-hidden="true"
+                />
+                등록
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
     </div>
   );
 }
+
 function TextAreaField({ label, onChange, value }) {
   return (
     <label className="LocationSummaryPage LocationSummaryPage__field-6 grid min-w-0 gap-1">
@@ -1092,26 +1160,6 @@ function TextAreaField({ label, onChange, value }) {
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />
-    </label>
-  );
-}
-function SelectField({ getOptionLabel, label, onChange, options, value }) {
-  return (
-    <label className="LocationSummaryPage LocationSummaryPage__field-2 grid min-w-0 gap-1">
-      <span className="LocationSummaryPage LocationSummaryPage__label-9 truncate text-[10px] font-medium text-muted-foreground">
-        {label}
-      </span>
-      <select
-        className="LocationSummaryPage LocationSummaryPage__select-1 h-8 min-w-0 rounded-md border border-border bg-background px-2 text-xs font-semibold outline-none transition focus:border-primary"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {getOptionLabel ? getOptionLabel(option) : option}
-          </option>
-        ))}
-      </select>
     </label>
   );
 }
@@ -1141,9 +1189,7 @@ function NumberField({ label, min, onChange, suffix, value }) {
 function toManagedAsset(asset) {
   return {
     ...asset,
-    alarmLinked: asset.status !== "normal",
-    cameraId: asset.type === "전기 설비" ? "열화상 CAM" : cameraOptions[0],
-    collectionCycleSec: asset.status === "normal" ? 5 : 2,
+    cameraId: readAssetCameraId(asset) ?? "",
     emergencyContact: asset.emergencyContact ?? asset.managerContact ?? "",
     lastInspectionDate: asset.lastInspectionDate ?? "",
     maintenanceCompany: asset.maintenanceCompany ?? "",
@@ -1154,6 +1200,28 @@ function toManagedAsset(asset) {
     temperatureThreshold: asset.type === "전기 설비" ? 65 : 70,
     ultrasoundThresholdDb: asset.type === "배관 설비" ? 68 : 72,
   };
+}
+function readAssetCameraId(record) {
+  return readRecordString(record, [
+    "cameraId",
+    "camera_id",
+    "cameraKey",
+    "camera_key",
+    "primaryCameraId",
+    "primary_camera_id",
+  ]);
+}
+function readRecordString(record, keys) {
+  for (const key of keys) {
+    const value = record?.[key];
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return String(value);
+    }
+  }
+  return undefined;
 }
 function createAssetSnapshotMap(assets) {
   return Object.fromEntries(assets.map((asset) => [asset.id, { ...asset }]));
@@ -1191,12 +1259,6 @@ function formatOptionValue(key, value) {
   if (key === "status") {
     return statusLabel[value] ?? readDisplayValue(value);
   }
-  if (key === "alarmLinked") {
-    return value ? "연동" : "해제";
-  }
-  if (key === "collectionCycleSec") {
-    return `${readDisplayValue(value)}초`;
-  }
   if (key === "temperatureThreshold") {
     return `${readDisplayValue(value)}℃`;
   }
@@ -1213,11 +1275,9 @@ function readDisplayValue(value) {
 }
 function toAssetOptionSavePayload(asset) {
   return removeUndefinedValues({
-    alarm_linked: asset.alarmLinked,
     asset_code: asset.assetCode ?? asset.asset_code,
     asset_number: asset.assetNumber ?? asset.asset_number,
     camera_id: asset.cameraId,
-    collection_cycle_sec: asset.collectionCycleSec,
     description: asset.description,
     emergency_contact: asset.managerContact ?? asset.emergencyContact,
     last_inspection_date: asset.lastInspectionDate,
@@ -1233,7 +1293,6 @@ function toAssetOptionSavePayload(asset) {
     primary_camera_id: asset.cameraId,
     serial_number: asset.serialNumber ?? asset.serial_number,
     site_id: asset.site_id,
-    status: asset.status,
     temperature_threshold: asset.temperatureThreshold,
     type: asset.type,
     ultrasound_threshold_db: asset.ultrasoundThresholdDb,
@@ -1245,21 +1304,50 @@ function removeUndefinedValues(record) {
   );
 }
 function readCreatedAssetId(response) {
+  const record = readAssetResponseRecord(response);
+  const value = record?.asset_id ?? record?.id;
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+function readCreatedAssetCameraId(response) {
+  return readAssetCameraId(readAssetResponseRecord(response));
+}
+function readCreatedAssetStatus(response) {
+  const status = readRecordString(readAssetResponseRecord(response), ["status"]);
+  return status && statusLabel[status] ? status : undefined;
+}
+function readAssetResponseRecord(response) {
   if (!response || typeof response !== "object") return undefined;
-  const record =
+  return (
     response.asset && typeof response.asset === "object"
       ? response.asset
       : response.data && typeof response.data === "object"
         ? response.data
-        : response;
-  const value = record.asset_id ?? record.id;
-  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+        : response
+  );
 }
 function getCurrentClockLabel() {
   return formatCurrentDashboardTime();
 }
 function getCurrentDateTimeLabel() {
   return formatCurrentDashboardDateTime(undefined, { includeSeconds: false });
+}
+function formatOptionUpdatedAt(value) {
+  if (!value) {
+    return "기록 없음";
+  }
+  const formattedValue = formatCheckLabDateTime(value, undefined, {
+    includeSeconds: false,
+  });
+  if (formattedValue) {
+    return formattedValue.replace(/\s*KST$/, "");
+  }
+  const parsedTime = Date.parse(value);
+  if (Number.isFinite(parsedTime)) {
+    return createDashboardDateTimeFormatter(undefined, {
+      includeSeconds: false,
+    }).format(new Date(parsedTime));
+  }
+  return value;
 }
 function toDateInputValue(value) {
   if (typeof value !== "string") {

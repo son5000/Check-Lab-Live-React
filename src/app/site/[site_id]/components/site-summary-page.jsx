@@ -64,7 +64,7 @@ export function SiteSummaryPage({ site, locations, assets }) {
       const savedLocation = applyLocationResponse(normalizedLocation, response);
 
       if (!savedLocation.location_id.trim()) {
-        throw new Error("백엔드 응답에 위치 ID가 없습니다.");
+        throw new Error("서버 응답에 위치 ID가 없습니다.");
       }
 
       setLocationItems((currentLocations) => [
@@ -114,7 +114,11 @@ export function SiteSummaryPage({ site, locations, assets }) {
             </span>
           </div>
           <div className="SiteSummaryPage SiteSummaryPage__container-4 mt-3 grid gap-2 sm:grid-cols-4">
-            <SummaryMetric icon={MapPin} label="위치" value={`${locationCount}개`} />
+            <SummaryMetric
+              icon={MapPin}
+              label="위치"
+              value={`${locationCount}개`}
+            />
             <SummaryMetric icon={Gauge} label="설비" value={assetCount} />
             <SummaryMetric
               icon={AlertTriangle}
@@ -256,7 +260,7 @@ export function SiteSummaryPage({ site, locations, assets }) {
                 ))
               ) : (
                 <div className="SiteSummaryPage SiteSummaryPage__location-empty-1 rounded-md border border-dashed border-border bg-background p-4 text-sm text-muted-foreground sm:col-span-2">
-                  백엔드에서 전달된 위치가 없습니다.
+                  등록된 위치가 없습니다.
                 </div>
               )}
             </div>
@@ -270,10 +274,11 @@ export function SiteSummaryPage({ site, locations, assets }) {
               {site.alertCount > 0 ? (
                 <div className="SiteSummaryPage SiteSummaryPage__alert-summary-1 rounded-md border border-border bg-background px-3 py-2">
                   <p className="truncate text-sm font-semibold">
-                    {`백엔드 알림 집계 ${site.alertCount}건`}
+                    {`서버 알림 집계 ${site.alertCount}건`}
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    알림 상세 목록 API가 연결되면 이 영역에 실제 알림 행을 표시합니다.
+                    발생한 알림이 있으면 이곳에서 상세 내용을 확인할 수
+                    있습니다.
                   </p>
                 </div>
               ) : (

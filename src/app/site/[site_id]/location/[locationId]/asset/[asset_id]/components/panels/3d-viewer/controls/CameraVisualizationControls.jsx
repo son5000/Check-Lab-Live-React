@@ -2,7 +2,7 @@
 
 import { Camera } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ControlSection } from "./control-fields";
+import { ControlSection, ToggleField } from "./control-fields";
 import { CAMERA_PRESETS } from "../constants/cameraPresets";
 
 export function CameraVisualizationControls({
@@ -14,6 +14,7 @@ export function CameraVisualizationControls({
 }) {
   const selectedCameraId = config?.selectedCameraId;
   const showAll = config?.showAll !== false;
+  const showLaserBeams = config?.showLaserBeams !== false;
 
   const handleCameraChange = (cameraId) => {
     if (cameraId === "all") {
@@ -29,6 +30,13 @@ export function CameraVisualizationControls({
         selectedCameraId: cameraId,
       });
     }
+  };
+
+  const handleLaserBeamChange = (checked) => {
+    onChange({
+      ...config,
+      showLaserBeams: checked,
+    });
   };
 
   return (
@@ -55,6 +63,12 @@ export function CameraVisualizationControls({
             ))}
           </select>
         </div>
+
+        <ToggleField
+          checked={showLaserBeams}
+          label="레이저 빔 표시"
+          onChange={handleLaserBeamChange}
+        />
 
         {/* 선택된 카메라 정보 표시 */}
         {selectedCamera && !showAll && (

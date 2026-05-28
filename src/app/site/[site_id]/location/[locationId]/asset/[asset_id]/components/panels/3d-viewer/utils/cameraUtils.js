@@ -12,6 +12,9 @@ const CAMERA_MARKER_STICKY_RADIUS_PX = 76;
 const CAMERA_FOV_COLOR = 0x00bfff;
 const CAMERA_FOV_HOVER_COLOR = 0xfacc15;
 const CAMERA_FOV_SELECTED_COLOR = 0xa3e635;
+const CAMERA_LASER_COLOR = 0x67e8f9;
+const CAMERA_LASER_HOVER_COLOR = 0xfacc15;
+const CAMERA_LASER_SELECTED_COLOR = 0xa3e635;
 
 // FOV 콘 기하학 생성 - 카메라의 화각 범위를 시각화
 export const createCameraFOVCone = (camera, cameraId, isSelected = false) => {
@@ -111,11 +114,64 @@ export const createCameraMarker = (cameraId, isSelected = false) => {
   return group;
 };
 
+export const createCameraLaserBeam = (
+  camera,
+  cameraId,
+  position,
+  isSelected = false
+) => {
+  const start = new THREE.Vector3(position.x, position.y, position.z);
+  const end = new THREE.Vector3(camera.target.x, camera.target.y, camera.target.z);
+  const direction = end.clone().sub(start);
+  const length = direction.length();
+  const group = new THREE.Group();
+
+  group.name = `viewer-camera-laser-${cameraId}`;
+  group.userData.cameraId = cameraId;
+  group.userData.isCameraLaser = true;
+  group.userData.isInteractive = false;
+
+  if (!length) {
+    return group;
+  }
+
+  direction.normalize();
+  const midpoint = start.clone().add(end).multiplyScalar(0.5);
+  const quaternion = new THREE.Quaternion();
+  quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
+
+  const glow = createLaserBeamSegment({
+    cameraId,
+    length,
+    opacity: 0.12,
+    radius: 1.05,
+    role: "glow",
+  });
+  const core = createLaserBeamSegment({
+    cameraId,
+    length,
+    opacity: 0.58,
+    radius: 0.28,
+    role: "core",
+  });
+
+  [glow, core].forEach((beam) => {
+    beam.position.copy(midpoint);
+    beam.quaternion.copy(quaternion);
+    group.add(beam);
+  });
+
+  applyCameraLaserVisualState(group, isSelected, false);
+
+  return group;
+};
+
 // 카메라 FOV 가시성 업데이트
 export const updateCameraFOVVisibility = (
   scene,
   visibleCameraIds,
-  selectedCameraId
+  selectedCameraId,
+  showLaserBeams = true
 ) => {
   const cones = scene.children.filter(
     (obj) =>
@@ -129,7 +185,7 @@ export const updateCameraFOVVisibility = (
     const isVisible = visibleCameraIds.includes(cameraId);
     const isSelected = cameraId === selectedCameraId;
 
-    cone.visible = isVisible;
+    cone.visible = showLaserBeams && isVisible;
     applyCameraFOVVisualState(cone, isSelected, false);
   });
 
@@ -154,6 +210,7 @@ export const removeAllCameraVisualizations = (scene) => {
   const objectsToRemove = scene.children.filter(
     (obj) =>
       (obj.name && obj.name.startsWith("viewer-camera-fov-")) ||
+      (obj.name && obj.name.startsWith("viewer-camera-laser-")) ||
       (obj.name && obj.name.startsWith("viewer-camera-marker-"))
   );
 
@@ -296,6 +353,10 @@ export const updateCameraMarkerInteractionState = (
     if (obj.userData?.isCameraFOV) {
       applyCameraFOVVisualState(obj, isSelected, isHovered);
     }
+
+    if (obj.userData?.isCameraLaser) {
+      applyCameraLaserVisualState(obj, isSelected, isHovered);
+    }
   });
 };
 
@@ -304,7 +365,9 @@ export const updateCameraVisualizationObjects = (
   scene,
   cameras,
   selectedCameraId,
-  visibleCameraIds
+  visibleCameraIds,
+  customPositions = {},
+  showLaserBeams = true
 ) => {
   // 기존 객체 제거
   removeAllCameraVisualizations(scene);
@@ -312,32 +375,38 @@ export const updateCameraVisualizationObjects = (
   // 새로운 카메라 객체 생성 및 추가
   cameras.forEach((camera) => {
     const isSelected = camera.id === selectedCameraId;
+    const position = customPositions[camera.id] || camera.position;
+    const isVisible = visibleCameraIds.includes(camera.id);
+
+    const laserBeam = createCameraLaserBeam(camera, camera.id, position, isSelected);
+    laserBeam.visible = showLaserBeams && isVisible;
+    scene.add(laserBeam);
 
     // FOV 콘 생성
     const cone = createCameraFOVCone(camera, camera.id, isSelected);
     cone.position.copy(
-      new THREE.Vector3(camera.position.x, camera.position.y, camera.position.z)
+      new THREE.Vector3(position.x, position.y, position.z)
     );
 
     // 콘이 카메라를 향하도록 회전
     const direction = new THREE.Vector3(
-      camera.target.x - camera.position.x,
-      camera.target.y - camera.position.y,
-      camera.target.z - camera.position.z
+      camera.target.x - position.x,
+      camera.target.y - position.y,
+      camera.target.z - position.z
     ).normalize();
     const quaternion = new THREE.Quaternion();
     quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), direction);
     cone.quaternion.copy(quaternion);
 
-    cone.visible = visibleCameraIds.includes(camera.id);
+    cone.visible = showLaserBeams && isVisible;
     scene.add(cone);
 
     // 마커 생성 및 추가
     const marker = createCameraMarker(camera.id, isSelected);
     marker.position.copy(
-      new THREE.Vector3(camera.position.x, camera.position.y, camera.position.z)
+      new THREE.Vector3(position.x, position.y, position.z)
     );
-    marker.visible = visibleCameraIds.includes(camera.id);
+    marker.visible = isVisible;
     scene.add(marker);
   });
 };
@@ -397,6 +466,51 @@ function applyCameraFOVVisualState(cone, isSelected, isHovered) {
   cone.material.emissive.setHex(color);
   cone.material.emissiveIntensity = isHovered ? 1.15 : isSelected ? 1 : 0.5;
   cone.material.needsUpdate = true;
+}
+
+function createLaserBeamSegment({ cameraId, length, opacity, radius, role }) {
+  const geometry = new THREE.CylinderGeometry(radius, radius, length, 16, 1, true);
+  const material = new THREE.MeshBasicMaterial({
+    blending: THREE.AdditiveBlending,
+    color: CAMERA_LASER_COLOR,
+    depthWrite: false,
+    opacity,
+    transparent: true,
+  });
+  const beam = new THREE.Mesh(geometry, material);
+
+  beam.name = `viewer-camera-laser-${role}-${cameraId}`;
+  beam.userData.cameraId = cameraId;
+  beam.userData.isCameraLaserVisual = true;
+  beam.userData.isInteractive = false;
+  beam.userData.laserRole = role;
+  beam.raycast = () => {};
+  beam.renderOrder = role === "core" ? 6 : 5;
+
+  return beam;
+}
+
+function applyCameraLaserVisualState(laser, isSelected, isHovered) {
+  const color = isHovered
+    ? CAMERA_LASER_HOVER_COLOR
+    : isSelected
+    ? CAMERA_LASER_SELECTED_COLOR
+    : CAMERA_LASER_COLOR;
+  const coreOpacity = isHovered ? 0.92 : isSelected ? 0.84 : 0.58;
+  const glowOpacity = isHovered ? 0.26 : isSelected ? 0.22 : 0.12;
+  const widthScale = isHovered ? 1.28 : isSelected ? 1.16 : 1;
+
+  laser.children?.forEach((beam) => {
+    if (!beam.userData?.isCameraLaserVisual || !beam.material) {
+      return;
+    }
+
+    beam.material.color.setHex(color);
+    beam.material.opacity =
+      beam.userData.laserRole === "core" ? coreOpacity : glowOpacity;
+    beam.material.needsUpdate = true;
+    beam.scale.set(widthScale, 1, widthScale);
+  });
 }
 
 function createCameraNumberLabel(cameraId) {

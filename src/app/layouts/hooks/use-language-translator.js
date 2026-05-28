@@ -122,17 +122,10 @@ function translateTree(root, language) {
 function translateTextNode(node, language) {
   const currentText = node.nodeValue ?? "";
   const previousOriginalText = textNodeOriginals.get(node);
-  const previousTranslatedText = previousOriginalText
-    ? translateText(previousOriginalText, "en")
-    : undefined;
-
-  const nextOriginalText =
-    !previousOriginalText ||
-    (language === "en" &&
-      /[가-힣]/.test(currentText) &&
-      currentText !== previousTranslatedText)
-      ? currentText
-      : previousOriginalText;
+  const nextOriginalText = resolveOriginalValue(
+    currentText,
+    previousOriginalText,
+  );
 
   textNodeOriginals.set(node, nextOriginalText);
 
@@ -158,19 +151,14 @@ function translateElementAttributes(element, language) {
     const originalAttributeName = getOriginalAttributeName(attributeName);
     const currentValue = element.getAttribute(attributeName) ?? "";
     const storedOriginalValue = element.getAttribute(originalAttributeName);
-    const storedTranslatedValue = storedOriginalValue
-      ? translateText(storedOriginalValue, "en")
-      : undefined;
+    const nextOriginalValue = resolveOriginalValue(
+      currentValue,
+      storedOriginalValue,
+    );
 
-    const nextOriginalValue =
-      !storedOriginalValue ||
-      (language === "en" &&
-        /[가-힣]/.test(currentValue) &&
-        currentValue !== storedTranslatedValue)
-        ? currentValue
-        : storedOriginalValue;
-
-    element.setAttribute(originalAttributeName, nextOriginalValue);
+    if (storedOriginalValue !== nextOriginalValue) {
+      element.setAttribute(originalAttributeName, nextOriginalValue);
+    }
 
     const nextValue = language === "en"
       ? translateText(nextOriginalValue, language)
@@ -180,6 +168,19 @@ function translateElementAttributes(element, language) {
       element.setAttribute(attributeName, nextValue);
     }
   });
+}
+
+function resolveOriginalValue(currentValue, previousOriginalValue) {
+  if (!previousOriginalValue) {
+    return currentValue;
+  }
+
+  const previousTranslatedValue = translateText(previousOriginalValue, "en");
+  const isKnownTranslatorValue =
+    currentValue === previousOriginalValue ||
+    currentValue === previousTranslatedValue;
+
+  return isKnownTranslatorValue ? previousOriginalValue : currentValue;
 }
 
 function getOriginalAttributeName(attributeName) {

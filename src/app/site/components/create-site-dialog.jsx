@@ -262,7 +262,7 @@ function SiteCreateStep({ site, onSiteChange }) {
         onChange={(value) =>
           onSiteChange((current) => ({ ...current, name: value }))
         }
-        placeholder="압축 공정"
+        placeholder="공정명을 입력하세요"
         value={site.name}
       />
       <TextAreaField
@@ -270,7 +270,7 @@ function SiteCreateStep({ site, onSiteChange }) {
         onChange={(value) =>
           onSiteChange((current) => ({ ...current, description: value }))
         }
-        placeholder="공정 설명"
+        placeholder="공정 설명을 입력하세요"
         value={site.description}
       />
       <ImageUploadField
@@ -307,7 +307,7 @@ function LocationCreateStep({
           onChange={(value) =>
             onLocationChange((current) => ({ ...current, name: value }))
           }
-          placeholder="1층 기계실"
+          placeholder="위치명을 입력하세요"
           value={location.name}
         />
         <TextField
@@ -315,7 +315,7 @@ function LocationCreateStep({
           onChange={(value) =>
             onLocationChange((current) => ({ ...current, floor: value }))
           }
-          placeholder="1F"
+          placeholder="층/구역을 입력하세요"
           value={location.floor}
         />
       </div>
@@ -324,11 +324,11 @@ function LocationCreateStep({
         onChange={(value) =>
           onLocationChange((current) => ({ ...current, summary: value }))
         }
-        placeholder="위치 설명"
+        placeholder="위치 설명을 입력하세요"
         value={location.summary}
       />
       <ImageUploadField
-        label="위치 이미지"
+        label="대표 이미지"
         onChange={(value) =>
           onLocationChange((current) => ({ ...current, imageUrl: value }))
         }

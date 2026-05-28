@@ -14,7 +14,7 @@ export const CAMERA_PRESETS = [
   {
     id: "1",
     name: "정면 (Front)",
-    position: normalizeVector(0, 0, 1),
+    position: { x: 4, y: 22, z: 56 },
     target: { x: 0, y: 0, z: 0 },
     fov: 60,
     sampleImagePath: "/cam/cam_sample_1.PNG",

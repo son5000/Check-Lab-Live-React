@@ -22,7 +22,7 @@ export const DEFAULT_VIEWER_3D_CONFIG = {
         gridSize: 180,
         groundColor: "#0f172a",
         showAxes: true,
-        showGrid: true,
+        showGrid: false,
         showGround: false,
     },
     camera: {
@@ -37,6 +37,7 @@ export const DEFAULT_VIEWER_3D_CONFIG = {
     cameraVisualization: {
         enabled: true,
         selectedCameraId: null,
+        showLaserBeams: true,
         showAll: true,
     },
     controls: {
@@ -77,7 +78,7 @@ export const DEFAULT_VIEWER_3D_CONFIG = {
         opacity: 1,
         receiveShadow: false,
         roughness: 0.72,
-        rotation: { x: -64, y: 38, z: -135 },
+        rotation: { x: -92, y: 237, z: 11 },
         scale: 1,
         textureBlend: 1,
         wireframe: false,

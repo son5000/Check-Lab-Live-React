@@ -33,6 +33,23 @@ const PRESENTATION_INTEREST_AREA_IMAGES = [
 const CAMERA_ASSET_PART_PREVIEW_SIZE = 480;
 const CAMERA_AREA_PREVIEW_MARGIN_RATIO = 0.12;
 const CAMERA_POINT_PREVIEW_RADIUS_PERCENT = 15;
+function getViewer3DOverviewConfig(config) {
+    return {
+        ...config,
+        autoRotate: DEFAULT_VIEWER_3D_CONFIG.autoRotate,
+        camera: {
+            ...DEFAULT_VIEWER_3D_CONFIG.camera,
+            position: { ...DEFAULT_VIEWER_3D_CONFIG.camera.position },
+            target: { ...DEFAULT_VIEWER_3D_CONFIG.camera.target },
+        },
+        cameraVisualization: {
+            ...config.cameraVisualization,
+            enabled: config.cameraVisualization?.enabled ?? true,
+            selectedCameraId: null,
+            showAll: true,
+        },
+    };
+}
 const defaultCameraFeeds = PRESENTATION_CAMERA_IMAGE_URLS.map((presentationImageUrl, index) => ({
     id: `cam-${index + 1}`,
     label: `CAM ${index + 1}`,
@@ -58,7 +75,7 @@ const defaultPresentationInterestAreas = [
         presentationOnly: true,
     },
 ];
-export function AssetCameraPanel({ activeCameraId, cameraFeeds = defaultCameraFeeds, defaultAssetThresholds, assetParts, assetPartStates = [], assetThresholds, selectedAssetPartId, cameraSetupRequestId = 0, onCameraSelect, onCreateAssetPart, onDeleteAssetPart, onSelectAssetPart, onUpdateAssetPart, initialViewMode = "camera", onViewer3DConfigChange, onViewer3DModelFileChange, temperatureData = [], ultrasonicData = [], viewer3DConfig, viewer3DModelFile, }) {
+export function AssetCameraPanel({ activeCameraId, cameraFeeds = defaultCameraFeeds, defaultAssetThresholds, assetParts, assetPartStates = [], assetThresholds, selectedAssetPartId, cameraSetupRequestId = 0, onCreateAssetPart, onDeleteAssetPart, onSelectAssetPart, onUpdateAssetPart, onViewer3DConfigChange, onViewer3DModelFileChange, temperatureData = [], ultrasonicData = [], viewer3DConfig, viewer3DModelFile, }) {
     const { settings: displaySettings } = useDisplaySettings();
     const availableCameraFeeds = useMemo(() => buildPresentationCameraFeeds(cameraFeeds), [cameraFeeds]);
     const selectedCamera = useMemo(() => availableCameraFeeds.find((camera) => camera.id === activeCameraId) ??
@@ -77,7 +94,8 @@ export function AssetCameraPanel({ activeCameraId, cameraFeeds = defaultCameraFe
     const previousCameraSetupRequestIdRef = useRef(cameraSetupRequestId);
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
     const [canRenderPreviewPortal, setCanRenderPreviewPortal] = useState(false);
-    const [viewMode, setViewMode] = useState(initialViewMode);
+    const viewMode = "3d";
+    const [viewer3DWorldRenderKey, setViewer3DWorldRenderKey] = useState(0);
     const [currentViewer3DConfig, setCurrentViewer3DConfig] = useState(viewer3DConfig ?? DEFAULT_VIEWER_3D_CONFIG);
     const [currentViewer3DModelFile, setCurrentViewer3DModelFile] = useState(viewer3DModelFile ?? null);
     const [viewer3DAnalysisMode, setViewer3DAnalysisMode] = useState();
@@ -165,7 +183,7 @@ export function AssetCameraPanel({ activeCameraId, cameraFeeds = defaultCameraFe
         }
         const handleKeyDown = (event) => {
             if (event.key === "Escape") {
-                setIsPreviewOpen(false);
+                handlePreviewClose();
             }
         };
         window.addEventListener("keydown", handleKeyDown);
@@ -182,7 +200,6 @@ export function AssetCameraPanel({ activeCameraId, cameraFeeds = defaultCameraFe
         dragInteractionRef.current = undefined;
         setDragInteraction(undefined);
         setViewer3DAnalysisMode(undefined);
-        setViewMode("camera");
         setIsPreviewOpen(true);
         setCameraSetupMode("area");
         setSelectionMode("area");
@@ -351,6 +368,15 @@ export function AssetCameraPanel({ activeCameraId, cameraFeeds = defaultCameraFe
         setCurrentViewer3DConfig(nextConfig);
         onViewer3DConfigChange?.(nextConfig);
     };
+    function handlePreviewClose() {
+        if (viewMode === "3d") {
+            handleViewer3DConfigChange(getViewer3DOverviewConfig(currentViewer3DConfig));
+        }
+        setIsPreviewOpen(false);
+    }
+    const handleViewer3DWorldReset = () => {
+        setViewer3DWorldRenderKey((currentKey) => currentKey + 1);
+    };
     const handleViewer3DModelFileChange = (nextModelFile) => {
         setCurrentViewer3DModelFile(nextModelFile);
         onViewer3DModelFileChange?.(nextModelFile);
@@ -485,24 +511,27 @@ export function AssetCameraPanel({ activeCameraId, cameraFeeds = defaultCameraFe
         onSelectAssetPart(partId);
     };
     return (<section className="AssetCameraPanel AssetCameraPanel__section-1 flex min-h-0 min-w-0 flex-col overflow-hidden rounded-md border border-border bg-card p-1 text-card-foreground">
-      <div className="AssetCameraPanel AssetCameraPanel__container-1 mb-1 flex min-w-0 items-center justify-between gap-2">
-        <div className="AssetCameraPanel AssetCameraPanel__container-2 flex min-w-0 items-center gap-1.5 ml-3">
-          <div className="AssetCameraPanel AssetCameraPanel__view-toggle-1 flex items-center gap-1 rounded-md border border-border bg-background p-0.5" role="group" aria-label="패널 보기">
-            <PanelModeButton active={viewMode === "camera"} icon={Camera} label="카메라" onClick={() => setViewMode("camera")}/>
-            <PanelModeButton active={viewMode === "3d"} icon={Box} label="3D" onClick={() => setViewMode("3d")}/>
+      <div className="AssetCameraPanel AssetCameraPanel__container-1 mb-1 flex min-w-0 items-center justify-between gap-2 rounded-md border border-border bg-background px-2 py-1.5">
+        <div className="AssetCameraPanel AssetCameraPanel__container-2 flex min-w-0 items-center gap-2">
+          <span className="AssetCameraPanel AssetCameraPanel__viewer-icon-1 grid h-7 w-7 shrink-0 place-items-center rounded-sm border border-cyan-200/30 bg-cyan-300/10 text-cyan-500">
+            <Box className="AssetCameraPanel AssetCameraPanel__icon-1 h-3.5 w-3.5" aria-hidden="true"/>
+          </span>
+          <div className="AssetCameraPanel AssetCameraPanel__viewer-title-wrap-1 min-w-0">
+            <p className="AssetCameraPanel AssetCameraPanel__viewer-title-1 truncate text-xs font-semibold text-foreground">
+              3D 월드 뷰어
+            </p>
+            <p className="AssetCameraPanel AssetCameraPanel__viewer-subtitle-1 truncate text-[10px] font-semibold text-muted-foreground">
+              {readyViewer3DModelFile ? "PLY 모델 연결됨" : "PLY 모델 업로드 필요"}
+            </p>
           </div>
         </div>
-        <div className="AssetCameraPanel AssetCameraPanel__container-4 mb-1 flex justify-end mr-1">
-          {viewMode === "camera" ? (<label className="AssetCameraPanel AssetCameraPanel__field-1 flex min-w-[8.5rem] items-center gap-1 rounded-md border border-border bg-background px-2 text-[11px] font-semibold text-muted-foreground">
-              <span className="AssetCameraPanel AssetCameraPanel__label-2 shrink-0">
-                카메라
-              </span>
-              <select className="AssetCameraPanel AssetCameraPanel__select-1 h-7 min-w-0 flex-1 bg-transparent text-xs font-semibold text-foreground outline-none" value={selectedCamera.id} onChange={(event) => onCameraSelect(event.target.value)}>
-                {availableCameraFeeds.map((camera) => (<option key={camera.id} value={camera.id}>
-                    {camera.label}
-                  </option>))}
-              </select>
-            </label>) : null}
+        <div className="AssetCameraPanel AssetCameraPanel__viewer-actions-1 flex shrink-0 items-center gap-1">
+          <button type="button" className="AssetCameraPanel AssetCameraPanel__world-reset-1 grid h-7 w-7 place-items-center rounded-md border border-border bg-card text-muted-foreground transition hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-45" disabled={!readyViewer3DModelFile} onClick={handleViewer3DWorldReset} title="월드만 초기화" aria-label="월드만 초기화">
+            <RotateCcw className="AssetCameraPanel AssetCameraPanel__icon-5 h-3.5 w-3.5" aria-hidden="true"/>
+          </button>
+          <span className="AssetCameraPanel AssetCameraPanel__viewer-badge-1 shrink-0 rounded-sm border border-border bg-card px-2 py-1 text-[10px] font-semibold text-muted-foreground">
+            3D 고정
+          </span>
         </div>
       </div>
       <div className="AssetCameraPanel AssetCameraPanel__container-5 grid min-h-0 flex-1 place-items-center overflow-hidden rounded-md border border-border bg-neutral-950/85 p-1 [container-type:size]">
@@ -511,7 +540,7 @@ export function AssetCameraPanel({ activeCameraId, cameraFeeds = defaultCameraFe
             "cursor-crosshair border-primary/70", viewMode === "camera" && isDraggingRoi && "cursor-move")} onPointerDown={viewMode === "camera" ? handlePointerDown : undefined} onPointerMove={viewMode === "camera" ? handlePointerMove : undefined} onPointerCancel={viewMode === "camera" ? handlePointerCancel : undefined} onPointerUp={viewMode === "camera" ? handlePointerUp : undefined}>
           {viewMode === "3d" ? (<>
               {readyViewer3DModelFile ? (<>
-                  <Three3DViewer allowOptionBar={false} config={currentViewer3DConfig} modelFile={readyViewer3DModelFile} onConfigChange={handleViewer3DConfigChange} onModelFileChange={handleViewer3DModelFileChange}/>
+                  <Three3DViewer key={`dashboard-${viewer3DWorldRenderKey}`} allowOptionBar={false} config={currentViewer3DConfig} modelFile={readyViewer3DModelFile} showCameraOverlays={false} onConfigChange={handleViewer3DConfigChange} onModelFileChange={handleViewer3DModelFileChange}/>
                   <button type="button" className="AssetCameraPanel AssetCameraPanel__button-1 absolute right-2 top-12 z-20 grid h-8 w-8 place-items-center rounded-md border border-white/20 bg-black/45 text-white/80 backdrop-blur transition hover:bg-white/15 hover:text-white" onClick={(event) => {
                     event.stopPropagation();
                     setIsPreviewOpen(true);
@@ -529,7 +558,7 @@ export function AssetCameraPanel({ activeCameraId, cameraFeeds = defaultCameraFe
       </div>
 
       {isPreviewOpen && canRenderPreviewPortal
-            ? createPortal(<div className="AssetCameraPanel AssetCameraPanel__container-15 fixed inset-0 z-[100] grid place-items-center bg-black/70 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={viewMode === "3d" ? "3D 크게 보기" : "캠 크게 보기"} onClick={() => setIsPreviewOpen(false)}>
+            ? createPortal(<div className="AssetCameraPanel AssetCameraPanel__container-15 fixed inset-0 z-[100] grid place-items-center bg-black/70 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={viewMode === "3d" ? "3D 크게 보기" : "캠 크게 보기"} onClick={handlePreviewClose}>
               <div className="AssetCameraPanel AssetCameraPanel__container-16 flex h-[min(92dvh,56rem)] max-h-[calc(100dvh-2rem)] w-[min(98dvw,104rem)] max-w-[calc(100dvw-2rem)] min-w-0 flex-col overflow-hidden rounded-md border border-white/15 bg-neutral-950 text-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
                 <div className="AssetCameraPanel AssetCameraPanel__container-17 flex h-10 shrink-0 items-center justify-between gap-2 border-b border-white/15 px-3">
                   <div className="AssetCameraPanel AssetCameraPanel__container-18 flex min-w-0 items-center gap-2">
@@ -540,13 +569,13 @@ export function AssetCameraPanel({ activeCameraId, cameraFeeds = defaultCameraFe
                     : `${selectedCamera.label} · ${selectedCamera.name}`}
                     </p>
                   </div>
-                  <button type="button" className="AssetCameraPanel AssetCameraPanel__button-2 grid h-7 w-7 place-items-center rounded-md border border-white/15 bg-white/10 text-white/80 transition hover:bg-white/15 hover:text-white" onClick={() => setIsPreviewOpen(false)} title="닫기">
+                  <button type="button" className="AssetCameraPanel AssetCameraPanel__button-2 grid h-7 w-7 place-items-center rounded-md border border-white/15 bg-white/10 text-white/80 transition hover:bg-white/15 hover:text-white" onClick={handlePreviewClose} title="닫기">
                     <X className="AssetCameraPanel AssetCameraPanel__icon-4 h-3.5 w-3.5" aria-hidden="true"/>
                   </button>
                 </div>
                 {viewMode === "3d" ? (<div className="AssetCameraPanel AssetCameraPanel__container-19 grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_16rem] gap-3 overflow-hidden p-3 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)] lg:grid-rows-[minmax(0,1fr)]">
                     <div className="AssetCameraPanel AssetCameraPanel__viewer-wrap-1 h-full min-h-0 min-w-0">
-                      {readyViewer3DModelFile ? (<Three3DViewer activeAnalysisMode={viewer3DAnalysisMode} allowOptionBar={false} analysisSummary={selectedViewer3DAnalysisItem?.summary} analysisTargets={viewer3DAnalysisTargets} className="AssetCameraPanel AssetCameraPanel__viewer-1 h-full" config={currentViewer3DConfig} modelFile={readyViewer3DModelFile} selectedAnalysisTargetId={selectedViewer3DAnalysisTargetId} onAnalysisModeChange={handleViewer3DAnalysisModeChange} onAnalysisTargetCreate={handleViewer3DAnalysisTargetCreate} onAnalysisTargetSelect={handleViewer3DAnalysisTargetSelect} onConfigChange={handleViewer3DConfigChange} onModelFileChange={handleViewer3DModelFileChange}/>) : (<Viewer3DModelUploadPanel modelFile={currentViewer3DModelFile} onPlyFileChange={handleViewer3DPlyFileChange} onTextureFileChange={handleViewer3DTextureFileChange} onUseSample={handleUseSampleViewer3DModel}/>)}
+                      {readyViewer3DModelFile ? (<Three3DViewer key={`preview-${viewer3DWorldRenderKey}`} activeAnalysisMode={viewer3DAnalysisMode} allowOptionBar={false} analysisSummary={selectedViewer3DAnalysisItem?.summary} analysisTargets={viewer3DAnalysisTargets} className="AssetCameraPanel AssetCameraPanel__viewer-1 h-full" config={currentViewer3DConfig} modelFile={readyViewer3DModelFile} selectedAnalysisTargetId={selectedViewer3DAnalysisTargetId} onAnalysisModeChange={handleViewer3DAnalysisModeChange} onAnalysisTargetCreate={handleViewer3DAnalysisTargetCreate} onAnalysisTargetSelect={handleViewer3DAnalysisTargetSelect} onConfigChange={handleViewer3DConfigChange} onModelFileChange={handleViewer3DModelFileChange}/>) : (<Viewer3DModelUploadPanel modelFile={currentViewer3DModelFile} onPlyFileChange={handleViewer3DPlyFileChange} onTextureFileChange={handleViewer3DTextureFileChange} onUseSample={handleUseSampleViewer3DModel}/>)}
                     </div>
 
                     <Viewer3DAnalysisPanel activeMode={viewer3DAnalysisMode} config={currentViewer3DConfig} displaySettings={displaySettings} items={viewer3DAnalysisItems} modelFile={currentViewer3DModelFile ?? createViewer3DModelDraft()} selectedItem={selectedViewer3DAnalysisItem} selectedTargetId={selectedViewer3DAnalysisTargetId} onConfigChange={handleViewer3DConfigChange} onDelete={handleViewer3DAnalysisTargetDelete} onModelFileChange={handleViewer3DModelFileChange} onSelect={handleViewer3DAnalysisTargetSelect} onUpdate={handleViewer3DAnalysisTargetUpdate}/>
@@ -621,21 +650,7 @@ function Viewer3DAnalysisPanel({ activeMode, config, displaySettings, items, mod
         ? getCameraPreset(config.cameraVisualization.selectedCameraId)
         : undefined;
     const handleResetCameraView = () => {
-        onConfigChange({
-            ...config,
-            autoRotate: DEFAULT_VIEWER_3D_CONFIG.autoRotate,
-            camera: {
-                ...DEFAULT_VIEWER_3D_CONFIG.camera,
-                position: { ...DEFAULT_VIEWER_3D_CONFIG.camera.position },
-                target: { ...DEFAULT_VIEWER_3D_CONFIG.camera.target },
-            },
-            cameraVisualization: {
-                ...config.cameraVisualization,
-                enabled: config.cameraVisualization?.enabled ?? true,
-                selectedCameraId: null,
-                showAll: true,
-            },
-        });
+        onConfigChange(getViewer3DOverviewConfig(config));
     };
     return (<aside className="Viewer3DAnalysisPanel Viewer3DAnalysisPanel__aside-1 flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-md border border-border bg-card p-2 text-card-foreground">
       <div className="Viewer3DAnalysisPanel Viewer3DAnalysisPanel__tabs-1 mb-2 grid shrink-0 grid-cols-2 gap-1 rounded-md border border-border bg-background p-1" role="tablist" aria-label="3D 패널">
@@ -1063,14 +1078,6 @@ function formatViewer3DVector(vector) {
 }
 function formatCreatedTime(value, displaySettings) {
     return formatCheckLabKoreanTime(value, displaySettings, { includeSeconds: false }) ?? "-";
-}
-function PanelModeButton({ active, icon: Icon, label, onClick, }) {
-    return (<button type="button" className={cn("PanelModeButton PanelModeButton__button-1 inline-flex h-7 min-w-[2.25rem] items-center justify-center gap-1 rounded-sm px-2 text-[11px] font-semibold text-muted-foreground transition hover:bg-accent hover:text-foreground", active && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground")} onClick={onClick} title={label}>
-      <Icon className="PanelModeButton PanelModeButton__icon-1 h-3.5 w-3.5" aria-hidden="true"/>
-      <span className="PanelModeButton PanelModeButton__label-1 hidden sm:inline">
-        {label}
-      </span>
-    </button>);
 }
 function ModeButton({ active, icon: Icon, label, onClick, }) {
     return (<button type="button" className={cn("ModeButton ModeButton__button-1 inline-flex h-8 min-w-0 items-center justify-center gap-1 rounded-md border px-2 text-[11px] font-semibold", active

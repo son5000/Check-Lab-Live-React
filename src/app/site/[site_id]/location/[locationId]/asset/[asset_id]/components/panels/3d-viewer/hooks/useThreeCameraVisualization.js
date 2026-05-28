@@ -31,6 +31,7 @@ export function useThreeCameraVisualization(sceneRef, config) {
 
     // 표시할 카메라 ID 목록 결정
     const showAll = config?.showAll !== false || !selectedCameraId;
+    const showLaserBeams = config?.showLaserBeams !== false;
     const visibleCameraIds = showAll
       ? CAMERA_PRESETS.map((cam) => cam.id)
       : selectedCameraId
@@ -42,7 +43,9 @@ export function useThreeCameraVisualization(sceneRef, config) {
       scene,
       CAMERA_PRESETS,
       selectedCameraId,
-      visibleCameraIds
+      visibleCameraIds,
+      config?.customPositions,
+      showLaserBeams
     );
 
     // 참조 저장
@@ -56,7 +59,7 @@ export function useThreeCameraVisualization(sceneRef, config) {
       selectedCameraId,
       hoveredCameraIdRef.current
     );
-  }, [sceneRef, config?.selectedCameraId, config?.showAll, config?.enabled]);
+  }, [sceneRef, config?.selectedCameraId, config?.showAll, config?.enabled, config?.customPositions, config?.showLaserBeams]);
 
   const setHoveredCameraId = useCallback((cameraId) => {
     if (hoveredCameraIdRef.current === cameraId) {

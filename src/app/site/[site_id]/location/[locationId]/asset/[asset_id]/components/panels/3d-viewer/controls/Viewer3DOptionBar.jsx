@@ -6,6 +6,7 @@ import { ControlSection, RangeField, } from "./control-fields";
 import { LightingControls } from "./LightingControls";
 import { ModelControls } from "./ModelControls";
 import { ModelFileControls } from "./ModelFileControls";
+import { CameraPositionControls } from "./CameraPositionControls";
 const TEXT = {
     animation: "\uC560\uB2C8\uBA54\uC774\uC158",
     rotationSpeed: "\uD68C\uC804 \uC18D\uB3C4",
@@ -22,6 +23,8 @@ export function Viewer3DOptionBar({ className, config, modelFile, onConfigChange
             controls: { ...controls, autoRotateSpeed },
         })} step={0.1} value={controls.autoRotateSpeed ?? 0.7}/>
         </ControlSection>
+
+        <CameraPositionControls config={config.cameraVisualization} onChange={(cameraVisualization) => onConfigChange({ ...config, cameraVisualization })}/>
 
         <ModelControls config={config.model} onChange={(model) => onConfigChange({ ...config, model })}/>
         <LightingControls config={config.lighting} onChange={(lighting) => onConfigChange({ ...config, lighting })}/>

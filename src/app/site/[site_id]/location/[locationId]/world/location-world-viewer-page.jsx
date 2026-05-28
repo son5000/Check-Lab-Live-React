@@ -21,6 +21,16 @@ import * as THREE from "three";
 import { cn } from "@/lib/utils";
 import { ModelLoader } from "@/app/site/[site_id]/location/[locationId]/asset/[asset_id]/components/panels/3d-viewer/modules/ModelLoader";
 import { disposeObject3D } from "@/app/site/[site_id]/location/[locationId]/asset/[asset_id]/components/panels/3d-viewer/utils/threeDisposal";
+const WORLD_SIZE = { depth: 48, width: 72 };
+const WORLD_ASSET_BASE_Y = 0.08;
+const WORLD_GROUND_Y = -0.02;
+const WORLD_GROUND_MODEL_FILE = createWorldSampleModelFile({
+  id: "bg-sample-ground",
+  label: "Background Sample Ground",
+  normalizeSize: WORLD_SIZE.width,
+  plyUrl: "/3d/bg_sample.ply",
+  textureUrl: "/3d/bg_sample.png",
+});
 const WORLD_SAMPLE_MODEL_FILES = [
   createWorldSampleModelFile({
     id: "equipment-sample",
@@ -200,7 +210,6 @@ function buildRegisteredAssetSamples(sampleAssets, fallbackAssets) {
       }))
     : fallbackAssets;
 }
-const WORLD_SIZE = { depth: 48, width: 72 };
 const EYE_HEIGHT = 3.4;
 const DEFAULT_ASSET_ROTATION = {
   pitch: -64,
@@ -675,6 +684,7 @@ function LocationWorldScene({
       "LocationWorldViewerPage LocationWorldViewerPage__canvas-1 h-full w-full";
     container.appendChild(renderer.domElement);
     sceneRef.current = scene;
+    const modelLoader = new ModelLoader();
     createWorldEnvironment(scene, worldSettingsRef.current);
     scene.add(placementPreview);
     applyCameraState(camera, cameraStateRef.current);
@@ -774,7 +784,7 @@ function LocationWorldScene({
           -WORLD_SIZE.width / 2 + 3,
           WORLD_SIZE.width / 2 - 3,
         ),
-        0.08,
+        WORLD_ASSET_BASE_Y,
         clampNumber(
           floorHit.z,
           -WORLD_SIZE.depth / 2 + 3,
@@ -788,8 +798,25 @@ function LocationWorldScene({
     window.addEventListener("location-world-move", handleMoveEvent);
     renderer.domElement.addEventListener("pointerdown", handlePointerDown);
     renderer.domElement.addEventListener("pointermove", handlePointerMove);
-    const modelLoader = new ModelLoader();
-    Promise.all(
+    let assetModelLoadFailed = false;
+    const worldGroundPromise = loadWorldGroundModel(
+      modelLoader,
+      scene,
+      worldSettingsRef.current,
+    )
+      .then((groundModel) => {
+        if (isDisposed) {
+          disposeObject3D(groundModel);
+          return;
+        }
+        attachWorldGroundModel(scene, groundModel, worldSettingsRef.current);
+      })
+      .catch(() => {
+        if (!isDisposed) {
+          showFallbackWorldFloor(scene);
+        }
+      });
+    const assetModelPromise = Promise.all(
       getWorldAssetModelFiles(assetsRef.current).map(async (modelFile) => [
         getModelFileKey(modelFile),
         await modelLoader.loadModel(modelFile),
@@ -809,11 +836,16 @@ function LocationWorldScene({
           scene,
           selectedAssetId: selectedAssetIdRef.current,
         });
-        setLoadMessage(undefined);
       })
       .catch(() => {
+        assetModelLoadFailed = true;
         setLoadMessage("샘플 3D 모델을 불러오지 못했습니다.");
       });
+    Promise.all([worldGroundPromise, assetModelPromise]).then(() => {
+      if (!isDisposed && !assetModelLoadFailed) {
+        setLoadMessage(undefined);
+      }
+    });
     const animate = (timestamp) => {
       const deltaSeconds = Math.min(
         (timestamp - previousTimestamp) / 1000,
@@ -1562,37 +1594,24 @@ function createWorldEnvironment(scene, settings) {
     color: settings.floorColor,
     metalness: 0.04,
     roughness: 0.88,
+    transparent: true,
+    opacity: 0.92,
   });
   const floor = new THREE.Mesh(
     new THREE.PlaneGeometry(WORLD_SIZE.width, WORLD_SIZE.depth),
     floorMaterial,
   );
-  floor.name = "world-floor";
+  floor.name = "world-fallback-floor";
   floor.rotation.x = -Math.PI / 2;
+  floor.position.y = WORLD_GROUND_Y;
   floor.receiveShadow = true;
+  floor.visible = false;
   scene.add(floor);
   const grid = new THREE.GridHelper(WORLD_SIZE.width, 36, "#38bdf8", "#334155");
   grid.name = "world-grid";
+  grid.position.y = WORLD_ASSET_BASE_Y * 0.5;
   setGridMaterialOpacity(grid, settings.gridOpacity);
   scene.add(grid);
-  addWall(
-    scene,
-    { x: 0, y: 5, z: -WORLD_SIZE.depth / 2 },
-    { x: WORLD_SIZE.width, y: 10, z: 0.4 },
-  );
-  addWall(
-    scene,
-    { x: -WORLD_SIZE.width / 2, y: 5, z: 0 },
-    { x: 0.4, y: 10, z: WORLD_SIZE.depth },
-  );
-  addWall(
-    scene,
-    { x: WORLD_SIZE.width / 2, y: 5, z: 0 },
-    { x: 0.4, y: 10, z: WORLD_SIZE.depth },
-  );
-  addFloorMarkings(scene);
-  addColumns(scene);
-  addPipes(scene);
   const ambient = new THREE.AmbientLight("#ffffff", 1.15 * settings.lightLevel);
   scene.add(ambient);
   const hemisphere = new THREE.HemisphereLight(
@@ -1647,88 +1666,84 @@ function createWorldEnvironment(scene, settings) {
     ambient,
     floor,
     grid,
+    groundModel: null,
     hemisphere,
     keyLight,
     fixtures,
     lamps,
   };
 }
-function addWall(scene, position, scale) {
-  const wall = new THREE.Mesh(
-    new THREE.BoxGeometry(scale.x, scale.y, scale.z),
-    new THREE.MeshStandardMaterial({
-      color: "#111827",
+async function loadWorldGroundModel(modelLoader) {
+  return modelLoader.loadModel(WORLD_GROUND_MODEL_FILE);
+}
+function attachWorldGroundModel(scene, groundModel, settings) {
+  prepareWorldGroundModel(groundModel, settings);
+  scene.add(groundModel);
+  const environment = scene.userData.worldEnvironment;
+  if (!environment) {
+    return;
+  }
+  environment.groundModel = groundModel;
+  environment.floor.visible = false;
+}
+function prepareWorldGroundModel(groundModel, settings) {
+  groundModel.name = "world-bg-sample-ground";
+  groundModel.userData.isWorldGround = true;
+  groundModel.traverse((object) => {
+    if (!(object instanceof THREE.Mesh)) {
+      return;
+    }
+    object.castShadow = false;
+    object.receiveShadow = true;
+    object.renderOrder = -1;
+    setMaterialColor(object.material, settings.floorColor);
+    setMaterialSurface(object.material, {
       metalness: 0.02,
-      roughness: 0.72,
-    }),
-  );
-  wall.position.set(position.x, position.y, position.z);
-  wall.receiveShadow = true;
-  scene.add(wall);
-}
-function addFloorMarkings(scene) {
-  const stripeMaterial = new THREE.MeshStandardMaterial({
-    color: "#facc15",
-    emissive: "#713f12",
-    emissiveIntensity: 0.18,
-    roughness: 0.7,
-  });
-  [-12, 12].forEach((x) => {
-    const stripe = new THREE.Mesh(
-      new THREE.BoxGeometry(0.25, 0.03, WORLD_SIZE.depth - 8),
-      stripeMaterial,
-    );
-    stripe.position.set(x, 0.025, 0);
-    scene.add(stripe);
-  });
-  [-18, 0, 18].forEach((x) => {
-    const cross = new THREE.Mesh(
-      new THREE.BoxGeometry(7, 0.035, 0.18),
-      stripeMaterial,
-    );
-    cross.position.set(x, 0.035, 18);
-    scene.add(cross);
-  });
-}
-function addColumns(scene) {
-  const material = new THREE.MeshStandardMaterial({
-    color: "#334155",
-    metalness: 0.18,
-    roughness: 0.55,
-  });
-  [-28, 28].forEach((x) => {
-    [-16, 6, 20].forEach((z) => {
-      const column = new THREE.Mesh(
-        new THREE.BoxGeometry(1.1, 8.8, 1.1),
-        material,
-      );
-      column.position.set(x, 4.4, z);
-      column.castShadow = true;
-      column.receiveShadow = true;
-      scene.add(column);
+      roughness: 0.86,
     });
   });
+  groundModel.updateMatrixWorld(true);
+  const bounds = new THREE.Box3().setFromObject(groundModel);
+  const center = bounds.getCenter(new THREE.Vector3());
+  groundModel.position.x -= center.x;
+  groundModel.position.z -= center.z;
+  groundModel.position.y += WORLD_GROUND_Y - bounds.min.y;
+  groundModel.updateMatrixWorld(true);
 }
-function addPipes(scene) {
-  const material = new THREE.MeshStandardMaterial({
-    color: "#64748b",
-    metalness: 0.55,
-    roughness: 0.3,
+function showFallbackWorldFloor(scene) {
+  const environment = scene.userData.worldEnvironment;
+  if (environment?.floor) {
+    environment.floor.visible = true;
+  }
+}
+function setWorldGroundTint(groundModel, color) {
+  groundModel.traverse((object) => {
+    if (object instanceof THREE.Mesh) {
+      setMaterialColor(object.material, color);
+    }
   });
-  [-18, -8, 10, 20].forEach((z, index) => {
-    const pipe = new THREE.Mesh(
-      new THREE.CylinderGeometry(
-        0.18 + index * 0.025,
-        0.18 + index * 0.025,
-        WORLD_SIZE.width - 8,
-        24,
-      ),
-      material,
-    );
-    pipe.position.set(0, 7.4 + index * 0.42, z);
-    pipe.rotation.z = Math.PI / 2;
-    pipe.castShadow = true;
-    scene.add(pipe);
+}
+function setMaterialColor(material, color) {
+  const materials = Array.isArray(material) ? material : [material];
+  materials.forEach((item) => {
+    if (item?.color) {
+      item.color.set(color);
+    }
+  });
+}
+function setMaterialSurface(material, surface) {
+  const materials = Array.isArray(material) ? material : [material];
+  materials.forEach((item) => {
+    if (!item) {
+      return;
+    }
+    if ("metalness" in item) {
+      item.metalness = surface.metalness;
+    }
+    if ("roughness" in item) {
+      item.roughness = surface.roughness;
+    }
+    item.needsUpdate = true;
   });
 }
 function createPlacementPreview() {
@@ -1982,7 +1997,7 @@ function updateNearestAssetFocus({
   onFocus(nearest.assetId);
 }
 function applyPlacement(group, placement) {
-  group.position.set(placement.x, 0, placement.z);
+  group.position.set(placement.x, WORLD_ASSET_BASE_Y, placement.z);
   group.rotation.y = 0;
   if (group.userData.model) {
     group.userData.model.rotation.order = "XYZ";
@@ -2121,6 +2136,9 @@ function applyWorldSettings(scene, settings) {
     return;
   }
   environment.floor.material.color.set(settings.floorColor);
+  if (environment.groundModel) {
+    setWorldGroundTint(environment.groundModel, settings.floorColor);
+  }
   setGridMaterialOpacity(
     environment.grid,
     settings.gridOpacity,

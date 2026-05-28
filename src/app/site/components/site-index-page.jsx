@@ -130,7 +130,7 @@ export function SiteIndexPage({ initialSites = EMPTY_INITIAL_SITES, }) {
     const showBackendIdError = (label) => {
         setApiMessage({
             tone: "error",
-            text: `백엔드 응답에 ${label} ID가 없습니다.`,
+            text: `서버 응답에 ${label} ID가 없습니다.`,
         });
     };
     const resetCreateDialog = () => {
