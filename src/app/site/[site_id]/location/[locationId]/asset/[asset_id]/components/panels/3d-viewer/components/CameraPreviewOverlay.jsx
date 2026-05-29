@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 export function CameraPreviewOverlay({
   selectedCamera,
   onClose,
+  screenshotData = null,
 }) {
   if (!selectedCamera) {
     return null;
@@ -50,7 +51,7 @@ export function CameraPreviewOverlay({
       {/* 미리보기 이미지 */}
       <div className="CameraPreviewOverlay CameraPreviewOverlay__image-container-1 overflow-hidden rounded-sm border border-cyan-200/30">
         <img
-          src={selectedCamera.sampleImagePath}
+          src={screenshotData || selectedCamera.sampleImagePath}
           alt={selectedCamera.name}
           className={cn(
             "CameraPreviewOverlay CameraPreviewOverlay__image-1",

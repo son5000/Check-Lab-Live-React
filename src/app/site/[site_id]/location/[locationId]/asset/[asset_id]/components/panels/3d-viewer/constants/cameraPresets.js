@@ -14,7 +14,7 @@ export const CAMERA_PRESETS = [
   {
     id: "1",
     name: "정면 (Front)",
-    position: { x: 4, y: 22, z: 56 },
+    position: { x: 90, y: 42, z: 50 },
     target: { x: 0, y: 0, z: 0 },
     fov: 60,
     sampleImagePath: "/cam/cam_sample_1.PNG",
@@ -22,7 +22,7 @@ export const CAMERA_PRESETS = [
   {
     id: "2",
     name: "후면 (Back)",
-    position: normalizeVector(0, 0, -1),
+    position: { x: 10, y: 40, z: 61 },
     target: { x: 0, y: 0, z: 0 },
     fov: 60,
     sampleImagePath: "/cam/cam_sample_2.PNG",
@@ -30,7 +30,7 @@ export const CAMERA_PRESETS = [
   {
     id: "3",
     name: "좌측 (Left)",
-    position: normalizeVector(-1, 0, 0),
+    position: { x: 29, y: 34, z: 52 },
     target: { x: 0, y: 0, z: 0 },
     fov: 60,
     sampleImagePath: "/cam/cam_sample_3.PNG",
@@ -38,7 +38,7 @@ export const CAMERA_PRESETS = [
   {
     id: "4",
     name: "우측 (Right)",
-    position: normalizeVector(1, 0, 0),
+    position: { x: 59, y: 2, z: -8 },
     target: { x: 0, y: 0, z: 0 },
     fov: 60,
     sampleImagePath: "/cam/cam_sample_4.PNG",
