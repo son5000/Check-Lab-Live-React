@@ -37,25 +37,28 @@ const WORLD_PREVIEW_CAMERA_MIN_BACK_OFFSET = 18;
 const WORLD_PREVIEW_CAMERA_PADDING = 1.18;
 const WORLD_PREVIEW_MIN_RADIUS = 82;
 const WORLD_POPUP_POS_KEY = "three3d_world_popup_pos";
-export const Three3DViewer = forwardRef(function Three3DViewer({
-  activeAnalysisMode,
-  allowOptionBar = true,
-  analysisSummary,
-  analysisTargets = EMPTY_ANALYSIS_TARGETS,
-  className,
-  config,
-  initialConfig = DEFAULT_VIEWER_3D_CONFIG,
-  modelFile,
-  onAnalysisModeChange,
-  onAnalysisTargetCreate,
-  onAnalysisTargetSelect,
-  onAnalysisTargetUpdate,
-  onConfigChange,
-  onModelFileChange,
-  selectedAnalysisTargetId,
-  showCameraOverlays = true,
-  onAnalysisItemCameraFocus,
-}, ref) {
+export const Three3DViewer = forwardRef(function Three3DViewer(
+  {
+    activeAnalysisMode,
+    allowOptionBar = true,
+    analysisSummary,
+    analysisTargets = EMPTY_ANALYSIS_TARGETS,
+    className,
+    config,
+    initialConfig = DEFAULT_VIEWER_3D_CONFIG,
+    modelFile,
+    onAnalysisModeChange,
+    onAnalysisTargetCreate,
+    onAnalysisTargetSelect,
+    onAnalysisTargetUpdate,
+    onConfigChange,
+    onModelFileChange,
+    selectedAnalysisTargetId,
+    showCameraOverlays = true,
+    onAnalysisItemCameraFocus,
+  },
+  ref,
+) {
   const containerRef = useRef(null);
   const cameraImageCanvasRef = useRef(null);
   const cameraImageElementRef = useRef(null);
@@ -77,7 +80,10 @@ export const Three3DViewer = forwardRef(function Three3DViewer({
       const saved = localStorage.getItem(WORLD_POPUP_POS_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (typeof parsed?.left === "number" && typeof parsed?.top === "number") {
+        if (
+          typeof parsed?.left === "number" &&
+          typeof parsed?.top === "number"
+        ) {
           return parsed;
         }
       }
@@ -399,10 +405,14 @@ export const Three3DViewer = forwardRef(function Three3DViewer({
     },
     [handleConfigChange, resolvedCameraVisualizationConfig, resolvedConfig],
   );
-  useImperativeHandle(ref, () => ({
-    switchToCamera,
-    resetToOverviewCamera,
-  }), [switchToCamera, resetToOverviewCamera]);
+  useImperativeHandle(
+    ref,
+    () => ({
+      switchToCamera,
+      resetToOverviewCamera,
+    }),
+    [switchToCamera, resetToOverviewCamera],
+  );
   useLayoutEffect(() => {
     setWorldPopupPos(null);
   }, [selectedCameraForPreview?.id]);
@@ -505,8 +515,14 @@ export const Three3DViewer = forwardRef(function Three3DViewer({
     const dy = event.clientY - drag.startY;
     const rawLeft = drag.origLeft + dx;
     const rawTop = drag.origTop + dy;
-    const clampedLeft = Math.max(0, Math.min(rawLeft, containerRect.width - popupRect.width));
-    const clampedTop = Math.max(0, Math.min(rawTop, containerRect.height - popupRect.height));
+    const clampedLeft = Math.max(
+      0,
+      Math.min(rawLeft, containerRect.width - popupRect.width),
+    );
+    const clampedTop = Math.max(
+      0,
+      Math.min(rawTop, containerRect.height - popupRect.height),
+    );
     setWorldPopupPos({ left: clampedLeft, top: clampedTop });
   }, []);
   const handleWorldPopupPointerUp = useCallback((event) => {
@@ -770,13 +786,13 @@ export const Three3DViewer = forwardRef(function Three3DViewer({
                 </div>
                 <button
                   type="button"
-                  className="Three3DViewer Three3DViewer__world-preview-close-1 grid h-6 w-6 shrink-0 place-items-center rounded-sm border border-cyan-200/20 bg-white/5 text-cyan-100/70 transition hover:bg-cyan-300/15 hover:text-cyan-50"
+                  className="Three3DViewer Three3DViewer__world-preview-close-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-xs border border-cyan-200/20 bg-white/5 p-0 text-cyan-100/70 leading-none transition hover:bg-cyan-300/15 hover:text-cyan-50"
                   onClick={handleCameraPreviewClose}
                   onPointerDown={(e) => e.stopPropagation()}
                   title="카메라 보기 닫기"
                   aria-label="카메라 보기 닫기"
                 >
-                  ×
+                  X
                 </button>
               </div>
               <div className="Three3DViewer Three3DViewer__world-snapshot-frame-1 flex max-h-full items-center justify-center overflow-hidden rounded-sm border border-cyan-200/30 bg-neutral-950">
