@@ -40,7 +40,6 @@ export function prepareModelGeometry(geometry, normalizeSize) {
     if (!preparedGeometry.getAttribute('normal')) {
         preparedGeometry.computeVertexNormals();
     }
-    preparedGeometry.computeVertexNormals();
     centerGeometry(preparedGeometry);
     if (normalizeSize && normalizeSize > 0) {
         normalizeGeometrySize(preparedGeometry, normalizeSize);

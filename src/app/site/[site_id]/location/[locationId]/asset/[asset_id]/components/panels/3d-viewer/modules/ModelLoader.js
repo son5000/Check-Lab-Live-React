@@ -8,7 +8,11 @@ export class ModelLoader {
         this.plyLoader = new PLYLoader();
     }
     async loadModel(modelFile) {
-        const geometry = prepareModelGeometry(await this.loadPLY(modelFile.plyUrl), modelFile.normalizeSize);
+        const loadedGeometry = await this.loadPLY(modelFile.plyUrl);
+        const geometry = prepareModelGeometry(loadedGeometry, modelFile.normalizeSize);
+        if (geometry !== loadedGeometry) {
+            loadedGeometry.dispose();
+        }
         const material = await this.createMaterial(normalizeModelTextures(modelFile));
         const mesh = new THREE.Mesh(geometry, material);
         const group = new THREE.Group();

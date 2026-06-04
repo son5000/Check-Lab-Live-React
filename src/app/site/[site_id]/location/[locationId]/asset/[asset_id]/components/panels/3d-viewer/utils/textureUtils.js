@@ -1,6 +1,30 @@
 import * as THREE from 'three';
+
+const textureLoader = new THREE.TextureLoader();
+const MATERIAL_TEXTURE_KEYS = [
+    "alphaMap",
+    "aoMap",
+    "bumpMap",
+    "clearcoatMap",
+    "clearcoatNormalMap",
+    "clearcoatRoughnessMap",
+    "displacementMap",
+    "emissiveMap",
+    "envMap",
+    "gradientMap",
+    "lightMap",
+    "map",
+    "metalnessMap",
+    "normalMap",
+    "roughnessMap",
+    "sheenColorMap",
+    "sheenRoughnessMap",
+    "specularColorMap",
+    "specularIntensityMap",
+    "transmissionMap",
+];
+
 export async function loadTexture(url) {
-    const textureLoader = new THREE.TextureLoader();
     return new Promise((resolve) => {
         textureLoader.load(url, (texture) => resolve(configureTexture(texture)), undefined, () => {
             console.warn(`Failed to load texture: ${url}`);
@@ -34,12 +58,6 @@ export async function loadTextureSource(source) {
         ? loadTexture(source)
         : loadTextureFromFile(source);
 }
-export function applyTextureToMaterial(material, texture) {
-    if (texture) {
-        material.map = texture;
-        material.needsUpdate = true;
-    }
-}
 export function configureTexture(texture) {
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.flipY = true;
@@ -49,13 +67,11 @@ export function configureTexture(texture) {
     return texture;
 }
 export function disposeMaterialTextures(material) {
-    if (material instanceof THREE.MeshStandardMaterial ||
-        material instanceof THREE.MeshPhongMaterial) {
-        material.map?.dispose();
-        material.emissiveMap?.dispose();
-        material.alphaMap?.dispose();
-    }
-    if (material instanceof THREE.MeshStandardMaterial) {
-        material.roughnessMap?.dispose();
+    for (const key of MATERIAL_TEXTURE_KEYS) {
+        const texture = material[key];
+        if (texture instanceof THREE.Texture) {
+            texture.dispose();
+            material[key] = null;
+        }
     }
 }

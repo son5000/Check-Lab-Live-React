@@ -1,112 +1,98 @@
 import { useCallback, useEffect, useRef } from "react";
+import { CAMERA_PRESETS } from "../constants/cameraPresets";
 import {
   pickCameraMarkerFromClientPoint,
   removeAllCameraVisualizations,
-  raycastCameraMarkers,
   updateCameraMarkerInteractionState,
   updateCameraVisualizationObjects,
 } from "../utils/cameraUtils";
-import { CAMERA_PRESETS } from "../constants/cameraPresets";
+
+const CAMERA_PRESET_IDS = CAMERA_PRESETS.map((camera) => camera.id);
+const EMPTY_CUSTOM_POSITIONS = {};
 
 export function useThreeCameraVisualization(sceneRef, config) {
-  const cameraVisualizationRef = useRef(null);
   const hoveredCameraIdRef = useRef(null);
 
   useEffect(() => {
     const scene = sceneRef.current;
     if (!scene) {
-      return;
+      return undefined;
     }
 
-    // 카메라 시각화 활성화 여부 확인
-    const isEnabled = config?.enabled !== false;
-
-    if (!isEnabled) {
+    if (config?.enabled === false) {
       removeAllCameraVisualizations(scene);
-      return;
+      return undefined;
     }
 
-    // 선택된 카메라 ID 가져오기
-    const selectedCameraId = config?.selectedCameraId;
-
-    // 표시할 카메라 ID 목록 결정
+    const selectedCameraId = config?.selectedCameraId ?? null;
     const showAll = config?.showAll !== false || !selectedCameraId;
     const showLaserBeams = config?.showLaserBeams !== false;
     const visibleCameraIds = showAll
-      ? CAMERA_PRESETS.map((cam) => cam.id)
+      ? CAMERA_PRESET_IDS
       : selectedCameraId
       ? [selectedCameraId]
       : [];
 
-    // 카메라 시각화 객체 업데이트
     updateCameraVisualizationObjects(
       scene,
       CAMERA_PRESETS,
       selectedCameraId,
       visibleCameraIds,
-      config?.customPositions,
-      showLaserBeams
+      config?.customPositions ?? EMPTY_CUSTOM_POSITIONS,
+      showLaserBeams,
     );
-
-    // 참조 저장
-    cameraVisualizationRef.current = {
-      visibleCameraIds,
-      selectedCameraId,
-    };
-
     updateCameraMarkerInteractionState(
       scene,
       selectedCameraId,
-      hoveredCameraIdRef.current
+      hoveredCameraIdRef.current,
     );
-  }, [sceneRef, config?.selectedCameraId, config?.showAll, config?.enabled, config?.customPositions, config?.showLaserBeams]);
 
-  const setHoveredCameraId = useCallback((cameraId) => {
-    if (hoveredCameraIdRef.current === cameraId) {
-      return;
-    }
+    return undefined;
+  }, [
+    sceneRef,
+    config?.selectedCameraId,
+    config?.showAll,
+    config?.enabled,
+    config?.customPositions,
+    config?.showLaserBeams,
+  ]);
 
-    hoveredCameraIdRef.current = cameraId;
+  const setHoveredCameraId = useCallback(
+    (cameraId) => {
+      if (hoveredCameraIdRef.current === cameraId) {
+        return;
+      }
 
-    const scene = sceneRef.current;
-    if (!scene) {
-      return;
-    }
+      hoveredCameraIdRef.current = cameraId;
 
-    updateCameraMarkerInteractionState(
-      scene,
-      config?.selectedCameraId,
-      cameraId
-    );
-  }, [config?.selectedCameraId, sceneRef]);
+      const scene = sceneRef.current;
+      if (!scene) {
+        return;
+      }
 
-  // 레이캐스트 메서드 반환: 카메라 구체만 판정한다.
-  const getCameraAtPoint = useCallback((raycaster) => {
-    const scene = sceneRef.current;
-    if (!scene) return null;
+      updateCameraMarkerInteractionState(
+        scene,
+        config?.selectedCameraId ?? null,
+        cameraId,
+      );
+    },
+    [config?.selectedCameraId, sceneRef],
+  );
 
-    return raycastCameraMarkers(raycaster, scene);
-  }, [sceneRef]);
-
-  const getCameraAtClientPoint = useCallback(({
-    camera,
-    clientPoint,
-    previousCameraId,
-    renderer,
-  }) => {
-    return pickCameraMarkerFromClientPoint({
-      camera,
-      clientPoint,
-      previousCameraId,
-      renderer,
-      scene: sceneRef.current,
-    });
-  }, [sceneRef]);
+  const getCameraAtClientPoint = useCallback(
+    ({ camera, clientPoint, previousCameraId, renderer }) =>
+      pickCameraMarkerFromClientPoint({
+        camera,
+        clientPoint,
+        previousCameraId,
+        renderer,
+        scene: sceneRef.current,
+      }),
+    [sceneRef],
+  );
 
   return {
-    cameraVisualizationRef,
     getCameraAtClientPoint,
-    getCameraAtPoint,
     setHoveredCameraId,
   };
 }

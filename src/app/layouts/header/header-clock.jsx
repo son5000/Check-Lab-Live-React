@@ -12,13 +12,14 @@
  * - 포맷팅은 훅에 남겨 이 컴포넌트는 레이아웃만 담당합니다.
  */
 export function HeaderClock({ currentDate, currentTime }) {
-    return (<div className="HeaderClock HeaderClock__container-1 hidden h-10 w-[clamp(16rem,34vw,21rem)] min-w-0 shrink-0 items-center justify-center gap-3 px-2 text-foreground md:flex xl:gap-4" aria-label={`현재 날짜 ${currentDate}, 현재 시간 ${currentTime}`}>
+    const displayDate = removeWeekdayFromDateLabel(currentDate);
+    return (<div className="HeaderClock HeaderClock__container-1 hidden h-10 w-[clamp(16rem,34vw,21rem)] min-w-0 shrink-0 items-center justify-center gap-3 px-2 text-foreground md:flex xl:gap-4" aria-label={`현재 날짜 ${displayDate}, 현재 시간 ${currentTime}`}>
       <div className="HeaderClock HeaderClock__container-2 flex min-w-0 items-baseline gap-2">
         <span className="HeaderClock HeaderClock__label-3 shrink-0 whitespace-nowrap text-[10px] font-semibold leading-none text-muted-foreground">
           날짜
         </span>
-        <span className="HeaderClock HeaderClock__label-1 max-w-48 truncate text-sm font-bold leading-tight text-foreground" title={currentDate}>
-          {currentDate}
+        <span className="HeaderClock HeaderClock__label-1 max-w-48 truncate text-sm font-bold leading-tight text-foreground" title={displayDate}>
+          {displayDate}
         </span>
       </div>
       <span className="HeaderClock HeaderClock__divider-1 h-6 w-px shrink-0 bg-border" aria-hidden="true"/>
@@ -31,4 +32,11 @@ export function HeaderClock({ currentDate, currentTime }) {
         </span>
       </div>
     </div>);
+}
+function removeWeekdayFromDateLabel(value) {
+    return String(value ?? "")
+        .replace(/\s*\([^)]*\)\s*$/, "")
+        .replace(/^[A-Za-z]{3,},\s*/, "")
+        .replace(/,\s*[A-Za-z]{3,}\s*$/, "")
+        .trim();
 }

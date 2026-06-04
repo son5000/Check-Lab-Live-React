@@ -1,11 +1,13 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Camera, Check, Box, Maximize2, MousePointer2, RotateCcw, Settings2, SquareDashedMousePointer, Trash2, Upload, X, } from "lucide-react";
+import { Camera, Check, Box, Grid3X3, Maximize2, MousePointer2, Play, RotateCcw, SquareDashedMousePointer, Trash2, Upload, X, } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCheckLabKoreanTime } from "@/app/layouts/helpers/time-formatters";
 import { useDisplaySettings } from "@/app/layouts/hooks/use-display-settings";
+import { MOCK_THERMAL_CAMERAS } from "@/lib/thermal-mapping";
 import { DEFAULT_MODEL_3D_FILE, DEFAULT_VIEWER_3D_CONFIG, Three3DViewer, Viewer3DOptionBar, } from "./3d-viewer";
+import { ThermalAssetViewerOptionContent } from "./3d-viewer/components/ThermalAssetViewerPanel";
 import { CameraVisualizationControls } from "./3d-viewer/controls/CameraVisualizationControls";
 import { ControlSection } from "./3d-viewer/controls/control-fields";
 import { getCameraPreset } from "./3d-viewer/constants/cameraPresets";
@@ -98,10 +100,17 @@ export function AssetCameraPanel({ activeCameraId, cameraFeeds = defaultCameraFe
     const [viewer3DWorldRenderKey, setViewer3DWorldRenderKey] = useState(0);
     const [currentViewer3DConfig, setCurrentViewer3DConfig] = useState(viewer3DConfig ?? DEFAULT_VIEWER_3D_CONFIG);
     const [currentViewer3DModelFile, setCurrentViewer3DModelFile] = useState(viewer3DModelFile ?? null);
+    const [viewer3DPanelTab, setViewer3DPanelTab] = useState("analysis");
+    const [viewer3DAnalysisViewMode, setViewer3DAnalysisViewMode] = useState("viewer");
     const [viewer3DAnalysisMode, setViewer3DAnalysisMode] = useState();
     const [viewer3DAnalysisTargets, setViewer3DAnalysisTargets] = useState([]);
     const [selectedViewer3DAnalysisTargetId, setSelectedViewer3DAnalysisTargetId,] = useState();
     const viewer3DPreviewRef = useRef(null);
+    const viewer3DThermalMaterialRecordsRef = useRef(new Map());
+    const [isViewer3DThermalMeshPicking, setIsViewer3DThermalMeshPicking] = useState(false);
+    const [viewer3DThermalMesh, setViewer3DThermalMesh] = useState(null);
+    const [selectedViewer3DThermalCameraId, setSelectedViewer3DThermalCameraId] = useState(null);
+    const [selectedViewer3DThermalFramePreview, setSelectedViewer3DThermalFramePreview,] = useState(null);
     const canSave = Boolean(cameraSetupMode) &&
         draftName.trim().length > 0 &&
         (selectionMode === "area"
@@ -112,6 +121,7 @@ export function AssetCameraPanel({ activeCameraId, cameraFeeds = defaultCameraFe
     const readyViewer3DModelFile = hasCompleteViewer3DModelFile(currentViewer3DModelFile)
         ? currentViewer3DModelFile
         : null;
+    const isViewer3DAnalysisEnabled = viewer3DPanelTab !== "settings";
     const viewer3DAnalysisItems = useMemo(() => viewer3DAnalysisTargets.map((target, index) => ({
         summary: buildViewer3DAnalysisSummary({
             assetParts,
@@ -161,6 +171,11 @@ export function AssetCameraPanel({ activeCameraId, cameraFeeds = defaultCameraFe
         }
     }, [viewer3DModelFile]);
     useEffect(() => {
+        setViewer3DThermalMesh(null);
+        setSelectedViewer3DThermalFramePreview(null);
+        setIsViewer3DThermalMeshPicking(false);
+    }, [readyViewer3DModelFile]);
+    useEffect(() => {
         if (!cameraSetupMode) {
             return;
         }
@@ -177,6 +192,7 @@ export function AssetCameraPanel({ activeCameraId, cameraFeeds = defaultCameraFe
     ]);
     useEffect(() => {
         if (!isPreviewOpen) {
+            setViewer3DPanelTab("analysis");
             setViewer3DAnalysisMode(undefined);
             setCameraSetupMode(undefined);
             resetDraft(activeAssetThresholds);
@@ -369,6 +385,15 @@ export function AssetCameraPanel({ activeCameraId, cameraFeeds = defaultCameraFe
         setCurrentViewer3DConfig(nextConfig);
         onViewer3DConfigChange?.(nextConfig);
     };
+    const handleViewer3DPanelTabChange = (nextPanelTab) => {
+        setViewer3DPanelTab(nextPanelTab);
+        if (nextPanelTab === "thermal" && currentViewer3DConfig.autoRotate) {
+            handleViewer3DConfigChange({
+                ...currentViewer3DConfig,
+                autoRotate: false,
+            });
+        }
+    };
     function handlePreviewClose() {
         if (viewMode === "3d") {
             handleViewer3DConfigChange(getViewer3DOverviewConfig(currentViewer3DConfig));
@@ -511,6 +536,13 @@ export function AssetCameraPanel({ activeCameraId, cameraFeeds = defaultCameraFe
         resetDraft(activeAssetThresholds);
         onSelectAssetPart(partId);
     };
+    const isViewer3DAutoRotateActive = currentViewer3DConfig.autoRotate ?? DEFAULT_VIEWER_3D_CONFIG.autoRotate;
+    const handleViewer3DAutoRotateToggle = () => {
+        handleViewer3DConfigChange({
+            ...currentViewer3DConfig,
+            autoRotate: !isViewer3DAutoRotateActive,
+        });
+    };
     return (<section className="AssetCameraPanel AssetCameraPanel__section-1 flex min-h-0 min-w-0 flex-col overflow-hidden rounded-md border border-border bg-card p-1 text-card-foreground">
       <div className="AssetCameraPanel AssetCameraPanel__container-1 mb-1 flex min-w-0 items-center justify-between gap-2 rounded-md border border-border bg-background px-2 py-1.5">
         <div className="AssetCameraPanel AssetCameraPanel__container-2 flex min-w-0 items-center gap-2">
@@ -527,35 +559,26 @@ export function AssetCameraPanel({ activeCameraId, cameraFeeds = defaultCameraFe
           </div>
         </div>
         <div className="AssetCameraPanel AssetCameraPanel__viewer-actions-1 flex shrink-0 items-center gap-1">
+          <Viewer3DAutoRotateToggle active={isViewer3DAutoRotateActive} disabled={!readyViewer3DModelFile} onClick={handleViewer3DAutoRotateToggle}/>
           <button type="button" className="AssetCameraPanel AssetCameraPanel__world-reset-1 grid h-7 w-7 place-items-center rounded-md border border-border bg-card text-muted-foreground transition hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-45" disabled={!readyViewer3DModelFile} onClick={handleViewer3DWorldReset} title="월드만 초기화" aria-label="월드만 초기화">
             <RotateCcw className="AssetCameraPanel AssetCameraPanel__icon-5 h-3.5 w-3.5" aria-hidden="true"/>
           </button>
-          <span className="AssetCameraPanel AssetCameraPanel__viewer-badge-1 shrink-0 rounded-sm border border-border bg-card px-2 py-1 text-[10px] font-semibold text-muted-foreground">
-            3D 고정
-          </span>
+          <button type="button" className="AssetCameraPanel AssetCameraPanel__preview-button-1 grid h-7 w-7 place-items-center rounded-md border border-border bg-card text-muted-foreground transition hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-45" disabled={!readyViewer3DModelFile} onClick={() => setIsPreviewOpen(true)} title="3D 크게 보기" aria-label="3D 크게 보기">
+            <Maximize2 className="AssetCameraPanel AssetCameraPanel__icon-2 h-3.5 w-3.5" aria-hidden="true"/>
+          </button>
         </div>
       </div>
-      <div className="AssetCameraPanel AssetCameraPanel__container-5 grid min-h-0 flex-1 place-items-center overflow-hidden rounded-md border border-border bg-neutral-950/85 p-1 [container-type:size]">
-        <div className={cn("AssetCameraPanel AssetCameraPanel__container-6 relative h-[min(100cqw,100cqh)] w-[min(100cqw,100cqh)] touch-none overflow-hidden rounded-md border border-white/15 bg-neutral-950 shadow-[0_0_28px_rgba(34,211,238,0.16)]", viewMode === "camera" &&
+      <div className={cn("AssetCameraPanel AssetCameraPanel__container-5 relative min-h-0 min-w-0 flex-1 touch-none overflow-hidden rounded-md border border-border bg-neutral-950/85", viewMode === "camera" &&
             isCameraSetupActive &&
             "cursor-crosshair border-primary/70", viewMode === "camera" && isDraggingRoi && "cursor-move")} onPointerDown={viewMode === "camera" ? handlePointerDown : undefined} onPointerMove={viewMode === "camera" ? handlePointerMove : undefined} onPointerCancel={viewMode === "camera" ? handlePointerCancel : undefined} onPointerUp={viewMode === "camera" ? handlePointerUp : undefined}>
           {viewMode === "3d" ? (<>
-              {readyViewer3DModelFile ? (<>
-                  <Three3DViewer key={`dashboard-${viewer3DWorldRenderKey}`} allowOptionBar={false} config={currentViewer3DConfig} modelFile={readyViewer3DModelFile} showCameraOverlays={false} onConfigChange={handleViewer3DConfigChange} onModelFileChange={handleViewer3DModelFileChange}/>
-                  <button type="button" className="AssetCameraPanel AssetCameraPanel__button-1 absolute right-2 top-12 z-20 grid h-8 w-8 place-items-center rounded-md border border-white/20 bg-black/45 text-white/80 backdrop-blur transition hover:bg-white/15 hover:text-white" onClick={(event) => {
-                    event.stopPropagation();
-                    setIsPreviewOpen(true);
-                }} title="3D 크게 보기">
-                    <Maximize2 className="AssetCameraPanel AssetCameraPanel__icon-2 h-4 w-4" aria-hidden="true"/>
-                  </button>
-                </>) : (<Viewer3DModelUploadPanel modelFile={currentViewer3DModelFile} onPlyFileChange={handleViewer3DPlyFileChange} onTextureFileChange={handleViewer3DTextureFileChange} onUseSample={handleUseSampleViewer3DModel}/>)}
+              {readyViewer3DModelFile ? (<Three3DViewer key={`dashboard-${viewer3DWorldRenderKey}`} allowOptionBar={false} className="AssetCameraPanel AssetCameraPanel__viewer-1 h-full w-full rounded-none border-0" config={currentViewer3DConfig} modelFile={readyViewer3DModelFile} showCameraOverlays={false} onConfigChange={handleViewer3DConfigChange} onModelFileChange={handleViewer3DModelFileChange}/>) : (<Viewer3DModelUploadPanel modelFile={currentViewer3DModelFile} onPlyFileChange={handleViewer3DPlyFileChange} onTextureFileChange={handleViewer3DTextureFileChange} onUseSample={handleUseSampleViewer3DModel}/>)}
             </>) : (<>
               <div className="AssetCameraPanel AssetCameraPanel__container-7 absolute inset-0 opacity-25 [background-image:linear-gradient(90deg,rgba(255,255,255,0.16)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.16)_1px,transparent_1px)] [background-size:34px_34px]"/>
               <CameraViewport focused={selectedCamera.id !== "default"} imageUrl={selectedCamera.presentationImageUrl} streamMessage={selectedCamera.streamMessage} streamState={selectedCamera.streamState} streamUrl={selectedCamera.streamUrl} onOpenPreview={() => setIsPreviewOpen(true)}>
                 <DetectionOverlays parts={cameraAssetParts} draftPoints={draftPoints} draftRoi={draftRoi} isDraftVisible={isCameraSetupActive} selectedPartId={selectedAssetPartId}/>
               </CameraViewport>
             </>)}
-        </div>
       </div>
 
       {isPreviewOpen && canRenderPreviewPortal
@@ -570,16 +593,31 @@ export function AssetCameraPanel({ activeCameraId, cameraFeeds = defaultCameraFe
                     : `${selectedCamera.label} · ${selectedCamera.name}`}
                     </p>
                   </div>
-                  <button type="button" className="AssetCameraPanel AssetCameraPanel__button-2 grid h-7 w-7 place-items-center rounded-md border border-white/15 bg-white/10 text-white/80 transition hover:bg-white/15 hover:text-white" onClick={handlePreviewClose} title="닫기">
-                    <X className="AssetCameraPanel AssetCameraPanel__icon-4 h-3.5 w-3.5" aria-hidden="true"/>
-                  </button>
+                  <div className="AssetCameraPanel AssetCameraPanel__preview-actions-1 flex shrink-0 items-center gap-1">
+                    {viewMode === "3d" ? (<>
+                        <Viewer3DAutoRotateToggle active={isViewer3DAutoRotateActive} disabled={!readyViewer3DModelFile} onClick={handleViewer3DAutoRotateToggle}/>
+                        <button type="button" className="AssetCameraPanel AssetCameraPanel__preview-world-reset-1 grid h-7 w-7 place-items-center rounded-md border border-white/15 bg-white/10 text-white/80 transition hover:bg-white/15 hover:text-white disabled:cursor-not-allowed disabled:opacity-45" disabled={!readyViewer3DModelFile} onClick={handleViewer3DWorldReset} title="월드만 초기화" aria-label="월드만 초기화">
+                          <RotateCcw className="AssetCameraPanel AssetCameraPanel__icon-5 h-3.5 w-3.5" aria-hidden="true"/>
+                        </button>
+                      </>) : null}
+                    <button type="button" className="AssetCameraPanel AssetCameraPanel__button-2 grid h-7 w-7 place-items-center rounded-md border border-white/15 bg-white/10 text-white/80 transition hover:bg-white/15 hover:text-white" onClick={handlePreviewClose} title="닫기">
+                      <X className="AssetCameraPanel AssetCameraPanel__icon-4 h-3.5 w-3.5" aria-hidden="true"/>
+                    </button>
+                  </div>
                 </div>
                 {viewMode === "3d" ? (<div className="AssetCameraPanel AssetCameraPanel__container-19 grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_16rem] gap-3 overflow-hidden p-3 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)] lg:grid-rows-[minmax(0,1fr)]">
                     <div className="AssetCameraPanel AssetCameraPanel__viewer-wrap-1 h-full min-h-0 min-w-0">
-                      {readyViewer3DModelFile ? (<Three3DViewer ref={viewer3DPreviewRef} key={`preview-${viewer3DWorldRenderKey}`} activeAnalysisMode={viewer3DAnalysisMode} allowOptionBar={false} analysisSummary={selectedViewer3DAnalysisItem?.summary} analysisTargets={viewer3DAnalysisTargets} className="AssetCameraPanel AssetCameraPanel__viewer-1 h-full" config={currentViewer3DConfig} modelFile={readyViewer3DModelFile} selectedAnalysisTargetId={selectedViewer3DAnalysisTargetId} onAnalysisModeChange={handleViewer3DAnalysisModeChange} onAnalysisTargetCreate={handleViewer3DAnalysisTargetCreate} onAnalysisTargetSelect={handleViewer3DAnalysisTargetSelect} onAnalysisTargetUpdate={handleViewer3DAnalysisTargetUpdate} onConfigChange={handleViewer3DConfigChange} onModelFileChange={handleViewer3DModelFileChange}/>) : (<Viewer3DModelUploadPanel modelFile={currentViewer3DModelFile} onPlyFileChange={handleViewer3DPlyFileChange} onTextureFileChange={handleViewer3DTextureFileChange} onUseSample={handleUseSampleViewer3DModel}/>)}
+                      {readyViewer3DModelFile ? (<Three3DViewer ref={viewer3DPreviewRef} key={`preview-${viewer3DWorldRenderKey}`} activeAnalysisMode={isViewer3DAnalysisEnabled ? viewer3DAnalysisMode : undefined} allowOptionBar={false} analysisSummary={isViewer3DAnalysisEnabled ? selectedViewer3DAnalysisItem?.summary : undefined} analysisTargets={isViewer3DAnalysisEnabled ? viewer3DAnalysisTargets : []} analysisViewMode={viewer3DPanelTab === "analysis" ? viewer3DAnalysisViewMode : "viewer"} className="AssetCameraPanel AssetCameraPanel__viewer-1 h-full" config={currentViewer3DConfig} hideCameraVisualization={viewer3DPanelTab === "thermal"} isThermalMeshPicking={isViewer3DThermalMeshPicking} modelFile={readyViewer3DModelFile} selectedAnalysisTargetId={isViewer3DAnalysisEnabled ? selectedViewer3DAnalysisTargetId : undefined} thermalCameraOverlay={viewer3DPanelTab === "thermal"
+                            ? {
+                                cameras: MOCK_THERMAL_CAMERAS,
+                                selectedFramePreview: selectedViewer3DThermalFramePreview,
+                                selectedCameraId: selectedViewer3DThermalCameraId,
+                                onCameraSelect: setSelectedViewer3DThermalCameraId,
+                            }
+                            : undefined} onAnalysisModeChange={isViewer3DAnalysisEnabled ? handleViewer3DAnalysisModeChange : undefined} onAnalysisTargetCreate={isViewer3DAnalysisEnabled ? handleViewer3DAnalysisTargetCreate : undefined} onAnalysisTargetSelect={isViewer3DAnalysisEnabled ? handleViewer3DAnalysisTargetSelect : undefined} onAnalysisTargetUpdate={isViewer3DAnalysisEnabled ? handleViewer3DAnalysisTargetUpdate : undefined} onConfigChange={handleViewer3DConfigChange} onModelFileChange={handleViewer3DModelFileChange} onThermalMeshPicked={(mesh) => { setViewer3DThermalMesh(mesh); setIsViewer3DThermalMeshPicking(false); }}/>) : (<Viewer3DModelUploadPanel modelFile={currentViewer3DModelFile} onPlyFileChange={handleViewer3DPlyFileChange} onTextureFileChange={handleViewer3DTextureFileChange} onUseSample={handleUseSampleViewer3DModel}/>)}
                     </div>
 
-                    <Viewer3DAnalysisPanel activeMode={viewer3DAnalysisMode} config={currentViewer3DConfig} displaySettings={displaySettings} items={viewer3DAnalysisItems} modelFile={currentViewer3DModelFile ?? createViewer3DModelDraft()} selectedItem={selectedViewer3DAnalysisItem} selectedTargetId={selectedViewer3DAnalysisTargetId} onConfigChange={handleViewer3DConfigChange} onDelete={handleViewer3DAnalysisTargetDelete} onModelFileChange={handleViewer3DModelFileChange} onSelect={handleViewer3DAnalysisTargetSelect} onUpdate={handleViewer3DAnalysisTargetUpdate} onItemCameraFocus={(cameraId) => { if (cameraId) viewer3DPreviewRef.current?.switchToCamera(cameraId); }}/>
+                    <Viewer3DAnalysisPanel activeMode={viewer3DAnalysisMode} activePanelTab={viewer3DPanelTab} analysisViewMode={viewer3DAnalysisViewMode} config={currentViewer3DConfig} displaySettings={displaySettings} isThermalMeshPicking={isViewer3DThermalMeshPicking} items={viewer3DAnalysisItems} modelFile={currentViewer3DModelFile ?? createViewer3DModelDraft()} selectedItem={selectedViewer3DAnalysisItem} selectedTargetId={selectedViewer3DAnalysisTargetId} selectedThermalCameraId={selectedViewer3DThermalCameraId} thermalMaterialRecordsRef={viewer3DThermalMaterialRecordsRef} thermalMesh={viewer3DThermalMesh} viewerRef={viewer3DPreviewRef} onAnalysisViewModeChange={setViewer3DAnalysisViewMode} onConfigChange={handleViewer3DConfigChange} onDelete={handleViewer3DAnalysisTargetDelete} onModelFileChange={handleViewer3DModelFileChange} onPanelTabChange={handleViewer3DPanelTabChange} onSelect={handleViewer3DAnalysisTargetSelect} onThermalCameraSelect={setSelectedViewer3DThermalCameraId} onThermalFramePreviewChange={setSelectedViewer3DThermalFramePreview} onThermalMeshPickStart={() => setIsViewer3DThermalMeshPicking((isPicking) => !isPicking)} onUpdate={handleViewer3DAnalysisTargetUpdate} onItemCameraFocus={(cameraId) => { if (cameraId) viewer3DPreviewRef.current?.switchToCamera(cameraId); }}/>
                   </div>) : (<div className="AssetCameraPanel AssetCameraPanel__container-19 grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_16rem] gap-3 overflow-hidden p-3 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)] lg:grid-rows-[minmax(0,1fr)]">
                     <div className="AssetCameraPanel AssetCameraPanel__camera-preview-wrap-1 grid min-h-0 min-w-0 place-items-center overflow-hidden rounded-md border border-cyan-200/25 bg-neutral-950/90 p-2 [container-type:size]">
                       <div className={cn("AssetCameraPanel AssetCameraPanel__container-20 relative h-[min(100cqw,100cqh)] w-[min(100cqw,100cqh)] touch-none overflow-hidden rounded-md border border-cyan-200/25 bg-neutral-950 shadow-[0_0_42px_rgba(34,211,238,0.2)]", isCameraSetupActive &&
@@ -643,23 +681,53 @@ function Viewer3DFilePicker({ accept, label, name, onFile, }) {
         }} type="file"/>
     </label>);
 }
-function Viewer3DAnalysisPanel({ activeMode, config, displaySettings, items, modelFile, onConfigChange, onDelete, onModelFileChange, onSelect, onUpdate, selectedItem, selectedTargetId, onItemCameraFocus, }) {
-    const [activePanelTab, setActivePanelTab] = useState("analysis");
+function Viewer3DAutoRotateToggle({ active, disabled, onClick, }) {
+    return (<button type="button" className="Viewer3DAutoRotateToggle Viewer3DAutoRotateToggle__button-1 inline-flex h-7 items-center gap-1.5 rounded-md border border-border bg-card px-1.5 text-muted-foreground transition hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-45" disabled={disabled} onClick={onClick} title="자동 회전" aria-label="자동 회전" aria-pressed={active}>
+      <Play className={cn("Viewer3DAutoRotateToggle Viewer3DAutoRotateToggle__icon-1 h-3.5 w-3.5 shrink-0", active && "fill-cyan-300 text-cyan-500 dark:text-cyan-300")} aria-hidden="true"/>
+      <span className={cn("Viewer3DAutoRotateToggle Viewer3DAutoRotateToggle__track-1 relative h-4 w-8 rounded-full border transition-colors", active
+        ? "border-cyan-300/70 bg-cyan-300/25 dark:border-cyan-300/70 dark:bg-cyan-300/20"
+        : "border-border bg-muted dark:bg-zinc-800")}>
+        <span className={cn("Viewer3DAutoRotateToggle Viewer3DAutoRotateToggle__thumb-1 absolute left-0.5 top-1/2 h-3 w-3 -translate-y-1/2 rounded-full shadow-sm transition-transform", active
+        ? "translate-x-4 bg-cyan-300"
+        : "translate-x-0 bg-muted-foreground/80 dark:bg-zinc-300")}/>
+      </span>
+    </button>);
+}
+function Viewer3DAnalysisPanel({ activeMode, activePanelTab = "analysis", analysisViewMode = "viewer", config, displaySettings, isThermalMeshPicking, items, modelFile, onAnalysisViewModeChange, onConfigChange, onDelete, onModelFileChange, onPanelTabChange, onSelect, onThermalCameraSelect, onThermalFramePreviewChange, onThermalMeshPickStart, onUpdate, selectedItem, selectedTargetId, selectedThermalCameraId, thermalMaterialRecordsRef, thermalMesh, viewerRef, onItemCameraFocus, }) {
     const selectedTarget = selectedItem?.target;
     const selectedSummary = selectedItem?.summary;
     const selectedCamera = config.cameraVisualization?.selectedCameraId
         ? getCameraPreset(config.cameraVisualization.selectedCameraId)
         : undefined;
+    const cameraVisualizationConfig = config.cameraVisualization ?? {};
+    const showCameraLaserBeams = cameraVisualizationConfig.showLaserBeams !== false;
+    const handleCameraVisualizationChange = (cameraVisualization) => {
+        onConfigChange({ ...config, cameraVisualization });
+    };
+    const handleCameraLaserToggle = (showLaserBeams) => {
+        handleCameraVisualizationChange({
+            ...cameraVisualizationConfig,
+            showLaserBeams,
+        });
+    };
+    const thermalTargetObject = thermalMesh ?? viewerRef?.current?.getThermalModel?.();
+    const thermalTargetLabel = thermalMesh
+        ? getViewer3DThermalMeshLabel(thermalMesh)
+        : getViewer3DThermalModelLabel(modelFile);
+    const thermalAlignmentStorageKey = `checklab:asset-3d-viewer:${getViewer3DThermalStorageKey(modelFile)}:thermal-alignment:v1`;
     const handleResetCameraView = () => {
         onConfigChange(getViewer3DOverviewConfig(config));
     };
     return (<aside className="Viewer3DAnalysisPanel Viewer3DAnalysisPanel__aside-1 flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-md border border-border bg-card p-2 text-card-foreground">
-      <div className="Viewer3DAnalysisPanel Viewer3DAnalysisPanel__tabs-1 mb-2 grid shrink-0 grid-cols-2 gap-1 rounded-md border border-border bg-background p-1" role="tablist" aria-label="3D 패널">
-        <PanelTabButton active={activePanelTab === "analysis"} label="정밀 분석" onClick={() => setActivePanelTab("analysis")}/>
-        <PanelTabButton active={activePanelTab === "settings"} label="설정" onClick={() => setActivePanelTab("settings")}/>
+      <div className="Viewer3DAnalysisPanel Viewer3DAnalysisPanel__tabs-1 mb-2 grid shrink-0 grid-cols-3 gap-1 rounded-md border border-border bg-background p-1" role="tablist" aria-label="3D 패널">
+        <PanelTabButton active={activePanelTab === "analysis"} label="실화상" onClick={() => onPanelTabChange?.("analysis")}/>
+        <PanelTabButton active={activePanelTab === "thermal"} label="열화상" onClick={() => onPanelTabChange?.("thermal")}/>
+        <PanelTabButton active={activePanelTab === "settings"} label="설정" onClick={() => onPanelTabChange?.("settings")}/>
       </div>
       {activePanelTab === "analysis" ? (<div className="Viewer3DAnalysisPanel Viewer3DAnalysisPanel__stack-1 grid min-h-0 gap-2 overflow-y-auto pr-1">
-        <CameraVisualizationControls config={config.cameraVisualization} onChange={(cameraVisualization) => onConfigChange({ ...config, cameraVisualization })} onResetView={handleResetCameraView} selectedCamera={selectedCamera}/>
+        <AnalysisViewModeSwitch mode={analysisViewMode} onChange={onAnalysisViewModeChange}/>
+        <Viewer3DLaserToggle checked={showCameraLaserBeams} onChange={handleCameraLaserToggle}/>
+        <CameraVisualizationControls config={cameraVisualizationConfig} onChange={handleCameraVisualizationChange} onResetView={handleResetCameraView} selectedCamera={selectedCamera}/>
 
         <ControlSection icon={SquareDashedMousePointer} title="분석 상태">
           <div className="Viewer3DAnalysisPanel Viewer3DAnalysisPanel__status-1 grid grid-cols-2 gap-1.5">
@@ -770,13 +838,50 @@ function Viewer3DAnalysisPanel({ activeMode, config, displaySettings, items, mod
               <DetectionSetupStatusRow label="추이" value={selectedSummary.trendLabel}/>
             </div>
           </ControlSection>) : null}
-      </div>) : (<Viewer3DOptionBar className="h-full flex-1 border-0 bg-transparent p-0 md:border-0" config={config} modelFile={modelFile} onConfigChange={onConfigChange} onModelFileChange={onModelFileChange}/>)}
+      </div>) : activePanelTab === "thermal" ? (<Viewer3DOptionBar className="h-full flex-1 border-0 bg-transparent p-0 md:border-0" config={config} modelFile={modelFile} onConfigChange={onConfigChange} onModelFileChange={onModelFileChange}>
+        <ThermalAssetViewerOptionContent captureTargetRef={viewerRef?.current?.getThermalRenderer?.()} isPickingMesh={isThermalMeshPicking} materialRecordsRef={thermalMaterialRecordsRef} projectionCamera={viewerRef?.current?.getThermalCamera?.()} projectionRenderer={viewerRef?.current?.getThermalRenderer?.()} projectionScene={viewerRef?.current?.getThermalScene?.()} selectedCameraId={selectedThermalCameraId} selectedTargetLabel={thermalTargetLabel} selectedTargetObject={thermalTargetObject} storageKey={thermalAlignmentStorageKey} viewerRef={viewerRef} worldOverlayHost={viewerRef?.current?.getThermalStageElement?.()} onPickMesh={onThermalMeshPickStart} onSelectedCameraChange={onThermalCameraSelect} onSelectedFramePreviewChange={onThermalFramePreviewChange}/>
+      </Viewer3DOptionBar>) : (<Viewer3DOptionBar className="h-full flex-1 border-0 bg-transparent p-0 md:border-0" config={config} modelFile={modelFile} onConfigChange={onConfigChange} onModelFileChange={onModelFileChange}/>)}
     </aside>);
 }
 function PanelTabButton({ active, label, onClick }) {
     return (<button type="button" className={cn("Viewer3DAnalysisPanel Viewer3DAnalysisPanel__tab-1 h-7 rounded-sm px-2 text-[11px] font-semibold text-muted-foreground transition hover:bg-accent hover:text-foreground", active && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground")} aria-pressed={active} onClick={onClick}>
       {label}
     </button>);
+}
+function AnalysisViewModeSwitch({ mode = "viewer", onChange }) {
+    return (<div className="Viewer3DAnalysisPanel Viewer3DAnalysisPanel__analysis-view-switch-1 grid grid-cols-2 gap-1 rounded-md border border-border bg-background p-1" role="toolbar" aria-label="Precision analysis view mode">
+      <AnalysisViewModeButton active={mode === "viewer"} icon={Box} label="Viewer" onClick={() => onChange?.("viewer")}/>
+      <AnalysisViewModeButton active={mode === "tiles"} icon={Grid3X3} label="Tiles" onClick={() => onChange?.("tiles")}/>
+    </div>);
+}
+function AnalysisViewModeButton({ active, icon: Icon, label, onClick }) {
+    return (<button type="button" className={cn("Viewer3DAnalysisPanel Viewer3DAnalysisPanel__analysis-view-button-1 inline-flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-sm border px-2 text-[11px] font-semibold transition", active
+        ? "border-primary bg-primary text-primary-foreground"
+        : "border-transparent text-muted-foreground hover:border-border hover:bg-accent hover:text-foreground")} aria-pressed={active} onClick={onClick}>
+      <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true"/>
+      <span className="truncate">{label}</span>
+    </button>);
+}
+function Viewer3DLaserToggle({ checked, onChange }) {
+    return (<label className="Viewer3DAnalysisPanel Viewer3DAnalysisPanel__laser-toggle-1 flex min-w-0 cursor-pointer items-center justify-between gap-2 rounded-md border border-white/10 bg-white/[0.045] px-2 py-1.5">
+      <span className="Viewer3DAnalysisPanel Viewer3DAnalysisPanel__laser-toggle-label-1 truncate text-[11px] font-semibold text-white/66">
+        레이저 표시
+      </span>
+      <input checked={checked} className="Viewer3DAnalysisPanel Viewer3DAnalysisPanel__laser-toggle-input-1 h-4 w-4 shrink-0 accent-cyan-300" onChange={(event) => onChange?.(event.target.checked)} type="checkbox"/>
+    </label>);
+}
+function getViewer3DThermalModelLabel(modelFile) {
+    return (modelFile?.label ||
+        modelFile?.name ||
+        modelFile?.id ||
+        getModelSourceName(modelFile?.plyUrl) ||
+        "전체 3D 모델");
+}
+function getViewer3DThermalMeshLabel(mesh) {
+    return mesh?.name || mesh?.userData?.id || mesh?.uuid || "선택된 mesh";
+}
+function getViewer3DThermalStorageKey(modelFile) {
+    return encodeURIComponent(modelFile?.id || modelFile?.plyUrl || modelFile?.label || "default-model");
 }
 function createViewer3DModelDraft(modelFile) {
     return {

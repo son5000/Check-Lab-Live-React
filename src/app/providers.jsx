@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Toaster } from "react-hot-toast";
 import { useDisplaySettings } from "./layouts/hooks/use-display-settings";
 import { useLanguageTranslator } from "./layouts/hooks/use-language-translator";
+import { PwaRegistration } from "./pwa-registration";
 export function Providers({ children }) {
     const { settings } = useDisplaySettings();
     useLanguageTranslator(settings.language);
@@ -18,6 +19,7 @@ export function Providers({ children }) {
     }));
     return (<QueryClientProvider client={queryClient}>
       {children}
+      <PwaRegistration />
       <Toaster position="top-right" toastOptions={{ duration: 4000 }}/>
     </QueryClientProvider>);
 }

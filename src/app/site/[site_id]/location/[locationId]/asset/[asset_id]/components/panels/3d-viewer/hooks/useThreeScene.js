@@ -2,6 +2,8 @@ import { useEffect, useRef } from "react";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { CameraController } from "../modules/CameraController";
 import { SceneBuilder } from "../modules/SceneBuilder";
+import { disposeObject3D } from "../utils/threeDisposal";
+
 export function useThreeScene(containerRef, config) {
     const sceneRef = useRef(null);
     const cameraRef = useRef(null);
@@ -99,6 +101,7 @@ export function useThreeScene(containerRef, config) {
             if (renderer.domElement.parentNode === container) {
                 container.removeChild(renderer.domElement);
             }
+            scene.children.forEach((object) => disposeObject3D(object));
             renderer.dispose();
             scene.clear();
             sceneRef.current = null;
