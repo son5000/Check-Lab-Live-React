@@ -41,10 +41,18 @@ import {
 } from "@/app/monitoring/thermal-mapping/utils/thermalCameraPose";
 
 const THERMAL_TILE_CAMERA_COUNT = 8;
+const THERMAL_PROJECTION_DEPTH_MAP_HEIGHT = 512;
+const THERMAL_TILE_WORLD_CAMERA_BACK_OFFSET_SCALE = 2.4;
 const THERMAL_VIEW_MODES = Object.freeze({
   TILES: "tiles",
-  WORLD: "world",
+  WORLD: "viewer",
 });
+
+function normalizeThermalViewMode(mode) {
+  return mode === THERMAL_VIEW_MODES.TILES
+    ? THERMAL_VIEW_MODES.TILES
+    : THERMAL_VIEW_MODES.WORLD;
+}
 
 export function ThermalAssetViewerPanel({ onClose, ...contentProps }) {
   return (
@@ -58,9 +66,6 @@ export function ThermalAssetViewerPanel({ onClose, ...contentProps }) {
             <h2 className="truncate text-sm font-semibold">
               Asset 3D Viewer 열화상 매핑
             </h2>
-            <p className="mt-0.5 truncate text-[11px] text-white/55">
-              백엔드 실시간 열화상 데이터 대체용 CSV Mock 데이터를 현재 3D Viewer mesh에 적용합니다.
-            </p>
           </div>
         </div>
         <button
@@ -85,19 +90,29 @@ export function ThermalAssetViewerOptionContent(props) {
 
 function ThermalAssetViewerContent({
   cameras = MOCK_THERMAL_CAMERAS,
+  cameraListRenderSection = true,
   captureTargetRef,
+  hoveredCameraId,
   isPickingMesh,
   materialRecordsRef,
+  onCameraHover,
+  onShowLaserGuideChange,
   onSelectedCameraChange,
   onSelectedFramePreviewChange,
   onPickMesh,
+  onViewModeChange,
+  panelMode = "view",
   projectionRenderer,
   projectionScene,
+  requireCameraSelection = false,
   selectedCameraId: controlledSelectedCameraId,
   selectedTargetLabel,
   selectedTargetObject,
+  showLaserGuide: controlledShowLaserGuide,
   showOverlaySection = true,
+  showViewSettings = true,
   storageKey,
+  viewMode: controlledViewMode,
   viewerRef,
   worldOverlayHost,
 }) {
@@ -115,23 +130,85 @@ function ThermalAssetViewerContent({
         typeof nextCameraId === "function"
           ? nextCameraId(selectedCameraId)
           : nextCameraId;
+      const nextResolvedCameraId =
+        !requireCameraSelection &&
+        resolvedCameraId &&
+        resolvedCameraId === selectedCameraId
+          ? null
+          : resolvedCameraId;
 
       if (!isSelectedCameraControlled) {
-        setUncontrolledSelectedCameraId(resolvedCameraId);
+        setUncontrolledSelectedCameraId(nextResolvedCameraId);
       }
 
-      onSelectedCameraChange?.(resolvedCameraId);
+      onSelectedCameraChange?.(nextResolvedCameraId);
     },
-    [isSelectedCameraControlled, onSelectedCameraChange, selectedCameraId],
+    [
+      isSelectedCameraControlled,
+      onSelectedCameraChange,
+      requireCameraSelection,
+      selectedCameraId,
+    ],
   );
   const [captureResult, setCaptureResult] = useState(null);
   const [meshTextureMessage, setMeshTextureMessage] = useState("");
   const [textureActionVersion, setTextureActionVersion] = useState(0);
-  const [thermalViewMode, setThermalViewMode] = useState(
+  const isThermalViewModeControlled = controlledViewMode !== undefined;
+  const [uncontrolledThermalViewMode, setUncontrolledThermalViewMode] = useState(
     THERMAL_VIEW_MODES.WORLD,
   );
-  const [showThermalLaserGuide, setShowThermalLaserGuide] = useState(true);
-  const autoAppliedThermalLayerKeyRef = useRef("");
+  const activeThermalViewMode = normalizeThermalViewMode(
+    isThermalViewModeControlled
+      ? controlledViewMode
+      : uncontrolledThermalViewMode,
+  );
+  const isSettingsMode = panelMode === "settings";
+  const shouldRenderThermalCameraSettings =
+    showOverlaySection || isSettingsMode;
+  const shouldRenderThermalViewSettings =
+    !showOverlaySection && isSettingsMode && showViewSettings;
+  const shouldRenderThermalWorkflows =
+    showOverlaySection || !isSettingsMode;
+  const setThermalViewMode = useCallback(
+    (nextMode) => {
+      const resolvedMode = normalizeThermalViewMode(nextMode);
+
+      if (!isThermalViewModeControlled) {
+        setUncontrolledThermalViewMode(resolvedMode);
+      }
+
+      onViewModeChange?.(resolvedMode);
+    },
+    [isThermalViewModeControlled, onViewModeChange],
+  );
+  const isShowThermalLaserGuideControlled =
+    controlledShowLaserGuide !== undefined;
+  const [
+    uncontrolledShowThermalLaserGuide,
+    setUncontrolledShowThermalLaserGuide,
+  ] = useState(true);
+  const showThermalLaserGuide = isShowThermalLaserGuideControlled
+    ? controlledShowLaserGuide
+    : uncontrolledShowThermalLaserGuide;
+  const setShowThermalLaserGuide = useCallback(
+    (nextValue) => {
+      const resolvedValue =
+        typeof nextValue === "function"
+          ? nextValue(showThermalLaserGuide)
+          : nextValue;
+
+      if (!isShowThermalLaserGuideControlled) {
+        setUncontrolledShowThermalLaserGuide(resolvedValue);
+      }
+
+      onShowLaserGuideChange?.(resolvedValue);
+    },
+    [
+      isShowThermalLaserGuideControlled,
+      onShowLaserGuideChange,
+      showThermalLaserGuide,
+    ],
+  );
   const localMaterialRecordsRef = useRef(new Map());
   const thermalMaterialRecordsRef =
     materialRecordsRef ?? localMaterialRecordsRef;
@@ -231,7 +308,8 @@ function ThermalAssetViewerContent({
       selectedTargetObject,
   );
   const shouldRenderThermalTileOverlay = Boolean(
-    !showOverlaySection && thermalViewMode === THERMAL_VIEW_MODES.TILES,
+    !showOverlaySection &&
+      activeThermalViewMode === THERMAL_VIEW_MODES.TILES,
   );
   const thermalTileEntries = useMemo(
     () =>
@@ -244,12 +322,12 @@ function ThermalAssetViewerContent({
         })),
     [framesByCameraId, resolvedThermalCameras],
   );
-  const activeThermalViewMode = thermalViewMode;
+  const [expandedTileEntry, setExpandedTileEntry] = useState(null);
   const handleThermalViewModeChange = useCallback(
     (nextMode) => {
       setThermalViewMode(nextMode);
     },
-    [],
+    [setThermalViewMode],
   );
 
   useThermalCameraPreviewPlanes({
@@ -258,6 +336,8 @@ function ThermalAssetViewerContent({
       !showOverlaySection &&
       Boolean(projectionScene && selectedTargetObject),
     framesByCameraId,
+    hoveredCameraId,
+    requireSelection: requireCameraSelection,
     scene: projectionScene,
     selectedCameraId,
     showLaserGuide: showThermalLaserGuide,
@@ -283,11 +363,16 @@ function ThermalAssetViewerContent({
     }
 
     focusThermalCameraPose({
+      backOffsetScale:
+        activeThermalViewMode === THERMAL_VIEW_MODES.TILES
+          ? THERMAL_TILE_WORLD_CAMERA_BACK_OFFSET_SCALE
+          : 1,
       fov: selectedResolvedPose.projectorFov,
       lookAt: toPlainThermalVector(selectedResolvedPose.lookAt),
       position: toPlainThermalVector(selectedResolvedPose.position),
     });
   }, [
+    activeThermalViewMode,
     selectedCameraId,
     selectedResolvedPose,
     selectedTargetObject,
@@ -331,16 +416,51 @@ function ThermalAssetViewerContent({
     selectedResolvedPose,
     showOverlaySection,
   ]);
+  const expandedTileFramePreview = useMemo(() => {
+    const frame = expandedTileEntry?.frame;
+    const camera = expandedTileEntry?.camera;
+    const imageUrl = getThermalFrameImageDataUrl(frame);
+
+    if (
+      showOverlaySection ||
+      activeThermalViewMode !== THERMAL_VIEW_MODES.TILES ||
+      !frame ||
+      !camera ||
+      !imageUrl
+    ) {
+      return null;
+    }
+
+    return {
+      cameraId: frame.cameraId,
+      cameraIndex: frame.cameraIndex,
+      cameraName: frame.cameraName ?? camera.cameraName,
+      capturedAt: frame.capturedAt,
+      height: frame.height,
+      imageUrl,
+      onClose: () => setExpandedTileEntry(null),
+      presentation: "tile-popup",
+      width: frame.width,
+    };
+  }, [activeThermalViewMode, expandedTileEntry, showOverlaySection]);
+  const activeFramePreview =
+    expandedTileFramePreview ?? selectedFramePreview;
 
   useEffect(() => {
-    onSelectedFramePreviewChange?.(selectedFramePreview);
-  }, [onSelectedFramePreviewChange, selectedFramePreview]);
+    onSelectedFramePreviewChange?.(activeFramePreview);
+  }, [activeFramePreview, onSelectedFramePreviewChange]);
 
   useEffect(() => {
     return () => {
       onSelectedFramePreviewChange?.(null);
     };
   }, [onSelectedFramePreviewChange]);
+
+  useEffect(() => {
+    if (!shouldRenderThermalTileOverlay) {
+      setExpandedTileEntry(null);
+    }
+  }, [shouldRenderThermalTileOverlay]);
 
   useEffect(() => {
     if (!poseStorageKey) {
@@ -422,8 +542,6 @@ function ThermalAssetViewerContent({
 
   const restoreThermalTextureForTarget = useCallback(
     (targetObject, { silent = false, updateState = true } = {}) => {
-      autoAppliedThermalLayerKeyRef.current = "";
-
       if (!targetObject) {
         if (!silent && updateState) {
           setMeshTextureMessage("복구할 3D Viewer mesh를 찾지 못했습니다.");
@@ -488,187 +606,6 @@ function ThermalAssetViewerContent({
       });
     };
   }, [restoreThermalTextureForTarget, selectedTargetObject, showOverlaySection]);
-
-  useEffect(() => {
-    if (showOverlaySection || !selectedTargetObject) {
-      return;
-    }
-
-    if (loading || !projectionRenderer || !projectionScene || !cameras.length) {
-      return;
-    }
-
-    const entries = resolvedThermalCameras.map((camera, index) => ({
-      camera,
-      frame: framesByCameraId[camera.cameraId],
-      index,
-    }));
-    const readyEntries = selectedCameraId
-      ? entries.filter(
-          (entry) =>
-            entry.camera.cameraId === selectedCameraId && Boolean(entry.frame),
-        )
-      : entries.filter((entry) => entry.frame);
-    const expectedEntryCount = selectedCameraId ? 1 : cameras.length;
-
-    if (readyEntries.length !== expectedEntryCount) {
-      if (selectedCameraId) {
-        restoreThermalTextureForTarget(selectedTargetObject, { silent: true });
-      }
-      return;
-    }
-
-    const layerModeKey = selectedCameraId ?? "ALL";
-    const applyKey = [
-      selectedTargetObject.uuid,
-      layerModeKey,
-      readyEntries
-        .map(
-          ({ camera, frame, index }) =>
-            `${camera.cameraId}:${frame.capturedAt}:${getThermalCameraPoseKey(
-              camera,
-              index,
-              resolvedThermalCameras.length,
-            )}`,
-        )
-        .join("|"),
-    ].join("::");
-
-    if (autoAppliedThermalLayerKeyRef.current === applyKey) {
-      return;
-    }
-
-    const targetMeshUuids = collectThermalTargetMeshUuids(selectedTargetObject);
-    const staleLayersToDispose = new Set();
-    const staleTexturesToDispose = new Set();
-
-    thermalMaterialRecordsRef.current.forEach((record, meshUuid) => {
-      if (!targetMeshUuids.has(meshUuid)) {
-        return;
-      }
-
-      record.layers?.forEach((layer) => {
-        staleLayersToDispose.add(layer);
-      });
-
-      if (record.texture) {
-        staleTexturesToDispose.add(record.texture);
-      }
-    });
-
-    const nextLayers = readyEntries.reduce(
-      (layers, { camera, frame, index }) => {
-        const thermalCanvas = createThermalCanvasFromFrame(frame, {
-          paletteMaxTemperature: frame.maxTemperature,
-          paletteMinTemperature: frame.minTemperature,
-        });
-
-        if (!thermalCanvas) {
-          return layers;
-        }
-
-        const texture = createThermalTextureFromCanvas(thermalCanvas, {
-          flipY: false,
-        });
-
-        if (!texture) {
-          return layers;
-        }
-
-        const projection = createThermalCameraPoseProjectionOptions({
-          cameraConfig: camera,
-          cameraIndex: index,
-          frame,
-          includeDepthMap: Boolean(selectedCameraId),
-          renderer: projectionRenderer,
-          scene: projectionScene,
-          targetObject: selectedTargetObject,
-          totalCameraCount: resolvedThermalCameras.length,
-        });
-
-        if (!projection) {
-          texture.dispose();
-          return layers;
-        }
-
-        layers.push({
-          cameraId: frame.cameraId,
-          cameraName: frame.cameraName,
-          opacity: 0.92,
-          projection,
-          targetName: targetLabel,
-          texture,
-        });
-
-        return layers;
-      },
-      [],
-    );
-
-    if (nextLayers.length !== readyEntries.length) {
-      const nextTexturesToDispose = new Set();
-      nextLayers.forEach((layer) => {
-        disposeThermalLayerResources(layer, nextTexturesToDispose);
-      });
-      nextTexturesToDispose.forEach((texture) => texture?.dispose?.());
-      restoreThermalTextureForTarget(selectedTargetObject, { silent: true });
-      return;
-    }
-
-    const result = applyThermalTextureLayersToObject3D(
-      selectedTargetObject,
-      nextLayers,
-      {
-        disposeCurrentMaterial: true,
-        getOriginalMaterial: (mesh) =>
-          thermalMaterialRecordsRef.current.get(mesh.uuid)?.originalMaterial,
-      },
-    );
-
-    if (!result.ok) {
-      const nextTexturesToDispose = new Set();
-      nextLayers.forEach((layer) => {
-        disposeThermalLayerResources(layer, nextTexturesToDispose);
-      });
-      nextTexturesToDispose.forEach((texture) => texture?.dispose?.());
-      setMeshTextureMessage(
-        result.error ?? "모든 열화상 카메라 layer 적용에 실패했습니다.",
-      );
-      return;
-    }
-
-    staleLayersToDispose.forEach((layer) => {
-      disposeThermalLayerResources(layer, staleTexturesToDispose);
-    });
-    staleTexturesToDispose.forEach((texture) => texture?.dispose?.());
-    result.appliedEntries.forEach((entry) => {
-      thermalMaterialRecordsRef.current.set(entry.meshUuid, {
-        ...entry,
-        layers: nextLayers,
-        targetName: targetLabel,
-      });
-    });
-    autoAppliedThermalLayerKeyRef.current = applyKey;
-    setTextureActionVersion((version) => version + 1);
-    setMeshTextureMessage(
-      selectedCameraId
-        ? `${readyEntries[0].frame.cameraName} 열화상 layer만 mesh에 적용했습니다.`
-        : `모든 열화상 카메라 ${nextLayers.length}개 layer를 카메라 좌표 기준으로 적용했습니다.`,
-    );
-  }, [
-    cameras,
-    framesByCameraId,
-    loading,
-    projectionRenderer,
-    projectionScene,
-    restoreThermalTextureForTarget,
-    resolvedThermalCameras,
-    selectedCameraId,
-    selectedTargetObject,
-    showOverlaySection,
-    targetLabel,
-    thermalMaterialRecordsRef,
-  ]);
 
   const handleApplyThermalTexture = useCallback(() => {
     if (!selectedFrame) {
@@ -853,7 +790,7 @@ function ThermalAssetViewerContent({
           : "grid min-h-0 gap-3"
       }
       >
-      {!showOverlaySection ? (
+      {shouldRenderThermalViewSettings ? (
         <div className="grid gap-2">
           <ThermalViewModeSwitch
             mode={activeThermalViewMode}
@@ -865,13 +802,18 @@ function ThermalAssetViewerContent({
           />
         </div>
       ) : null}
-      <ThermalCameraList
-        cameras={cameras}
-        framesByCameraId={framesByCameraId}
-        loading={loading}
-        selectedCameraId={selectedCameraId}
-        onSelectCamera={setSelectedCameraId}
-      />
+      {shouldRenderThermalCameraSettings ? (
+        <ThermalCameraList
+          cameras={cameras}
+          framesByCameraId={framesByCameraId}
+          loading={loading}
+          onCameraHover={onCameraHover}
+          requireSelection={requireCameraSelection}
+          renderSection={cameraListRenderSection}
+          selectedCameraId={selectedCameraId}
+          onSelectCamera={setSelectedCameraId}
+        />
+      ) : null}
 
       {showOverlaySection ? (
         <ThermalCalibrationOverlay
@@ -897,7 +839,7 @@ function ThermalAssetViewerContent({
             onChange={handleAlignmentChange}
             onReset={handleAlignmentReset}
           />
-        ) : (
+        ) : isSettingsMode ? (
           <ThermalCameraPoseCalibrationControls
             basePose={selectedBasePose}
             disabled={!selectedCameraId || !selectedFrame || !selectedTargetObject}
@@ -906,40 +848,44 @@ function ThermalAssetViewerContent({
             onChange={handleVirtualPoseChange}
             onReset={handleVirtualPoseReset}
           />
-        )}
+        ) : null}
 
-        <ThermalProjectionStatus
-          appliedLayerCount={appliedLayerCount}
-          depthMaskEnabled={depthMaskEnabled}
-          selectedFrame={selectedFrame}
-          targetLabel={targetLabel}
-        />
-
-        <ThermalMeshTextureActions
-          disabled={!selectedCameraId || !selectedFrame || !selectedTargetObject}
-          hasStoredMaterialRecords={hasStoredMaterialRecords}
-          isPickingMesh={isPickingMesh}
-          message={meshTextureMessage}
-          selectedTargetLabel={targetLabel}
-          onApplyTexture={handleApplyThermalTexture}
-          onPickMesh={onPickMesh}
-          onRestoreMaterial={handleRestoreThermalTexture}
-        />
-
-        {selectedFrame ? (
-          <dl className="grid gap-2 rounded-md border border-white/10 bg-white/[0.045] p-2 text-[11px]">
-            <ThermalMetric label="선택 카메라" value={selectedFrame.cameraName} />
-            <ThermalMetric label="Width" value={selectedFrame.width} />
-            <ThermalMetric label="Height" value={selectedFrame.height} />
-            <ThermalMetric
-              label="실제 minTemperature"
-              value={`${formatTemperature(selectedFrame.minTemperature)} C`}
+        {shouldRenderThermalWorkflows ? (
+          <>
+            <ThermalProjectionStatus
+              appliedLayerCount={appliedLayerCount}
+              depthMaskEnabled={depthMaskEnabled}
+              selectedFrame={selectedFrame}
+              targetLabel={targetLabel}
             />
-            <ThermalMetric
-              label="실제 maxTemperature"
-              value={`${formatTemperature(selectedFrame.maxTemperature)} C`}
+
+            <ThermalMeshTextureActions
+              disabled={!selectedCameraId || !selectedFrame || !selectedTargetObject}
+              hasStoredMaterialRecords={hasStoredMaterialRecords}
+              isPickingMesh={isPickingMesh}
+              message={meshTextureMessage}
+              selectedTargetLabel={targetLabel}
+              onApplyTexture={handleApplyThermalTexture}
+              onPickMesh={onPickMesh}
+              onRestoreMaterial={handleRestoreThermalTexture}
             />
-          </dl>
+
+            {selectedFrame ? (
+              <dl className="grid gap-2 rounded-md border border-white/10 bg-white/[0.045] p-2 text-[11px]">
+                <ThermalMetric label="선택 카메라" value={selectedFrame.cameraName} />
+                <ThermalMetric label="Width" value={selectedFrame.width} />
+                <ThermalMetric label="Height" value={selectedFrame.height} />
+                <ThermalMetric
+                  label="실제 minTemperature"
+                  value={`${formatTemperature(selectedFrame.minTemperature)} C`}
+                />
+                <ThermalMetric
+                  label="실제 maxTemperature"
+                  value={`${formatTemperature(selectedFrame.maxTemperature)} C`}
+                />
+              </dl>
+            ) : null}
+          </>
         ) : null}
       </div>
       </div>
@@ -950,6 +896,7 @@ function ThermalAssetViewerContent({
               loading={loading}
               selectedCameraId={selectedCameraId}
               onCameraSelect={setSelectedCameraId}
+              onExpandedEntryChange={setExpandedTileEntry}
             />,
             worldOverlayHost,
           )
@@ -1023,9 +970,9 @@ function ThermalCameraTileOverlay({
   entries,
   loading,
   onCameraSelect,
+  onExpandedEntryChange,
   selectedCameraId,
 }) {
-  const [expandedEntry, setExpandedEntry] = useState(null);
   const cells = [
     entries[0],
     entries[1],
@@ -1050,18 +997,12 @@ function ThermalCameraTileOverlay({
               active={cell?.camera?.cameraId === selectedCameraId}
               entry={cell}
               loading={loading}
-              onExpand={setExpandedEntry}
+              onExpand={(entry) => onExpandedEntryChange?.(entry)}
               onSelect={onCameraSelect}
             />
           ),
         )}
       </div>
-      {expandedEntry ? (
-        <ThermalExpandedTilePreview
-          entry={expandedEntry}
-          onClose={() => setExpandedEntry(null)}
-        />
-      ) : null}
     </div>
   );
 }
@@ -1168,63 +1109,6 @@ function ThermalCameraImageTile({
   );
 }
 
-function ThermalExpandedTilePreview({ entry, onClose }) {
-  const imageDataUrl = useMemo(() => {
-    return getThermalFrameImageDataUrl(entry?.frame);
-  }, [entry?.frame]);
-  const camera = entry?.camera;
-  const frame = entry?.frame;
-
-  return (
-    <div
-      className="Three3DViewer__thermal-expanded-preview-1 pointer-events-auto absolute inset-0 z-20 grid place-items-center bg-black/76 p-4 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-      aria-label={camera?.cameraName ?? "Thermal frame preview"}
-      onClick={onClose}
-    >
-      <div
-        className="relative grid max-h-full w-[min(92%,56rem)] max-w-full grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-md border border-cyan-200/35 bg-neutral-950 shadow-2xl"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="flex min-w-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-white">
-              {camera?.cameraName ?? "Thermal camera"}
-            </p>
-            <p className="truncate font-mono text-[11px] text-white/55">
-              {frame ? `${frame.width}x${frame.height}` : "No frame"}
-            </p>
-          </div>
-          <button
-            type="button"
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-white/15 bg-white/[0.06] text-white/70 transition hover:bg-white/[0.12] hover:text-white"
-            title="Close"
-            aria-label="Close expanded thermal frame"
-            onClick={onClose}
-          >
-            <X className="h-4 w-4" aria-hidden="true" />
-          </button>
-        </div>
-        <div className="grid min-h-0 place-items-center bg-black p-2">
-          {imageDataUrl ? (
-            <img
-              alt={camera?.cameraName ?? "Thermal frame"}
-              className="max-h-full max-w-full object-contain"
-              draggable={false}
-              src={imageDataUrl}
-            />
-          ) : (
-            <div className="grid min-h-[16rem] place-items-center text-sm font-semibold text-white/50">
-              No frame
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function getThermalFrameImageDataUrl(frame) {
   if (!frame) {
     return "";
@@ -1236,26 +1120,6 @@ function getThermalFrameImageDataUrl(frame) {
   });
 
   return canvas?.toDataURL("image/png") ?? "";
-}
-
-function getThermalCameraPoseKey(cameraConfig, cameraIndex, totalCameraCount) {
-  const pose = cameraConfig?.worldPose ?? getFallbackThermalCameraPoseKeySource(
-    cameraIndex,
-    totalCameraCount,
-  );
-
-  return [
-    pose.coordinateSpace ?? "asset-relative-sample",
-    getThermalPoseVectorKey(pose.position),
-    getThermalPoseVectorKey(pose.lookAt),
-    toFiniteNumber(
-      pose.previewPlaneScale,
-      DEFAULT_THERMAL_SAMPLE_POSE.previewPlaneScale,
-    ),
-    clampThermalCaptureFov(
-      toFiniteNumber(pose.projectorFov, DEFAULT_THERMAL_SAMPLE_POSE.projectorFov),
-    ),
-  ].join(":");
 }
 
 function getFallbackThermalCameraPoseKeySource(cameraIndex, totalCameraCount) {
@@ -1272,14 +1136,6 @@ function getFallbackThermalCameraPoseKeySource(cameraIndex, totalCameraCount) {
     previewPlaneScale: DEFAULT_THERMAL_SAMPLE_POSE.previewPlaneScale,
     projectorFov: DEFAULT_THERMAL_SAMPLE_POSE.projectorFov,
   };
-}
-
-function getThermalPoseVectorKey(vector) {
-  return [
-    toFiniteNumber(vector?.x, 0),
-    toFiniteNumber(vector?.y, 0),
-    toFiniteNumber(vector?.z, 0),
-  ].join(",");
 }
 
 function toPlainThermalVector(vector) {
@@ -1335,10 +1191,13 @@ function createThermalCameraPoseProjectionOptions({
     depthMap: includeDepthMap
       ? captureThermalProjectionDepthMap({
           camera: projectorCamera,
-          height: 768,
+          height: THERMAL_PROJECTION_DEPTH_MAP_HEIGHT,
           renderer,
           scene,
-          width: Math.max(1, Math.round(768 * aspectRatio)),
+          width: Math.max(
+            1,
+            Math.round(THERMAL_PROJECTION_DEPTH_MAP_HEIGHT * aspectRatio),
+          ),
         })
       : null,
     height: 1,
@@ -1645,9 +1504,9 @@ function ThermalCameraPoseCalibrationControls({
     return (
       <section className="grid gap-2 rounded-md border border-white/10 bg-white/[0.045] p-2 text-[11px] text-white/60">
         <h3 className="truncate text-xs font-semibold text-white">
-          Virtual camera calibration
+          카메라 위치 / 화각
         </h3>
-        <p>열화상 카메라를 선택하면 가상 좌표와 화각을 조정할 수 있습니다.</p>
+        <p>열화상 카메라를 선택하면 위치와 화각을 조정할 수 있습니다.</p>
       </section>
     );
   }
@@ -1656,11 +1515,8 @@ function ThermalCameraPoseCalibrationControls({
     <section className="grid gap-2 rounded-md border border-white/10 bg-white/[0.045] p-2">
       <div className="min-w-0">
         <h3 className="truncate text-xs font-semibold text-white">
-          Virtual camera calibration
+          카메라 위치 / 화각
         </h3>
-        <p className="mt-0.5 text-[11px] text-white/55">
-          현실 설치값과 비교하면서 3D 월드의 가상 열화상 카메라 pose를 조정합니다.
-        </p>
       </div>
 
       <div className="grid gap-2">
@@ -1855,9 +1711,6 @@ function ThermalMeshTextureActions({
         <h3 className="truncate text-xs font-semibold text-white">
           Mesh thermal texture
         </h3>
-        <p className="mt-0.5 truncate text-[11px] text-white/55">
-          대상: {selectedTargetLabel}
-        </p>
       </div>
 
       <button

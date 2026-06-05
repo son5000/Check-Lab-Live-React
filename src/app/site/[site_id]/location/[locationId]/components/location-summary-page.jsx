@@ -829,9 +829,6 @@ function AssetOptionSaveDialog({
               <h4 className="LocationSummaryPage LocationSummaryPage__save-section-title-1 truncate text-sm font-semibold">
                 변경된 항목
               </h4>
-              <span className="LocationSummaryPage LocationSummaryPage__save-count-1 rounded-sm border border-border bg-card px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                {changedRows.length}개
-              </span>
             </div>
             <div className="LocationSummaryPage LocationSummaryPage__save-change-list-1 grid gap-1.5">
               {changedRows.map((row) => (
@@ -1179,9 +1176,6 @@ function NumberField({ label, min, onChange, suffix, value }) {
             onChange(readBoundedNumber(event.target.value, value, min))
           }
         />
-        <span className="LocationSummaryPage LocationSummaryPage__label-11 shrink-0 text-[10px] text-muted-foreground">
-          {suffix}
-        </span>
       </span>
     </label>
   );

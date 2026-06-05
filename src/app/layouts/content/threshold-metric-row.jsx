@@ -7,11 +7,6 @@ export function ThresholdMetricRow({ metric, onThresholdChange, }) {
       <span className="ThresholdMetricRow ThresholdMetricRow__label-1 truncate text-muted-foreground">{metric.group}</span>
       <div className="ThresholdMetricRow ThresholdMetricRow__container-2 min-w-0">
         <p className="ThresholdMetricRow ThresholdMetricRow__text-1 truncate font-semibold text-foreground">{metric.label}</p>
-        <p className="ThresholdMetricRow ThresholdMetricRow__text-2 truncate font-mono text-[10px] text-muted-foreground">
-          현재 {metric.value}
-          {metric.unit} · {isExceeded ? "초과" : "여유"} {difference}
-          {metric.unit}
-        </p>
       </div>
       <p className="ThresholdMetricRow ThresholdMetricRow__text-3 truncate text-right font-mono text-xs font-semibold text-foreground">
         {metric.value}
@@ -23,7 +18,6 @@ export function ThresholdMetricRow({ metric, onThresholdChange, }) {
             const nextValue = Number(event.target.value);
             onThresholdChange(metric.id, Number.isNaN(nextValue) ? 0 : nextValue);
         }}/>
-        <span className="ThresholdMetricRow ThresholdMetricRow__label-4 shrink-0 text-[10px] text-muted-foreground">{metric.unit}</span>
       </label>
       <span className={cn("ThresholdMetricRow ThresholdMetricRow__label-5 rounded-sm border px-1 py-0.5 text-center text-[10px] font-semibold", isExceeded ? thresholdStatusClassName.exceeded : thresholdStatusClassName.normal)}>
         {isExceeded ? "초과" : "정상"}

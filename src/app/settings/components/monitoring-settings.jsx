@@ -38,9 +38,6 @@ export function MonitoringSettings() {
               />
               <span className="text-sm font-medium text-foreground">알람 활성화</span>
             </label>
-            <p className="mt-1 text-xs text-muted-foreground">
-              설정된 임계치를 초과하면 알람이 발동됩니다
-            </p>
           </div>
 
           {/* 온도 임계치 */}
@@ -129,9 +126,6 @@ export function MonitoringSettings() {
               />
               <span className="text-sm text-muted-foreground">일</span>
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              설정된 기간이 지난 데이터는 자동으로 삭제됩니다
-            </p>
           </div>
         </div>
       </div>

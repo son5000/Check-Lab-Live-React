@@ -174,9 +174,6 @@ export function SecuritySettings() {
               <Trash2 className="mt-0.5 h-4 w-4 text-red-600" />
               <div className="flex-1">
                 <p className="text-sm font-medium text-foreground">계정 삭제</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  이 작업은 되돌릴 수 없습니다. 계정과 모든 관련 데이터가 영구적으로 삭제됩니다.
-                </p>
                 <button className="mt-2 rounded-md border border-red-600 bg-red-600/10 px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-600/20">
                   계정 삭제
                 </button>

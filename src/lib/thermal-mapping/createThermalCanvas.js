@@ -1,5 +1,7 @@
 import { jetColorMap, normalizeTemperature } from "./thermalPalette.js";
 
+const thermalCanvasCache = new WeakMap();
+
 export function createThermalCanvasFromFrame(frame, options = {}) {
   if (typeof document === "undefined" || !frame) {
     return null;
@@ -12,6 +14,18 @@ export function createThermalCanvasFromFrame(frame, options = {}) {
 
   if (!width || !height || !Array.isArray(frame.temperatureMatrix)) {
     return null;
+  }
+
+  const cacheKey = getThermalCanvasCacheKey({
+    height,
+    paletteMaxTemperature,
+    paletteMinTemperature,
+    width,
+  });
+  const cachedCanvas = thermalCanvasCache.get(frame)?.get(cacheKey);
+
+  if (cachedCanvas) {
+    return cachedCanvas;
   }
 
   const canvas = document.createElement("canvas");
@@ -49,7 +63,28 @@ export function createThermalCanvasFromFrame(frame, options = {}) {
   }
 
   context.putImageData(imageData, 0, 0);
+  setCachedThermalCanvas(frame, cacheKey, canvas);
   return canvas;
+}
+
+function getThermalCanvasCacheKey({
+  height,
+  paletteMaxTemperature,
+  paletteMinTemperature,
+  width,
+}) {
+  return [
+    width,
+    height,
+    Number.isFinite(paletteMinTemperature) ? paletteMinTemperature : "min",
+    Number.isFinite(paletteMaxTemperature) ? paletteMaxTemperature : "max",
+  ].join(":");
+}
+
+function setCachedThermalCanvas(frame, cacheKey, canvas) {
+  const cachedCanvases = thermalCanvasCache.get(frame) ?? new Map();
+  cachedCanvases.set(cacheKey, canvas);
+  thermalCanvasCache.set(frame, cachedCanvases);
 }
 
 function normalizeCanvasSize(value) {

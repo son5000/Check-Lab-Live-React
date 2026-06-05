@@ -49,6 +49,7 @@ import {
 const EMPTY_ANALYSIS_TARGETS = [];
 const WORLD_POPUP_POS_KEY = "three3d_world_popup_pos";
 const ANALYSIS_CAMERA_TILE_COUNT = 8;
+const ANALYSIS_TILE_WORLD_CAMERA_BACK_OFFSET_SCALE = 2.4;
 export const Three3DViewer = forwardRef(function Three3DViewer(
   {
     activeAnalysisMode,
@@ -64,6 +65,7 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
     modelFile,
     onAnalysisModeChange,
     onAnalysisTargetCreate,
+    onAnalysisTargetDelete,
     onAnalysisTargetSelect,
     onAnalysisTargetUpdate,
     onConfigChange,
@@ -83,6 +85,7 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
   const projectedTargetsKeyRef = useRef("");
   const raycasterRef = useRef(new THREE.Raycaster());
   const worldPreviewSnapshotFrameRef = useRef(0);
+  const previousThermalCameraIdRef = useRef(null);
   const [internalConfig, setInternalConfig] = useState(initialConfig);
   const [internalModelFile, setInternalModelFile] = useState(
     modelFile ?? DEFAULT_MODEL_3D_FILE,
@@ -92,7 +95,11 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
   const [cameraFrameVersion, setCameraFrameVersion] = useState(0);
   const [projectedTargets, setProjectedTargets] = useState([]);
   const [worldPreviewSnapshot, setWorldPreviewSnapshot] = useState("");
+  const [worldPreviewSnapshotFailed, setWorldPreviewSnapshotFailed] =
+    useState(false);
   const [worldPopupPos, setWorldPopupPos] = useState(loadWorldPopupPosition);
+  const [expandedAnalysisCameraId, setExpandedAnalysisCameraId] =
+    useState(null);
   const worldPopupRef = useRef(null);
   const worldPopupDragRef = useRef(null);
   const resolvedConfig = config ?? internalConfig;
@@ -153,27 +160,70 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
     },
     [modelFile, onModelFileChange],
   );
-  const selectedCameraForPreview =
-    !hideCameraVisualization &&
-    showCameraOverlays &&
-    activeCameraVisualizationConfig.selectedCameraId
-      ? getCameraPreset(activeCameraVisualizationConfig.selectedCameraId)
-      : undefined;
+  const selectedCameraForPreview = useMemo(() => {
+    if (
+      hideCameraVisualization ||
+      !showCameraOverlays ||
+      !activeCameraVisualizationConfig.selectedCameraId
+    ) {
+      return undefined;
+    }
+
+    return getConfiguredCameraPreset(
+      activeCameraVisualizationConfig.selectedCameraId,
+      activeCameraVisualizationConfig,
+    );
+  }, [
+    activeCameraVisualizationConfig.customFovs,
+    activeCameraVisualizationConfig.customPositions,
+    activeCameraVisualizationConfig.selectedCameraId,
+    hideCameraVisualization,
+    showCameraOverlays,
+  ]);
   const selectedCameraIdForPreview = selectedCameraForPreview?.id;
   const selectedThermalCameraIdForPreview =
     thermalCameraOverlay?.selectedCameraId ?? null;
+  const isCameraVisualizationSelectionRequired =
+    activeCameraVisualizationConfig.requireSelection === true;
+  const isThermalCameraSelectionRequired =
+    thermalCameraOverlay?.requireSelection === true;
+  const rawThermalFramePreview =
+    thermalCameraOverlay?.selectedFramePreview ?? null;
+  const isThermalTileFramePreview =
+    rawThermalFramePreview?.presentation === "tile-popup";
   const selectedThermalFramePreview =
-    selectedThermalCameraIdForPreview &&
-    thermalCameraOverlay?.selectedFramePreview?.cameraId ===
-      selectedThermalCameraIdForPreview
-      ? thermalCameraOverlay.selectedFramePreview
+    rawThermalFramePreview &&
+    (isThermalTileFramePreview ||
+      (selectedThermalCameraIdForPreview &&
+        rawThermalFramePreview.cameraId === selectedThermalCameraIdForPreview))
+      ? rawThermalFramePreview
       : null;
+  const selectedThermalViewerFramePreview = isThermalTileFramePreview
+    ? null
+    : selectedThermalFramePreview;
+  const selectedThermalTileFramePreview = isThermalTileFramePreview
+    ? selectedThermalFramePreview
+    : null;
   const isAnalysisTileMode = Boolean(
     analysisViewMode === "tiles" &&
       !hideCameraVisualization &&
       showCameraOverlays &&
       activeCameraVisualizationConfig.enabled,
   );
+  const expandedAnalysisCamera = useMemo(() => {
+    if (!isAnalysisTileMode || !expandedAnalysisCameraId) {
+      return null;
+    }
+
+    return getConfiguredCameraPreset(
+      expandedAnalysisCameraId,
+      activeCameraVisualizationConfig,
+    );
+  }, [
+    activeCameraVisualizationConfig,
+    expandedAnalysisCameraId,
+    isAnalysisTileMode,
+  ]);
   const selectedImagePreview = useMemo(
     () => {
       if (selectedCameraForPreview && !isAnalysisTileMode) {
@@ -186,34 +236,47 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
         };
       }
 
-      if (selectedThermalFramePreview?.imageUrl) {
+      if (selectedThermalViewerFramePreview?.imageUrl) {
         return {
-          cameraId: selectedThermalFramePreview.cameraId,
-          fov: selectedThermalFramePreview.fov,
-          imageUrl: selectedThermalFramePreview.imageUrl,
-          label: selectedThermalFramePreview.cameraName,
+          cameraId: selectedThermalViewerFramePreview.cameraId,
+          fov: selectedThermalViewerFramePreview.fov,
+          imageUrl: selectedThermalViewerFramePreview.imageUrl,
+          label: selectedThermalViewerFramePreview.cameraName,
           sourceSize: {
-            height: selectedThermalFramePreview.height,
-            width: selectedThermalFramePreview.width,
+            height: selectedThermalViewerFramePreview.height,
+            width: selectedThermalViewerFramePreview.width,
           },
-          worldCamera: selectedThermalFramePreview.worldCamera,
+          worldCamera: selectedThermalViewerFramePreview.worldCamera,
         };
       }
 
       return null;
     },
-    [isAnalysisTileMode, selectedCameraForPreview, selectedThermalFramePreview],
+    [
+      isAnalysisTileMode,
+      selectedCameraForPreview,
+      selectedThermalViewerFramePreview,
+    ],
   );
   const shouldRenderCameraImagePreview = Boolean(selectedImagePreview);
-  const renderInteractionMode = shouldRenderCameraImagePreview
+  const shouldRenderExpandedAnalysisSurface = Boolean(
+    expandedAnalysisCamera || selectedThermalTileFramePreview,
+  );
+  const hasCameraAnalysisSurface = Boolean(
+    selectedImagePreview ||
+      expandedAnalysisCamera ||
+      selectedThermalTileFramePreview,
+  );
+  const renderInteractionMode = hasCameraAnalysisSurface
     ? "camera"
     : "world";
   const showOptionBar =
     allowOptionBar && (resolvedConfig.controls?.showOptionBar ?? true);
   const selectedAnalysisCameraId =
     selectedImagePreview?.cameraId ??
-    selectedCameraIdForPreview ??
-    selectedThermalCameraIdForPreview;
+    expandedAnalysisCamera?.id ??
+    selectedThermalTileFramePreview?.cameraId ??
+    null;
   const filteredAnalysisTargets = useMemo(
     () =>
       selectedAnalysisCameraId
@@ -227,7 +290,7 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
     activeAnalysisMode &&
     onAnalysisTargetCreate &&
     selectedAnalysisCameraId &&
-    (selectedCameraIdForPreview || selectedImagePreview),
+    hasCameraAnalysisSurface,
   );
   const selectedProjectedTarget = useMemo(
     () =>
@@ -248,7 +311,7 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
   const shouldRenderAnalysisModeToolbar = Boolean(
     onAnalysisModeChange &&
       selectedAnalysisCameraId &&
-      (selectedCameraIdForPreview || selectedImagePreview),
+      hasCameraAnalysisSurface,
   );
   const analysisDragRect = useMemo(
     () =>
@@ -361,7 +424,7 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
   const getInteractionPoint = (clientPoint) => {
     if (renderInteractionMode === "camera") {
       return getCameraImageInteractionPoint({
-        cameraId: selectedImagePreview?.cameraId,
+        cameraId: selectedAnalysisCameraId,
         canvas: cameraImageCanvasRef.current,
         clientPoint,
         image: cameraImageElementRef.current,
@@ -498,14 +561,27 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
     activeAnalysisMode,
     onAnalysisModeChange,
   ]);
+  useEffect(() => {
+    const previousThermalCameraId = previousThermalCameraIdRef.current;
+
+    if (previousThermalCameraId && !selectedThermalCameraIdForPreview) {
+      resetToOverviewCamera();
+    }
+
+    previousThermalCameraIdRef.current = selectedThermalCameraIdForPreview;
+  }, [resetToOverviewCamera, selectedThermalCameraIdForPreview]);
   const switchToCamera = useCallback(
     (cameraId) => {
-      const camera = getCameraPreset(cameraId);
+      const camera = getConfiguredCameraPreset(
+        cameraId,
+        resolvedCameraVisualizationConfig,
+      );
       if (!camera) {
         return;
       }
       const focusedWorldCamera = isAnalysisTileMode
         ? getWorldPreviewCameraConfig({
+            backOffsetScale: ANALYSIS_TILE_WORLD_CAMERA_BACK_OFFSET_SCALE,
             container: containerRef.current,
             model: modelRef.current,
             overviewCamera:
@@ -577,11 +653,12 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
 
       const targetExtent = getThermalFocusExtent(modelRef.current);
       const thermalDistance = Math.max(0.001, viewDirection.length());
+      const backOffsetScale = Math.max(1, Number(pose.backOffsetScale) || 1);
       const backOffset = Math.max(
         targetExtent * 0.18,
         thermalDistance * 0.35,
         0.08,
-      );
+      ) * backOffsetScale;
       const viewPosition = thermalPosition
         .clone()
         .addScaledVector(viewDirection.normalize(), backOffset);
@@ -646,12 +723,18 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
       resetToOverviewCamera,
     ],
   );
+  useEffect(() => {
+    if (!isAnalysisTileMode) {
+      setExpandedAnalysisCameraId(null);
+    }
+  }, [isAnalysisTileMode]);
   useLayoutEffect(() => {
     setWorldPopupPos(null);
   }, [selectedImagePreview?.cameraId]);
   useLayoutEffect(() => {
     if (!selectedImagePreview?.worldCamera) {
       setWorldPreviewSnapshot("");
+      setWorldPreviewSnapshotFailed(false);
       return undefined;
     }
     if (loadState.isLoading || loadState.error) {
@@ -662,19 +745,33 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
       return undefined;
     }
     let isActive = true;
+    let failedCaptureCount = 0;
     setWorldPreviewSnapshot("");
+    setWorldPreviewSnapshotFailed(false);
     const capturePreview = () => {
       const snapshot = captureWorldPreviewSnapshot(
         selectedImagePreview.worldCamera,
       );
-      if (isActive && snapshot) {
+      if (!isActive) {
+        return;
+      }
+
+      if (snapshot) {
         setWorldPreviewSnapshot(snapshot);
+        setWorldPreviewSnapshotFailed(false);
+        return;
+      }
+
+      failedCaptureCount += 1;
+      if (failedCaptureCount >= 2) {
+        setWorldPreviewSnapshotFailed(true);
       }
     };
     const schedulePreviewRefresh = () => {
       if (worldPreviewSnapshotFrameRef.current) {
         window.cancelAnimationFrame(worldPreviewSnapshotFrameRef.current);
       }
+      failedCaptureCount = 0;
       worldPreviewSnapshotFrameRef.current = window.requestAnimationFrame(
         () => {
           capturePreview();
@@ -709,26 +806,62 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
   const handleCameraSelect = useCallback(
     (cameraId) => {
       if (!cameraId) {
+        if (isCameraVisualizationSelectionRequired) {
+          return;
+        }
+
         resetToOverviewCamera();
         return;
       }
 
       if (cameraId === resolvedCameraVisualizationConfig.selectedCameraId) {
+        if (isCameraVisualizationSelectionRequired) {
+          return;
+        }
+
         resetToOverviewCamera();
         return;
       }
       switchToCamera(cameraId);
     },
     [
+      isCameraVisualizationSelectionRequired,
       resetToOverviewCamera,
       resolvedCameraVisualizationConfig.selectedCameraId,
       switchToCamera,
     ],
   );
+  const handleThermalCameraSelect = useCallback(
+    (cameraId) => {
+      if (isThermalCameraSelectionRequired && !cameraId) {
+        return;
+      }
+
+      if (
+        isThermalCameraSelectionRequired &&
+        cameraId === selectedThermalCameraIdForPreview
+      ) {
+        return;
+      }
+
+      if (!cameraId || cameraId === selectedThermalCameraIdForPreview) {
+        thermalCameraOverlay?.onCameraSelect?.(null);
+        resetToOverviewCamera();
+        return;
+      }
+
+      thermalCameraOverlay?.onCameraSelect?.(cameraId);
+    },
+    [
+      isThermalCameraSelectionRequired,
+      resetToOverviewCamera,
+      selectedThermalCameraIdForPreview,
+      thermalCameraOverlay,
+    ],
+  );
   const handleCameraPreviewClose = useCallback(() => {
     if (selectedThermalFramePreview) {
       thermalCameraOverlay?.onCameraSelect?.(null);
-      return;
     }
 
     resetToOverviewCamera();
@@ -1000,6 +1133,55 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
     analysisEditStateRef.current = undefined;
     setAnalysisEditState(undefined);
   };
+  const handleAnalysisTargetDelete = (targetId) => {
+    restoreControls();
+    analysisEditStateRef.current = undefined;
+    setAnalysisEditState(undefined);
+    setAnalysisPointerState(undefined);
+    onAnalysisTargetDelete?.(targetId);
+  };
+  const analysisOverlayNode = (
+    <AnalysisOverlay
+      analysisSummary={analysisSummary}
+      analysisTargets={filteredAnalysisTargets}
+      isEditing={Boolean(analysisEditState)}
+      onDelete={handleAnalysisTargetDelete}
+      onSelect={onAnalysisTargetSelect}
+      onTargetPointerCancel={handleAnalysisTargetPointerCancel}
+      onTargetPointerDown={handleAnalysisTargetPointerDown}
+      onTargetPointerMove={handleAnalysisTargetPointerMove}
+      onTargetPointerUp={handleAnalysisTargetPointerUp}
+      projectedTargets={projectedTargets}
+      selectedProjectedTarget={selectedProjectedTarget}
+      selectedTargetId={selectedAnalysisTargetId}
+    />
+  );
+  const analysisCaptureLayerNode = shouldRenderEventLayer ? (
+    <div
+      className={cn(
+        "Three3DViewer Three3DViewer__analysis-capture-1 absolute inset-0 z-20 touch-none",
+        activeAnalysisMode === "point" && "cursor-crosshair",
+        activeAnalysisMode === "area" && "cursor-crosshair",
+      )}
+      onPointerCancel={handleAnalysisPointerCancel}
+      onPointerDown={handleAnalysisPointerDown}
+      onPointerMove={handleAnalysisPointerMove}
+      onPointerUp={handleAnalysisPointerUp}
+    >
+      {analysisDragRect ? (
+        <div
+          className="Three3DViewer Three3DViewer__analysis-drag-1 pointer-events-none absolute rounded-sm border border-cyan-200 bg-cyan-300/15 shadow-[0_0_18px_rgba(103,232,249,0.26)]"
+          style={{
+            height: `${analysisDragRect.height}%`,
+            left: `${analysisDragRect.left}%`,
+            top: `${analysisDragRect.top}%`,
+            width: `${analysisDragRect.width}%`,
+          }}
+        />
+      ) : null}
+    </div>
+  ) : null;
+  const shouldRenderStageAnalysisLayers = !shouldRenderExpandedAnalysisSurface;
   return (
     <div
       className={cn(
@@ -1037,8 +1219,26 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
           ) : null}
           {isAnalysisTileMode ? (
             <AnalysisCameraTileOverlay
+              analysisCaptureLayer={analysisCaptureLayerNode}
+              analysisOverlay={analysisOverlayNode}
+              canvasRef={cameraImageCanvasRef}
+              expandedCamera={expandedAnalysisCamera}
+              imageElementRef={cameraImageElementRef}
               selectedCameraId={selectedCameraForPreview?.id}
+              onCameraImageFrameChange={handleCameraImageFrameChange}
               onCameraSelect={switchToCamera}
+              onExpandedCameraChange={setExpandedAnalysisCameraId}
+            />
+          ) : null}
+          {selectedThermalTileFramePreview ? (
+            <AnalysisExpandedThermalFramePreview
+              analysisCaptureLayer={analysisCaptureLayerNode}
+              analysisOverlay={analysisOverlayNode}
+              canvasRef={cameraImageCanvasRef}
+              framePreview={selectedThermalTileFramePreview}
+              imageElementRef={cameraImageElementRef}
+              onCameraImageFrameChange={handleCameraImageFrameChange}
+              onClose={() => selectedThermalTileFramePreview.onClose?.()}
             />
           ) : null}
           {shouldRenderCameraImagePreview ? (
@@ -1085,6 +1285,14 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
                     className="Three3DViewer Three3DViewer__world-snapshot-1 block max-h-full max-w-full object-contain"
                     src={worldPreviewSnapshot}
                   />
+                ) : worldPreviewSnapshotFailed ? (
+                  <div
+                    className="Three3DViewer Three3DViewer__world-snapshot-fallback-1 flex aspect-video w-full items-center justify-center text-cyan-100/55"
+                    aria-label="World snapshot unavailable"
+                    role="img"
+                  >
+                    <Box className="h-5 w-5" aria-hidden="true" />
+                  </div>
                 ) : (
                   <div className="Three3DViewer Three3DViewer__world-snapshot-loader-frame-1 flex aspect-video w-full items-center justify-center">
                     <Loader2
@@ -1102,23 +1310,16 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
               isLoading={loadState.isLoading}
             />
           ) : null}
-          <AnalysisOverlay
-            analysisSummary={analysisSummary}
-            analysisTargets={filteredAnalysisTargets}
-            isEditing={Boolean(analysisEditState)}
-            onSelect={onAnalysisTargetSelect}
-            onTargetPointerCancel={handleAnalysisTargetPointerCancel}
-            onTargetPointerDown={handleAnalysisTargetPointerDown}
-            onTargetPointerMove={handleAnalysisTargetPointerMove}
-            onTargetPointerUp={handleAnalysisTargetPointerUp}
-            projectedTargets={projectedTargets}
-            selectedProjectedTarget={selectedProjectedTarget}
-            selectedTargetId={selectedAnalysisTargetId}
-          />
+          {shouldRenderStageAnalysisLayers ? analysisOverlayNode : null}
           {shouldRenderCameraListOverlay ||
           shouldRenderAnalysisModeToolbar ||
           shouldRenderThermalCameraListOverlay ? (
-            <div className="Three3DViewer Three3DViewer__right-overlay-dock-1 pointer-events-none absolute right-3 top-1/2 z-50 flex -translate-y-1/2 items-center gap-2">
+            <div
+              className={cn(
+                "Three3DViewer Three3DViewer__right-overlay-dock-1 pointer-events-none absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-2",
+                selectedThermalTileFramePreview ? "z-[90]" : "z-50",
+              )}
+            >
               {shouldRenderAnalysisModeToolbar ? (
                 <AnalysisModeToolbar
                   activeMode={activeAnalysisMode}
@@ -1130,7 +1331,7 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
                   selectedCameraId={
                     activeCameraVisualizationConfig.selectedCameraId
                   }
-                  showAllOption
+                  showAllOption={!isCameraVisualizationSelectionRequired}
                   allOptionLabel="ALL"
                   allOptionTitle="모든 카메라 보기"
                   onCameraHover={setHoveredCameraId}
@@ -1147,39 +1348,16 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
                   }
                   getCameraName={(camera) => camera.cameraName}
                   selectedCameraId={thermalCameraOverlay.selectedCameraId}
-                  showAllOption
+                  showAllOption={!isThermalCameraSelectionRequired}
                   allOptionLabel="ALL"
                   allOptionTitle="모든 열화상 카메라 보기"
-                  onCameraSelect={thermalCameraOverlay.onCameraSelect}
+                  onCameraHover={thermalCameraOverlay.onCameraHover}
+                  onCameraSelect={handleThermalCameraSelect}
                 />
               ) : null}
             </div>
           ) : null}
-          {shouldRenderEventLayer ? (
-            <div
-              className={cn(
-                "Three3DViewer Three3DViewer__analysis-capture-1 absolute inset-0 z-20 touch-none",
-                activeAnalysisMode === "point" && "cursor-crosshair",
-                activeAnalysisMode === "area" && "cursor-crosshair",
-              )}
-              onPointerCancel={handleAnalysisPointerCancel}
-              onPointerDown={handleAnalysisPointerDown}
-              onPointerMove={handleAnalysisPointerMove}
-              onPointerUp={handleAnalysisPointerUp}
-            >
-              {analysisDragRect ? (
-                <div
-                  className="Three3DViewer Three3DViewer__analysis-drag-1 pointer-events-none absolute rounded-sm border border-cyan-200 bg-cyan-300/15 shadow-[0_0_18px_rgba(103,232,249,0.26)]"
-                  style={{
-                    height: `${analysisDragRect.height}%`,
-                    left: `${analysisDragRect.left}%`,
-                    top: `${analysisDragRect.top}%`,
-                    width: `${analysisDragRect.width}%`,
-                  }}
-                />
-              ) : null}
-            </div>
-          ) : null}
+          {shouldRenderStageAnalysisLayers ? analysisCaptureLayerNode : null}
         </div>
 
         {showOptionBar ? (
@@ -1195,8 +1373,17 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
   );
 });
 
-function AnalysisCameraTileOverlay({ onCameraSelect, selectedCameraId }) {
-  const [expandedCamera, setExpandedCamera] = useState(null);
+function AnalysisCameraTileOverlay({
+  analysisCaptureLayer,
+  analysisOverlay,
+  canvasRef,
+  expandedCamera,
+  imageElementRef,
+  onCameraImageFrameChange,
+  onCameraSelect,
+  onExpandedCameraChange,
+  selectedCameraId,
+}) {
   const cameras = useMemo(
     () => getAllCameraPresets().slice(0, ANALYSIS_CAMERA_TILE_COUNT),
     [],
@@ -1224,7 +1411,7 @@ function AnalysisCameraTileOverlay({ onCameraSelect, selectedCameraId }) {
               key={cell?.id ?? `analysis-camera-empty-${index}`}
               active={cell?.id === selectedCameraId}
               camera={cell}
-              onExpand={setExpandedCamera}
+              onExpand={(camera) => onExpandedCameraChange?.(camera?.id)}
               onSelect={onCameraSelect}
             />
           ),
@@ -1232,8 +1419,13 @@ function AnalysisCameraTileOverlay({ onCameraSelect, selectedCameraId }) {
       </div>
       {expandedCamera ? (
         <AnalysisExpandedCameraTile
+          analysisCaptureLayer={analysisCaptureLayer}
+          analysisOverlay={analysisOverlay}
+          canvasRef={canvasRef}
           camera={expandedCamera}
-          onClose={() => setExpandedCamera(null)}
+          imageElementRef={imageElementRef}
+          onCameraImageFrameChange={onCameraImageFrameChange}
+          onClose={() => onExpandedCameraChange?.(null)}
         />
       ) : null}
     </div>
@@ -1323,17 +1515,25 @@ function AnalysisCameraImageTile({ active, camera, onExpand, onSelect }) {
   );
 }
 
-function AnalysisExpandedCameraTile({ camera, onClose }) {
+function AnalysisExpandedCameraTile({
+  analysisCaptureLayer,
+  analysisOverlay,
+  camera,
+  canvasRef,
+  imageElementRef,
+  onCameraImageFrameChange,
+  onClose,
+}) {
   return (
     <div
-      className="Three3DViewer Three3DViewer__analysis-expanded-preview-1 pointer-events-auto absolute inset-0 z-20 grid place-items-center bg-black/76 p-4 backdrop-blur-sm"
+      className="Three3DViewer Three3DViewer__analysis-expanded-preview-1 pointer-events-auto absolute inset-0 z-20 grid place-items-center bg-black/76 p-3 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-label={camera?.name ?? "Camera preview"}
       onClick={onClose}
     >
       <div
-        className="relative grid max-h-full w-[min(92%,56rem)] max-w-full grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-md border border-cyan-200/35 bg-neutral-950 shadow-2xl"
+        className="relative grid max-h-[calc(100dvh-1.5rem)] w-[min(96vw,68rem)] max-w-full grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-md border border-cyan-200/35 bg-neutral-950 shadow-2xl"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex min-w-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
@@ -1355,17 +1555,88 @@ function AnalysisExpandedCameraTile({ camera, onClose }) {
             <X className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
-        <div className="grid min-h-0 place-items-center bg-black p-2">
+        <div className="relative h-[min(64dvh,34rem)] min-h-[14rem] overflow-hidden bg-black md:h-[min(74dvh,40rem)]">
           {camera?.sampleImagePath ? (
-            <img
-              alt={camera.name}
-              className="max-h-full max-w-full object-contain"
-              draggable={false}
-              src={camera.sampleImagePath}
-            />
+            <>
+              <CameraImageCanvas
+                canvasRef={canvasRef}
+                imageElementRef={imageElementRef}
+                imageUrl={camera.sampleImagePath}
+                label={camera.name}
+                onFrameChange={onCameraImageFrameChange}
+              />
+              {analysisOverlay}
+              {analysisCaptureLayer}
+            </>
           ) : (
             <div className="grid min-h-[16rem] place-items-center text-sm font-semibold text-white/50">
               No camera frame
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AnalysisExpandedThermalFramePreview({
+  analysisCaptureLayer,
+  analysisOverlay,
+  canvasRef,
+  framePreview,
+  imageElementRef,
+  onCameraImageFrameChange,
+  onClose,
+}) {
+  return (
+    <div
+      className="Three3DViewer Three3DViewer__thermal-analysis-expanded-preview-1 pointer-events-auto absolute inset-0 z-[80] grid place-items-center bg-black/76 p-3 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-label={framePreview?.cameraName ?? "Thermal frame preview"}
+      onClick={onClose}
+    >
+      <div
+        className="relative grid max-h-[calc(100dvh-1.5rem)] w-[min(96vw,68rem)] max-w-full grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-md border border-cyan-200/35 bg-neutral-950 shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex min-w-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-white">
+              {framePreview?.cameraName ?? "Thermal camera"}
+            </p>
+            <p className="truncate font-mono text-[11px] text-white/55">
+              {framePreview?.width && framePreview?.height
+                ? `${framePreview.width}x${framePreview.height}`
+                : "No frame"}
+            </p>
+          </div>
+          <button
+            type="button"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-white/15 bg-white/[0.06] text-white/70 transition hover:bg-white/[0.12] hover:text-white"
+            title="Close"
+            aria-label="Close expanded thermal frame"
+            onClick={onClose}
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
+        <div className="relative h-[min(64dvh,34rem)] min-h-[14rem] overflow-hidden bg-black md:h-[min(74dvh,40rem)]">
+          {framePreview?.imageUrl ? (
+            <>
+              <CameraImageCanvas
+                canvasRef={canvasRef}
+                imageElementRef={imageElementRef}
+                imageUrl={framePreview.imageUrl}
+                label={framePreview.cameraName}
+                onFrameChange={onCameraImageFrameChange}
+              />
+              {analysisOverlay}
+              {analysisCaptureLayer}
+            </>
+          ) : (
+            <div className="grid min-h-[16rem] place-items-center text-sm font-semibold text-white/50">
+              No frame
             </div>
           )}
         </div>
@@ -1427,6 +1698,22 @@ function toPlainVector3(vector) {
     x: vector.x,
     y: vector.y,
     z: vector.z,
+  };
+}
+
+function getConfiguredCameraPreset(cameraId, cameraVisualizationConfig = {}) {
+  const camera = getCameraPreset(cameraId);
+
+  if (!camera) {
+    return undefined;
+  }
+
+  return {
+    ...camera,
+    fov: cameraVisualizationConfig.customFovs?.[cameraId] ?? camera.fov,
+    position:
+      cameraVisualizationConfig.customPositions?.[cameraId] ??
+      camera.position,
   };
 }
 

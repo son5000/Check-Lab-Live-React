@@ -45,17 +45,15 @@ export function AssetPartList({ parts, partStates, selectedPartId, onPartSelect,
                   <p className="AssetPartList AssetPartList__text-1 min-w-0 flex-1 truncate text-xs font-semibold">
                     {part.name}
                   </p>
-
-                  {/* 요약 수치: 초음파 · 평균 온도 */}
-                  <span className="AssetPartList AssetPartList__summary-1 shrink-0 font-mono text-[10px] text-muted-foreground">
+                  <span className="AssetPartList AssetPartList__summary-1 shrink-0 font-mono text-[10px]">
                     <span className={cn(isUltrasoundExceeded &&
                     "text-red-500 dark:text-red-400")}>
                       {partState?.ultrasoundPeakDb ?? 0} dB
                     </span>
-                    {" · "}
+                    {" / "}
                     <span className={cn(isTemperatureExceeded &&
                     "text-red-500 dark:text-red-400")}>
-                      {partState?.temperatureAverage ?? 0}℃
+                      {partState?.temperatureAverage ?? 0} C
                     </span>
                   </span>
 
@@ -71,13 +69,6 @@ export function AssetPartList({ parts, partStates, selectedPartId, onPartSelect,
                 {/* ── 펼친 상태: 디테일 ── */}
                 {isExpanded && (<div className="AssetPartList AssetPartList__container-9 grid min-w-0 gap-1 border-t border-border px-2.5 pb-2 pt-1.5 text-[10px]">
                     {/* 파트 지정 방식 + 범위 */}
-                    <p className="AssetPartList AssetPartList__text-2 truncate text-[10px] text-muted-foreground">
-                      <span className="rounded-sm border border-border bg-background px-1 py-0.5 font-medium">
-                        {getAssetPartModeLabel(part)}
-                      </span>
-                      {"  "}
-                      {formatAssetPartScope(part)}
-                    </p>
 
                     <AssetPartDetailRow label="온도" value={`최고 ${partState?.temperatureMax ?? 0}℃ · 평균 ${partState?.temperatureAverage ?? 0}℃`} detail={`임계 ${part.thresholds.temperature}℃`} highlighted={isTemperatureExceeded}/>
                     <AssetPartDetailRow label="초음파" value={`피크 ${partState?.ultrasoundPeakDb ?? 0} dB · ${partState?.dominantFrequencyKHz ?? 0} kHz`} detail={`임계 ${part.thresholds.ultrasoundDb} dB`} highlighted={isUltrasoundExceeded}/>

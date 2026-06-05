@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { ChevronDown, ChevronRight, Cpu, Factory, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -96,9 +96,6 @@ function SiteTreeItem({
               {site.site_id}
             </span>
           </span>
-          <span className="SiteTree shrink-0 rounded-sm border border-border bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground">
-            {site.locationCount}
-          </span>
         </button>
       </div>
 
@@ -161,9 +158,6 @@ function LocationTreeItem({
               {location.floor || location.location_id}
             </span>
           </span>
-          <span className="SiteTree shrink-0 rounded-sm border border-border bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground">
-            {location.assets.length}
-          </span>
         </button>
       </div>
 
@@ -180,9 +174,6 @@ function AssetTreeItem({ asset }) {
       <Cpu className="SiteTree h-3 w-3 shrink-0 text-muted-foreground" aria-hidden="true" />
       <span className="SiteTree min-w-0 flex-1">
         <span className="SiteTree block truncate text-xs font-medium">{asset.name}</span>
-        <span className="SiteTree block truncate text-[10px] text-muted-foreground">
-          {asset.asset_id}
-        </span>
       </span>
       <span
         className={cn(

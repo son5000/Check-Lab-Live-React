@@ -14,7 +14,7 @@ export const DEFAULT_MODEL_3D_FILE = {
     ],
 };
 export const DEFAULT_VIEWER_3D_CONFIG = {
-    autoRotate: true,
+    autoRotate: false,
     background: {
         color: "#111827",
         gridColor: "#475569",

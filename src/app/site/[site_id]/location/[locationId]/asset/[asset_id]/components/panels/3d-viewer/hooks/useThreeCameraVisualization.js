@@ -9,6 +9,7 @@ import {
 
 const CAMERA_PRESET_IDS = CAMERA_PRESETS.map((camera) => camera.id);
 const EMPTY_CUSTOM_POSITIONS = {};
+const EMPTY_CUSTOM_FOVS = {};
 
 export function useThreeCameraVisualization(sceneRef, config) {
   const hoveredCameraIdRef = useRef(null);
@@ -25,7 +26,10 @@ export function useThreeCameraVisualization(sceneRef, config) {
     }
 
     const selectedCameraId = config?.selectedCameraId ?? null;
-    const showAll = config?.showAll !== false || !selectedCameraId;
+    const requireSelection = config?.requireSelection === true;
+    const showAll = requireSelection
+      ? false
+      : config?.showAll !== false || !selectedCameraId;
     const showLaserBeams = config?.showLaserBeams !== false;
     const visibleCameraIds = showAll
       ? CAMERA_PRESET_IDS
@@ -39,6 +43,7 @@ export function useThreeCameraVisualization(sceneRef, config) {
       selectedCameraId,
       visibleCameraIds,
       config?.customPositions ?? EMPTY_CUSTOM_POSITIONS,
+      config?.customFovs ?? EMPTY_CUSTOM_FOVS,
       showLaserBeams,
     );
     updateCameraMarkerInteractionState(
@@ -52,8 +57,10 @@ export function useThreeCameraVisualization(sceneRef, config) {
     sceneRef,
     config?.selectedCameraId,
     config?.showAll,
+    config?.requireSelection,
     config?.enabled,
     config?.customPositions,
+    config?.customFovs,
     config?.showLaserBeams,
   ]);
 

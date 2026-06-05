@@ -7,23 +7,16 @@ import { useDisplaySettings } from "@/app/layouts/hooks/use-display-settings";
 
 export function ThermalCameraList({
   cameras,
-  framesByCameraId = {},
-  loading = false,
-  selectedCameraId,
+  onCameraHover,
   onSelectCamera,
+  requireSelection = false,
+  renderSection = true,
+  selectedCameraId,
 }) {
   const { settings } = useDisplaySettings();
   const language = settings.language;
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
-  const readyFrameCount = useMemo(
-    () =>
-      cameras.reduce(
-        (count, camera) => count + (framesByCameraId[camera.cameraId] ? 1 : 0),
-        0,
-      ),
-    [cameras, framesByCameraId],
-  );
   const selectedCamera = useMemo(
     () => cameras.find((camera) => camera.cameraId === selectedCameraId),
     [cameras, selectedCameraId],
@@ -47,8 +40,20 @@ export function ThermalCameraList({
     };
   }, [open]);
 
+  useEffect(() => {
+    if (!open) {
+      onCameraHover?.(null);
+    }
+  }, [onCameraHover, open]);
+
   if (!cameras.length) {
-    return (
+    const emptyBody = (
+      <div className="rounded-md border border-dashed border-border bg-card px-2 py-3 text-center text-[11px] font-semibold text-muted-foreground">
+        {getEmptyThermalCameraMessage(language)}
+      </div>
+    );
+
+    return renderSection ? (
       <section className="min-h-0 rounded-md border border-border bg-card p-4 text-card-foreground">
         <h2 className="text-sm font-semibold">
           {getThermalCameraListTitle(language)}
@@ -57,37 +62,36 @@ export function ThermalCameraList({
           {getEmptyThermalCameraMessage(language)}
         </p>
       </section>
+    ) : (
+      emptyBody
     );
   }
 
   const selectedLabel =
     getThermalCameraName(selectedCamera, language) ??
-    getAllCameraLabel(language);
-  const selectedDescription = selectedCamera
-    ? `${getThermalPoseLabel(selectedCamera, language)} · ${getDataSourceLabel(
-        selectedCamera,
-        language,
-      )}`
-    : getThermalFrameCountLabel(readyFrameCount, cameras.length, language);
+    (requireSelection
+      ? getThermalCameraSelectLabel(language)
+      : getAllCameraLabel(language));
 
   const handleSelect = (cameraId) => {
+    if (!cameraId && requireSelection) {
+      return;
+    }
+
+    onCameraHover?.(null);
     onSelectCamera?.(cameraId);
     setOpen(false);
   };
 
-  return (
-    <section
-      ref={rootRef}
-      className="relative min-h-0 rounded-md border border-border bg-card p-3 text-card-foreground"
-    >
-      <div className="mb-3 min-w-0">
-        <h2 className="truncate text-sm font-semibold">
-          {getThermalCameraListTitle(language)}
-        </h2>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {getThermalCameraListDescription(language)}
-        </p>
-      </div>
+  const body = (
+    <>
+      {renderSection ? (
+        <div className="mb-3 min-w-0">
+          <h2 className="truncate text-sm font-semibold">
+            {getThermalCameraListTitle(language)}
+          </h2>
+        </div>
+      ) : null}
 
       <button
         type="button"
@@ -98,9 +102,6 @@ export function ThermalCameraList({
         <span className="grid min-w-0 gap-0.5">
           <span className="truncate text-sm font-semibold">
             {selectedLabel}
-          </span>
-          <span className="truncate text-xs text-muted-foreground">
-            {selectedDescription}
           </span>
         </span>
         <ChevronDown
@@ -113,54 +114,61 @@ export function ThermalCameraList({
       </button>
 
       {open ? (
-        <div className="ThermalCameraList__dropdown-1 absolute left-3 right-3 top-[calc(100%-0.5rem)] z-50 grid max-h-80 gap-1 overflow-y-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-xl">
-          <CameraOption
+        <div
+          className={cn(
+            "ThermalCameraList__dropdown-1 absolute z-50 grid max-h-80 gap-1 overflow-y-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-xl",
+            renderSection
+              ? "left-3 right-3 top-[calc(100%-0.5rem)]"
+              : "left-0 right-0 top-[calc(100%+0.25rem)]",
+          )}
+        >
+          {!requireSelection ? (<CameraOption
             active={!selectedCameraId}
-            description={getThermalFrameCountLabel(
-              readyFrameCount,
-              cameras.length,
-              language,
-            )}
             label={getAllCameraLabel(language)}
-            language={language}
-            status={getThermalStatusLabel(loading ? "loading" : "all", language)}
+            onMouseEnter={() => onCameraHover?.(null)}
+            onMouseLeave={() => onCameraHover?.(null)}
             onSelect={() => handleSelect(null)}
-          />
+          />) : null}
 
-          {cameras.map((camera) => {
-            const frame = framesByCameraId[camera.cameraId];
-
-            return (
-              <CameraOption
-                key={camera.cameraId}
-                active={camera.cameraId === selectedCameraId}
-                description={`${getThermalPoseLabel(
-                  camera,
-                  language,
-                )} · ${getMockSourceLabel(camera, language)}`}
-                label={getThermalCameraName(camera, language)}
-                language={language}
-                status={getThermalStatusLabel(
-                  frame ? "ready" : loading ? "loading" : "pending",
-                  language,
-                )}
-                onSelect={() => handleSelect(camera.cameraId)}
-              />
-            );
-          })}
+          {cameras.map((camera) => (
+            <CameraOption
+              key={camera.cameraId}
+              active={camera.cameraId === selectedCameraId}
+              label={getThermalCameraName(camera, language)}
+              onMouseEnter={() => onCameraHover?.(camera.cameraId)}
+              onMouseLeave={() => onCameraHover?.(null)}
+              onSelect={() => handleSelect(camera.cameraId)}
+            />
+          ))}
         </div>
       ) : null}
+    </>
+  );
+
+  if (!renderSection) {
+    return (
+      <div ref={rootRef} className="relative min-w-0">
+        {body}
+      </div>
+    );
+  }
+
+  return (
+    <section
+      ref={rootRef}
+      className="relative min-h-0 rounded-md border border-border bg-card p-3 text-card-foreground"
+    >
+      {body}
     </section>
   );
 }
 
 function CameraOption({
   active,
-  description,
   label,
-  language,
+  onMouseEnter,
+  onMouseLeave,
   onSelect,
-  status,
 }) {
   return (
     <button
@@ -171,24 +179,13 @@ function CameraOption({
       )}
       aria-selected={active}
       onClick={onSelect}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
     >
       <span className="grid min-w-0 gap-0.5">
         <span className="truncate text-sm font-semibold">{label}</span>
-        <span className="truncate text-xs text-muted-foreground">
-          {description}
-        </span>
       </span>
       <span className="flex shrink-0 items-center gap-1.5">
-        <span
-          className={cn(
-            "rounded-sm border px-1.5 py-0.5 text-[10px] font-semibold",
-            isReadyStatus(status, language)
-              ? "border-lime-300/45 text-lime-200"
-              : "border-white/15 text-muted-foreground",
-          )}
-        >
-          {status}
-        </span>
         {active ? <Check className="h-3.5 w-3.5 text-cyan-300" /> : null}
       </span>
     </button>
@@ -199,12 +196,8 @@ function getAllCameraLabel(language) {
   return language === "en" ? "All cameras" : "모든 카메라 보기";
 }
 
-function getDataSourceLabel(camera, language) {
-  if (language === "en") {
-    return camera?.dataSourceType ?? "Mock data";
-  }
-
-  return "모의 데이터";
+function getThermalCameraSelectLabel(language) {
+  return language === "en" ? "Select thermal camera" : "열화상 카메라 선택";
 }
 
 function getEmptyThermalCameraMessage(language) {
@@ -213,64 +206,22 @@ function getEmptyThermalCameraMessage(language) {
     : "이 설비에 연결된 모의 열화상 카메라가 없습니다.";
 }
 
-function getMockSourceLabel(camera, language) {
-  if (language === "en") {
-    return camera?.mockCsvPath ?? "Mock source";
-  }
-
-  return "모의 열화상 데이터";
-}
-
 function getThermalCameraListTitle(language) {
   return language === "en" ? "Mock thermal cameras" : "모의 열화상 카메라";
 }
 
-function getThermalCameraListDescription(language) {
-  return language === "en"
-    ? "Backend realtime data substitute using connected thermal camera mock sources."
-    : "연결된 모의 열화상 카메라 데이터로 실시간 데이터를 대체합니다.";
-}
 
-function getThermalCameraName(camera, language) {
+function getThermalCameraName(camera) {
   if (!camera) {
     return undefined;
   }
 
-  return language === "en"
-    ? `Thermal camera ${camera.cameraIndex ?? ""}`.trim()
-    : camera.cameraName;
-}
-
-function getThermalFrameCountLabel(readyFrameCount, totalCount, language) {
-  return language === "en"
-    ? `${readyFrameCount}/${totalCount} frames ready`
-    : `${readyFrameCount}/${totalCount}개 프레임 준비`;
-}
-
-function getThermalPoseLabel(camera, language) {
-  if (language === "en") {
-    return camera?.worldPose?.poseLabel?.includes("sample")
-      ? camera.worldPose.poseLabel
-      : "Connected camera";
+  if (camera.cameraIndex !== undefined && camera.cameraIndex !== null) {
+    return `${camera.cameraIndex}`.trim();
   }
 
-  return "설비 연결 카메라";
-}
-
-function getThermalStatusLabel(status, language) {
-  const labels = {
-    all: language === "en" ? "All" : "전체",
-    loading: language === "en" ? "Loading" : "로딩 중",
-    pending: language === "en" ? "Pending" : "대기",
-    ready: language === "en" ? "Frame ready" : "프레임 준비",
-  };
-
-  return labels[status] ?? status;
-}
-
-function isReadyStatus(status, language) {
-  return (
-    status === getThermalStatusLabel("all", language) ||
-    status === getThermalStatusLabel("ready", language)
-  );
+  const cameraName = `${camera.cameraName ?? ""}`.trim();
+  return cameraName
+    .replace(/^(?:열화상 카메라|Thermal camera)\s+/i, "")
+    .trim();
 }

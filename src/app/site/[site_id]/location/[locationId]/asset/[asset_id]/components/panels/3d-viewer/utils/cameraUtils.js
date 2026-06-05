@@ -35,6 +35,7 @@ export function updateCameraVisualizationObjects(
   selectedCameraId,
   visibleCameraIds,
   customPositions = {},
+  customFovs = {},
   showLaserBeams = true,
 ) {
   const knownCameraIds = new Set(cameras.map((camera) => camera.id));
@@ -52,12 +53,18 @@ export function updateCameraVisualizationObjects(
     const isSelected = cameraId === selectedCameraId;
     const isVisible = visibleCameraIdSet.has(cameraId);
     const position = customPositions?.[cameraId] ?? camera.position;
-    const transformKey = getCameraTransformKey(camera, position);
+    const fov = customFovs?.[cameraId] ?? camera.fov ?? 60;
+    const resolvedCamera = {
+      ...camera,
+      fov,
+      position,
+    };
+    const transformKey = getCameraTransformKey(resolvedCamera, position);
 
     const laserBeam = getOrReplaceVisualizationObject({
       cacheKey: transformKey,
       createObject: () =>
-        createCameraLaserBeam(camera, cameraId, position, isSelected),
+        createCameraLaserBeam(resolvedCamera, cameraId, position, isSelected),
       name: `viewer-camera-laser-${cameraId}`,
       scene,
     });
@@ -66,11 +73,12 @@ export function updateCameraVisualizationObjects(
 
     const cone = getOrReplaceVisualizationObject({
       cacheKey: transformKey,
-      createObject: () => createCameraFOVCone(camera, cameraId, isSelected),
+      createObject: () =>
+        createCameraFOVCone(resolvedCamera, cameraId, isSelected),
       name: `viewer-camera-fov-${cameraId}`,
       scene,
     });
-    applyCameraFOVTransform(cone, camera, position);
+    applyCameraFOVTransform(cone, resolvedCamera, position);
     cone.visible = showLaserBeams && isVisible;
     applyCameraFOVVisualState(cone, isSelected, false);
 

@@ -85,9 +85,6 @@ export function ThermalMappingControls({
         <h3 className="truncate text-xs font-semibold text-white">
           수동 정합값
         </h3>
-        <p className="mt-0.5 text-[11px] text-white/55">
-          현재 overlay 정합값을 기준으로 3D 오브젝트에 열화상 texture를 적용합니다.
-        </p>
       </div>
 
       <div className="grid gap-2">

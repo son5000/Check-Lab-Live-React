@@ -66,9 +66,6 @@ export function AdvancedSettings() {
               />
               <span className="text-sm font-medium text-foreground">디버그 모드</span>
             </label>
-            <p className="mt-1 text-xs text-muted-foreground">
-              개발자용 로그 및 진단 정보를 표시합니다
-            </p>
           </div>
 
           {/* 캐시 설정 */}
@@ -112,9 +109,6 @@ export function AdvancedSettings() {
           {/* 데이터 설정 */}
           <div>
             <label className="text-sm font-medium text-foreground">최대 데이터 포인트</label>
-            <p className="mt-1 text-xs text-muted-foreground">
-              차트에 표시할 최대 데이터 포인트 수입니다
-            </p>
             <input
               type="number"
               min="100"
@@ -137,9 +131,6 @@ export function AdvancedSettings() {
               />
               <span className="text-sm font-medium text-foreground">API 요청 로깅</span>
             </label>
-            <p className="mt-1 text-xs text-muted-foreground">
-              모든 API 요청 및 응답을 기록합니다 (개발용)
-            </p>
           </div>
 
           {/* 성능 모니터링 */}
@@ -156,9 +147,6 @@ export function AdvancedSettings() {
                 <Zap className="h-4 w-4 text-yellow-600" />
               </div>
             </label>
-            <p className="mt-1 text-xs text-muted-foreground">
-              앱 성능을 추적하고 최적화합니다
-            </p>
           </div>
 
           {/* 분석 */}
@@ -172,9 +160,6 @@ export function AdvancedSettings() {
               />
               <span className="text-sm font-medium text-foreground">분석 활성화</span>
             </label>
-            <p className="mt-1 text-xs text-muted-foreground">
-              앱 사용 패턴을 분석하여 서비스 개선에 도움을 드립니다
-            </p>
           </div>
 
           {/* 저장소 정보 */}

@@ -11,12 +11,12 @@ export function useThreeScene(containerRef, config) {
     const controlsRef = useRef(null);
     const initialConfigRef = useRef(config);
     const animationConfigRef = useRef({
-        autoRotate: config.autoRotate ?? true,
+        autoRotate: config.autoRotate ?? false,
         autoRotateSpeed: config.controls?.autoRotateSpeed ?? 0.7,
     });
     useEffect(() => {
         animationConfigRef.current = {
-            autoRotate: config.autoRotate ?? true,
+            autoRotate: config.autoRotate ?? false,
             autoRotateSpeed: config.controls?.autoRotateSpeed ?? 0.7,
         };
     }, [config.autoRotate, config.controls?.autoRotateSpeed]);

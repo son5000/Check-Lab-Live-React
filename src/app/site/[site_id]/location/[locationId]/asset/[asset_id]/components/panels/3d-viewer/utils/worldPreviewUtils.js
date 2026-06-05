@@ -7,6 +7,7 @@ const WORLD_PREVIEW_CAMERA_BACK_OFFSET_RATIO = 0.6;
 const WORLD_PREVIEW_CAMERA_MIN_BACK_OFFSET = 18;
 const WORLD_PREVIEW_CAMERA_PADDING = 1.18;
 const WORLD_PREVIEW_MIN_RADIUS = 82;
+const WORLD_PREVIEW_DEFAULT_BACK_OFFSET_SCALE = 1;
 
 export function getRuntimeCameraConfig(camera, controls) {
   return {
@@ -51,6 +52,7 @@ export function applyRuntimeCameraConfig(camera, controls, config) {
 }
 
 export function getWorldPreviewCameraConfig({
+  backOffsetScale = WORLD_PREVIEW_DEFAULT_BACK_OFFSET_SCALE,
   container,
   model,
   overviewCamera,
@@ -93,7 +95,7 @@ export function getWorldPreviewCameraConfig({
   const backOffset = Math.max(
     WORLD_PREVIEW_CAMERA_MIN_BACK_OFFSET,
     radius * WORLD_PREVIEW_CAMERA_BACK_OFFSET_RATIO,
-  );
+  ) * Math.max(WORLD_PREVIEW_DEFAULT_BACK_OFFSET_SCALE, backOffsetScale);
   const distance = selectedCamera
     ? selectedDistance + backOffset
     : Math.max(fitDistance, minDistance + radius * 0.35);

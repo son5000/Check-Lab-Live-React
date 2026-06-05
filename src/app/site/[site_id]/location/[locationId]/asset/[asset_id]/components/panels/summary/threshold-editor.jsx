@@ -96,14 +96,8 @@ export function ThresholdEditor({ isSaving = false, onDirtyChange, saveError, th
 }
 function ThresholdInput({ label, onChange, suffix, value, }) {
     return (<label className="ThresholdInput ThresholdInput__field-1 grid min-w-0 gap-1">
-      <span className="ThresholdInput ThresholdInput__label-1 truncate text-[10px] text-muted-foreground">
-        {label}
-      </span>
       <span className="ThresholdInput ThresholdInput__label-2 flex h-8 min-w-0 items-center gap-1 rounded-md border border-border bg-card px-2">
         <input className="ThresholdInput ThresholdInput__input-1 min-w-0 flex-1 bg-transparent font-mono text-sm font-semibold outline-none" type="number" min={0} value={value} onChange={(event) => onChange(event.target.value)}/>
-        <span className="ThresholdInput ThresholdInput__label-3 shrink-0 text-[10px] text-muted-foreground">
-          {suffix}
-        </span>
       </span>
     </label>);
 }

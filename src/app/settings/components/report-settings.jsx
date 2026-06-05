@@ -39,9 +39,6 @@ export function ReportSettings() {
               />
               <span className="text-sm font-medium text-foreground">자동 보고서 생성</span>
             </label>
-            <p className="mt-1 text-xs text-muted-foreground">
-              설정된 주기에 따라 설비 보고서를 자동으로 생성합니다
-            </p>
           </div>
 
           {settings.autoGenerateReport && (
@@ -111,9 +108,6 @@ export function ReportSettings() {
               />
               <span className="text-sm font-medium text-foreground">보고서 이메일 자동 발송</span>
             </label>
-            <p className="mt-1 text-xs text-muted-foreground">
-              생성된 보고서를 자동으로 이메일로 발송합니다
-            </p>
           </div>
 
           {settings.autoEmailReport && (

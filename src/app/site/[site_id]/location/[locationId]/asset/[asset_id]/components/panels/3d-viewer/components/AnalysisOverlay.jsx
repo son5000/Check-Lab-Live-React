@@ -1,6 +1,7 @@
 "use client";
 
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   areOverlayMetricsEqual,
@@ -15,6 +16,7 @@ export function AnalysisOverlay({
   analysisSummary,
   analysisTargets,
   isEditing,
+  onDelete,
   onSelect,
   onTargetPointerCancel,
   onTargetPointerDown,
@@ -142,6 +144,7 @@ export function AnalysisOverlay({
         }
 
         const selected = target.id === selectedTargetId;
+        const dismissSide = getDismissButtonSide(projectedTarget);
 
         if (target.kind === "area" && projectedTarget.rect) {
           return (
@@ -150,7 +153,7 @@ export function AnalysisOverlay({
               role="button"
               tabIndex={0}
               className={cn(
-                "AnalysisOverlay AnalysisOverlay__area-1 pointer-events-auto absolute overflow-hidden rounded-sm border bg-cyan-300/[0.12] text-left shadow-[0_0_18px_rgba(103,232,249,0.2)] transition hover:bg-cyan-300/20",
+                "AnalysisOverlay AnalysisOverlay__area-1 group pointer-events-auto absolute overflow-hidden rounded-sm border bg-cyan-300/[0.12] text-left shadow-[0_0_18px_rgba(103,232,249,0.2)] transition hover:bg-cyan-300/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-100/80",
                 selected
                   ? "border-lime-200 bg-lime-300/20 shadow-[0_0_24px_rgba(190,242,100,0.36)]"
                   : "border-cyan-200/80",
@@ -183,9 +186,13 @@ export function AnalysisOverlay({
               }}
               title={target.name}
             >
-              <span className="AnalysisOverlay AnalysisOverlay__area-label-1 absolute left-1 top-1 max-w-[calc(100%-0.5rem)] truncate rounded-sm bg-black/55 px-1 py-0.5 text-[10px] font-semibold text-white">
-                {target.name}
-              </span>
+              {onDelete ? (
+                <DismissTargetButton
+                  side={dismissSide}
+                  targetName={target.name}
+                  onDelete={() => onDelete(target.id)}
+                />
+              ) : null}
               {selected
                 ? RESIZE_HANDLES.map((handle) => (
                     <span
@@ -211,11 +218,12 @@ export function AnalysisOverlay({
         }
 
         return (
-          <button
+          <div
             key={target.id}
-            type="button"
+            role="button"
+            tabIndex={0}
             className={cn(
-              "AnalysisOverlay AnalysisOverlay__point-1 pointer-events-auto absolute grid h-7 w-7 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border text-[10px] font-bold shadow-[0_0_18px_rgba(103,232,249,0.26)] transition hover:scale-105",
+              "AnalysisOverlay AnalysisOverlay__point-1 group pointer-events-auto absolute grid h-7 w-7 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border text-[10px] font-bold shadow-[0_0_18px_rgba(103,232,249,0.26)] transition hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-100/80",
               selected
                 ? "border-lime-200 bg-lime-300 text-neutral-950"
                 : "border-cyan-200 bg-cyan-300 text-neutral-950",
@@ -223,6 +231,13 @@ export function AnalysisOverlay({
             )}
             onClick={(event) => {
               event.stopPropagation();
+              onSelect?.(target.id);
+            }}
+            onKeyDown={(event) => {
+              if (event.key !== "Enter" && event.key !== " ") {
+                return;
+              }
+              event.preventDefault();
               onSelect?.(target.id);
             }}
             onPointerCancel={onTargetPointerCancel}
@@ -237,8 +252,16 @@ export function AnalysisOverlay({
             }}
             title={target.name}
           >
+            {onDelete ? (
+              <DismissTargetButton
+                compact
+                side={dismissSide}
+                targetName={target.name}
+                onDelete={() => onDelete(target.id)}
+              />
+            ) : null}
             {index + 1}
-          </button>
+          </div>
         );
       })}
 
@@ -282,6 +305,44 @@ export function AnalysisOverlay({
         </div>
       ) : null}
     </div>
+  );
+}
+
+function getDismissButtonSide(projectedTarget) {
+  const centerLeft = projectedTarget.rect
+    ? projectedTarget.rect.left + projectedTarget.rect.width / 2
+    : projectedTarget.left;
+
+  return centerLeft > 50 ? "left" : "right";
+}
+
+function DismissTargetButton({ compact = false, onDelete, side, targetName }) {
+  return (
+    <button
+      type="button"
+      className={cn(
+        "AnalysisOverlay AnalysisOverlay__dismiss-1 absolute z-20 grid place-items-center rounded-full border border-white/70 bg-neutral-950/85 text-white opacity-0 shadow-[0_0_12px_rgba(2,6,23,0.55)] backdrop-blur-sm transition hover:bg-red-500 hover:text-white focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/85 group-hover:opacity-100 group-focus-within:opacity-100",
+        compact
+          ? "top-0 h-5 w-5"
+          : "top-1 h-5 w-5",
+        compact && side === "left" && "left-0 -translate-x-1/2 -translate-y-1/2",
+        compact && side !== "left" && "right-0 -translate-y-1/2 translate-x-1/2",
+        !compact && side === "left" && "left-1",
+        !compact && side !== "left" && "right-1",
+      )}
+      title={`${targetName} 취소`}
+      aria-label={`${targetName} 취소`}
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onDelete?.();
+      }}
+      onPointerDown={(event) => {
+        event.stopPropagation();
+      }}
+    >
+      <X className="h-3 w-3" aria-hidden="true" />
+    </button>
   );
 }
 

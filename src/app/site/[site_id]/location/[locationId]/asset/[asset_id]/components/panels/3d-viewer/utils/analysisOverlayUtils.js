@@ -20,11 +20,17 @@ export function getCalloutConnectorGeometry(target, overlayMetrics) {
     return undefined;
   }
 
-  const start = {
+  const center = {
     x: roundOverlayValue((target.left / 100) * overlayMetrics.width),
     y: roundOverlayValue((target.top / 100) * overlayMetrics.height),
   };
-  const anchor = getNearestRectAnchor(start, overlayMetrics.calloutRect);
+  const anchor = getNearestRectAnchor(center, overlayMetrics.calloutRect);
+  const start = getTargetConnectorStart(target, {
+    anchor,
+    center,
+    height: overlayMetrics.height,
+    width: overlayMetrics.width,
+  });
 
   return {
     anchor,
@@ -87,6 +93,97 @@ function getNearestRectAnchor(point, rect) {
   return {
     x: roundOverlayValue(anchor.x),
     y: roundOverlayValue(anchor.y),
+  };
+}
+
+function getTargetConnectorStart(target, { anchor, center, height, width }) {
+  if (!target.rect) {
+    return center;
+  }
+
+  const rect = {
+    bottom: ((target.rect.top + target.rect.height) / 100) * height,
+    left: (target.rect.left / 100) * width,
+    right: ((target.rect.left + target.rect.width) / 100) * width,
+    top: (target.rect.top / 100) * height,
+  };
+  const direction = {
+    x: anchor.x - center.x,
+    y: anchor.y - center.y,
+  };
+  const boundary = getRectRayIntersection(center, direction, rect);
+
+  if (!boundary) {
+    return center;
+  }
+
+  const length = Math.hypot(direction.x, direction.y) || 1;
+  const outwardOffset = 2;
+
+  return {
+    x: roundOverlayValue(
+      clamp(boundary.x + (direction.x / length) * outwardOffset, 0, width),
+    ),
+    y: roundOverlayValue(
+      clamp(boundary.y + (direction.y / length) * outwardOffset, 0, height),
+    ),
+  };
+}
+
+function getRectRayIntersection(origin, direction, rect) {
+  const candidates = [];
+
+  if (direction.x > 0) {
+    candidates.push(getRayIntersectionAtX(origin, direction, rect.right));
+  } else if (direction.x < 0) {
+    candidates.push(getRayIntersectionAtX(origin, direction, rect.left));
+  }
+
+  if (direction.y > 0) {
+    candidates.push(getRayIntersectionAtY(origin, direction, rect.bottom));
+  } else if (direction.y < 0) {
+    candidates.push(getRayIntersectionAtY(origin, direction, rect.top));
+  }
+
+  return candidates
+    .filter(
+      (candidate) =>
+        candidate &&
+        candidate.t >= 0 &&
+        candidate.x >= rect.left - 0.01 &&
+        candidate.x <= rect.right + 0.01 &&
+        candidate.y >= rect.top - 0.01 &&
+        candidate.y <= rect.bottom + 0.01,
+    )
+    .sort((first, second) => first.t - second.t)
+    .at(0);
+}
+
+function getRayIntersectionAtX(origin, direction, x) {
+  if (!direction.x) {
+    return null;
+  }
+
+  const t = (x - origin.x) / direction.x;
+
+  return {
+    t,
+    x,
+    y: origin.y + direction.y * t,
+  };
+}
+
+function getRayIntersectionAtY(origin, direction, y) {
+  if (!direction.y) {
+    return null;
+  }
+
+  const t = (y - origin.y) / direction.y;
+
+  return {
+    t,
+    x: origin.x + direction.x * t,
+    y,
   };
 }
 

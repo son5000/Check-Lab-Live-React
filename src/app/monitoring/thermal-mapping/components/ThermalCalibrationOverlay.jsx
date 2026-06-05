@@ -119,9 +119,6 @@ export function ThermalCalibrationOverlay({
           <h3 className="truncate text-xs font-semibold text-white">
             {title}
           </h3>
-          <p className="mt-0.5 truncate text-[11px] text-white/55">
-            {description}
-          </p>
         </div>
         <button
           type="button"

@@ -276,10 +276,6 @@ export function SiteSummaryPage({ site, locations, assets }) {
                   <p className="truncate text-sm font-semibold">
                     {`서버 알림 집계 ${site.alertCount}건`}
                   </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    발생한 알림이 있으면 이곳에서 상세 내용을 확인할 수
-                    있습니다.
-                  </p>
                 </div>
               ) : (
                 <div className="SiteSummaryPage SiteSummaryPage__alert-empty-1 rounded-md border border-dashed border-border bg-background px-3 py-4 text-sm text-muted-foreground">

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Box,
   ChevronLeft,
@@ -22,6 +22,7 @@ const DETECTION_AREA_SLIDE_INTERVAL_MS = 5000;
 const DEFAULT_SUMMARY_METRIC_ORDER = ["ultrasound", "temperature", "assetPart"];
 const SUMMARY_METRIC_ORDER_STORAGE_KEY =
   "checklab.assetDetailSummary.metricOrder.v1";
+const SUMMARY_METRIC_POINTER_DRAG_THRESHOLD_PX = 4;
 const summaryMetricCardLabels = {
   assetPart: "파트",
   temperature: "온도",
@@ -132,6 +133,8 @@ export function AssetSummaryPanel({
     useState(false);
   const [draggingSummaryMetricId, setDraggingSummaryMetricId] = useState();
   const [dropTargetSummaryMetricId, setDropTargetSummaryMetricId] = useState();
+  const summaryMetricCardsRef = useRef(null);
+  const summaryMetricDragStateRef = useRef(null);
   const isTemperatureExceeded = assetThresholds
     ? isCriticalThresholdExceeded(
         averageTemperature,
@@ -284,6 +287,113 @@ export function AssetSummaryPanel({
       setDraggingSummaryMetricId(undefined);
       setDropTargetSummaryMetricId(undefined);
     };
+    const getSummaryMetricCardById = (metricId) => {
+      if (!summaryMetricCardsRef.current) {
+        return null;
+      }
+      return summaryMetricCardsRef.current.querySelector(
+        `[data-summary-metric-id="${metricId}"]`,
+      );
+    };
+    const getSummaryMetricIdAtY = (clientY) => {
+      if (!summaryMetricCardsRef.current) {
+        return undefined;
+      }
+      const cardElements = Array.from(
+        summaryMetricCardsRef.current.querySelectorAll(
+          "[data-summary-metric-id]",
+        ),
+      );
+      if (!cardElements.length) {
+        return undefined;
+      }
+      let best;
+      let bestDistance = Infinity;
+      for (const card of cardElements) {
+        const bounds = card.getBoundingClientRect();
+        const centerY = bounds.top + bounds.height / 2;
+        const distance = Math.abs(clientY - centerY);
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          best = card.getAttribute("data-summary-metric-id");
+        }
+      }
+      return best;
+    };
+    const moveSummaryMetricByPointer = (
+      sourceMetricId,
+      targetMetricId,
+      clientY,
+    ) => {
+      if (!sourceMetricId || !targetMetricId || sourceMetricId === targetMetricId) {
+        return;
+      }
+      const targetCard = getSummaryMetricCardById(targetMetricId);
+      const targetBounds = targetCard?.getBoundingClientRect();
+      if (!targetBounds) {
+        return;
+      }
+      const placement =
+        clientY > targetBounds.top + targetBounds.height / 2
+          ? "after"
+          : "before";
+      moveSummaryMetric(sourceMetricId, targetMetricId, placement);
+    };
+    const handleSummaryMetricHandlePointerDown = (event, metricId) => {
+      if (event.pointerType === "mouse" && event.button !== 0) {
+        return;
+      }
+      event.preventDefault();
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+      summaryMetricDragStateRef.current = {
+        sourceMetricId: metricId,
+        targetMetricId: metricId,
+        pointerId: event.pointerId,
+        startY: event.clientY,
+        moved: false,
+      };
+      setDraggingSummaryMetricId(metricId);
+      setDropTargetSummaryMetricId(metricId);
+    };
+    const handleSummaryMetricHandlePointerMove = (event) => {
+      const dragState = summaryMetricDragStateRef.current;
+      if (!dragState || dragState.pointerId !== event.pointerId) {
+        return;
+      }
+      if (
+        !dragState.moved &&
+        Math.abs(event.clientY - dragState.startY) <
+          SUMMARY_METRIC_POINTER_DRAG_THRESHOLD_PX
+      ) {
+        return;
+      }
+      dragState.moved = true;
+      const targetMetricId = getSummaryMetricIdAtY(event.clientY);
+      if (!targetMetricId) {
+        return;
+      }
+      dragState.targetMetricId = targetMetricId;
+      setDropTargetSummaryMetricId(targetMetricId);
+    };
+    const handleSummaryMetricHandlePointerUp = (event) => {
+      const dragState = summaryMetricDragStateRef.current;
+      if (!dragState || dragState.pointerId !== event.pointerId) {
+        return;
+      }
+      if (dragState.moved && dragState.targetMetricId) {
+        moveSummaryMetricByPointer(
+          dragState.sourceMetricId,
+          dragState.targetMetricId,
+          event.clientY,
+        );
+      }
+      if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+      summaryMetricDragStateRef.current = null;
+      setDraggingSummaryMetricId(undefined);
+      setDropTargetSummaryMetricId(undefined);
+    };
     const handleSummaryMetricHandleKeyDown = (event, metricId) => {
       if (event.key !== "ArrowUp" && event.key !== "ArrowDown") {
         return;
@@ -304,6 +414,7 @@ export function AssetSummaryPanel({
     const renderDraggableSummaryMetricCard = (metricId) => (
       <div
         key={metricId}
+        data-summary-metric-id={metricId}
         className={cn(
           "AssetDetailSummaryPanel AssetDetailSummaryPanel__metric-card-wrap-1 relative min-h-0 min-w-0 overflow-hidden rounded-md transition",
           draggingSummaryMetricId === metricId && "opacity-70",
@@ -323,7 +434,13 @@ export function AssetSummaryPanel({
         {renderSummaryMetricCard(metricId)}
         <button
           type="button"
-          draggable
+          draggable={false}
+          onPointerCancel={handleSummaryMetricHandlePointerUp}
+          onPointerDown={(event) =>
+            handleSummaryMetricHandlePointerDown(event, metricId)
+          }
+          onPointerMove={handleSummaryMetricHandlePointerMove}
+          onPointerUp={handleSummaryMetricHandlePointerUp}
           className={cn(
             "AssetDetailSummaryPanel AssetDetailSummaryPanel__drag-handle-1 absolute right-2 top-2 z-10 grid h-6 w-6 shrink-0 cursor-grab touch-none place-items-center rounded-sm border border-border bg-background/90 text-muted-foreground shadow-sm backdrop-blur transition hover:bg-accent hover:text-foreground active:cursor-grabbing",
             draggingSummaryMetricId === metricId &&
@@ -400,7 +517,10 @@ export function AssetSummaryPanel({
             />
           </div>
         ) : null}
-        <div className="AssetDetailSummaryPanel AssetDetailSummaryPanel__container-3 grid min-h-0 flex-1 grid-rows-3 gap-2 overflow-hidden">
+        <div
+          ref={summaryMetricCardsRef}
+          className="AssetDetailSummaryPanel AssetDetailSummaryPanel__container-3 grid min-h-0 flex-1 grid-rows-3 gap-2 overflow-hidden"
+        >
           {summaryMetricOrder.map(renderDraggableSummaryMetricCard)}
         </div>
       </section>

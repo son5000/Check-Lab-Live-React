@@ -7,11 +7,7 @@ export function TemperatureAreaSection({ parts }) {
               <span className="TemperatureAreaSection TemperatureAreaSection__label-1 truncate text-xs font-semibold text-foreground">{area.id}</span>
               <div className="TemperatureAreaSection TemperatureAreaSection__container-4 min-w-0">
                 <p className="TemperatureAreaSection TemperatureAreaSection__text-1 truncate text-xs font-medium text-foreground">{area.name}</p>
-                <p className="TemperatureAreaSection TemperatureAreaSection__text-2 truncate text-[10px] text-muted-foreground">{area.points}</p>
               </div>
-              <p className="TemperatureAreaSection TemperatureAreaSection__text-3 truncate text-right text-[10px] text-muted-foreground">
-                평균 {area.average} / 최고 {area.max} / 최저 {area.min}
-              </p>
             </div>))}
         </div>
       </div>
