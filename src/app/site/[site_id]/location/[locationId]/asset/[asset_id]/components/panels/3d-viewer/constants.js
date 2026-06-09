@@ -37,7 +37,6 @@ export const DEFAULT_VIEWER_3D_CONFIG = {
     cameraVisualization: {
         enabled: true,
         selectedCameraId: null,
-        showLaserBeams: true,
         showAll: true,
     },
     controls: {

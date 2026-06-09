@@ -1,85 +1,33 @@
-// 9개의 가상 카메라 프리셋 - 3D 재구성에 최적화된 배치
-// 각 카메라는 메시 중심(0, 0, 0)을 바라봄
-
-const normalizeVector = (x, y, z) => {
-  const length = Math.sqrt(x * x + y * y + z * z);
-  return {
-    x: (x / length) * 60,
-    y: (y / length) * 60,
-    z: (z / length) * 60,
-  };
-};
-
 export const CAMERA_PRESETS = [
   {
     id: "1",
-    name: "정면 (Front)",
-    position: { x: 90, y: 42, z: 50 },
-    target: { x: 0, y: 0, z: 0 },
+    name: "실화상 카메라 1",
+    position: { x: 39.74, y: 8.7, z: 13.58 },
+    target: { x: 14.42, y: -10.56, z: -18.52 },
     fov: 60,
     sampleImagePath: "/cam/cam_sample_1.PNG",
   },
   {
     id: "2",
-    name: "후면 (Back)",
-    position: { x: 10, y: 40, z: 61 },
-    target: { x: 0, y: 0, z: 0 },
+    name: "실화상 카메라 2",
+    position: { x: -1.67, y: 16.65, z: 37.27 },
+    target: { x: -46.06, y: -8.08, z: -4.25 },
     fov: 60,
     sampleImagePath: "/cam/cam_sample_2.PNG",
   },
   {
     id: "3",
-    name: "좌측 (Left)",
-    position: { x: 29, y: 34, z: 52 },
-    target: { x: 0, y: 0, z: 0 },
+    name: "실화상 카메라 3",
+    position: { x: 9.81, y: -5.18, z: 30.02 },
+    target: { x: -12.12, y: -13.16, z: 11.86 },
     fov: 60,
     sampleImagePath: "/cam/cam_sample_3.PNG",
   },
   {
     id: "4",
-    name: "우측 (Right)",
-    position: { x: 59, y: 2, z: -8 },
-    target: { x: 0, y: 0, z: 0 },
-    fov: 60,
-    sampleImagePath: "/cam/cam_sample_4.PNG",
-  },
-  {
-    id: "5",
-    name: "상단-정면 (Top-Front)",
-    position: normalizeVector(0, 0.7, 1),
-    target: { x: 0, y: 0, z: 0 },
-    fov: 60,
-    sampleImagePath: "/cam/cam_sample_5.PNG",
-  },
-  {
-    id: "6",
-    name: "하단-정면 (Bottom-Front)",
-    position: normalizeVector(0, -0.7, 1),
-    target: { x: 0, y: 0, z: 0 },
-    fov: 60,
-    sampleImagePath: "/cam/cam_sample_1.PNG",
-  },
-  {
-    id: "7",
-    name: "상단-우측-정면 (Top-Right-Front)",
-    position: normalizeVector(1, 0.7, 0.7),
-    target: { x: 0, y: 0, z: 0 },
-    fov: 60,
-    sampleImagePath: "/cam/cam_sample_2.PNG",
-  },
-  {
-    id: "8",
-    name: "상단-좌측-정면 (Top-Left-Front)",
-    position: normalizeVector(-1, 0.7, 0.7),
-    target: { x: 0, y: 0, z: 0 },
-    fov: 60,
-    sampleImagePath: "/cam/cam_sample_3.PNG",
-  },
-  {
-    id: "9",
-    name: "하단-우측-정면 (Bottom-Right-Front)",
-    position: normalizeVector(1, -0.7, 0.7),
-    target: { x: 0, y: 0, z: 0 },
+    name: "실화상 카메라 4",
+    position: { x: 32.32, y: 1.36, z: 1.16 },
+    target: { x: -0.49, y: -13.36, z: -38.56 },
     fov: 60,
     sampleImagePath: "/cam/cam_sample_4.PNG",
   },

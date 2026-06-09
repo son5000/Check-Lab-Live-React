@@ -9,7 +9,6 @@ import {
   useState,
   forwardRef,
 } from "react";
-import { Box, Maximize2, X, Loader2 } from "lucide-react";
 import * as THREE from "three";
 import { cn } from "@/lib/utils";
 import { DEFAULT_MODEL_3D_FILE, DEFAULT_VIEWER_3D_CONFIG } from "./constants";
@@ -20,15 +19,18 @@ import { useThreeLighting } from "./hooks/useThreeLighting";
 import { useThreeModel } from "./hooks/useThreeModel";
 import { useThreeScene } from "./hooks/useThreeScene";
 import { useThreeCameraVisualization } from "./hooks/useThreeCameraVisualization";
+import { useWorldPreviewPopup } from "./hooks/useWorldPreviewPopup";
 import { AnalysisModeToolbar } from "./components/AnalysisModeToolbar";
 import { AnalysisOverlay } from "./components/AnalysisOverlay";
+import {
+  AnalysisCameraTileOverlay,
+  AnalysisExpandedThermalFramePreview,
+} from "./components/AnalysisCameraTileOverlay";
 import { CameraImageCanvas } from "./components/CameraImageCanvas";
 import { CameraListOverlay } from "./components/CameraListOverlay";
 import { ViewerLoadState } from "./components/ViewerLoadState";
-import {
-  getAllCameraPresets,
-  getCameraPreset,
-} from "./constants/cameraPresets";
+import { WorldPreviewPopup } from "./components/WorldPreviewPopup";
+import { getCameraPreset } from "./constants/cameraPresets";
 import {
   buildAnalysisDraft,
   buildEditedAnalysisTarget,
@@ -47,8 +49,6 @@ import {
   getWorldPreviewCameraConfig,
 } from "./utils/worldPreviewUtils";
 const EMPTY_ANALYSIS_TARGETS = [];
-const WORLD_POPUP_POS_KEY = "three3d_world_popup_pos";
-const ANALYSIS_CAMERA_TILE_COUNT = 8;
 const ANALYSIS_TILE_WORLD_CAMERA_BACK_OFFSET_SCALE = 2.4;
 export const Three3DViewer = forwardRef(function Three3DViewer(
   {
@@ -70,10 +70,13 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
     onAnalysisTargetUpdate,
     onConfigChange,
     onModelFileChange,
+    onTileLayoutChange,
     onThermalMeshPicked,
     selectedAnalysisTargetId,
     showCameraOverlays = true,
     thermalCameraOverlay,
+    tileLayoutConfig,
+    visualCameraCalibrationEnabled = false,
   },
   ref,
 ) {
@@ -97,11 +100,10 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
   const [worldPreviewSnapshot, setWorldPreviewSnapshot] = useState("");
   const [worldPreviewSnapshotFailed, setWorldPreviewSnapshotFailed] =
     useState(false);
-  const [worldPopupPos, setWorldPopupPos] = useState(loadWorldPopupPosition);
+  const [analysisTileWorldSnapshot, setAnalysisTileWorldSnapshot] =
+    useState("");
   const [expandedAnalysisCameraId, setExpandedAnalysisCameraId] =
     useState(null);
-  const worldPopupRef = useRef(null);
-  const worldPopupDragRef = useRef(null);
   const resolvedConfig = config ?? internalConfig;
   const resolvedModelFile = modelFile ?? internalModelFile;
   const resolvedCameraVisualizationConfig =
@@ -113,9 +115,30 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
         enabled: false,
         selectedCameraId: null,
         showAll: false,
-        showLaserBeams: false,
       }
     : resolvedCameraVisualizationConfig;
+  const isAnalysisTileMode = Boolean(
+    analysisViewMode === "tiles" &&
+      !hideCameraVisualization &&
+      showCameraOverlays &&
+      activeCameraVisualizationConfig.enabled,
+  );
+  const shouldSuspendWorldRenderForTiles = Boolean(
+    analysisViewMode === "tiles" &&
+      (isAnalysisTileMode || thermalCameraOverlay),
+  );
+  const sceneCameraVisualizationConfig = isAnalysisTileMode
+    ? {
+        ...activeCameraVisualizationConfig,
+        editComparison: undefined,
+        enabled: true,
+        requireSelection: false,
+        showAll: !activeCameraVisualizationConfig.selectedCameraId,
+      }
+    : activeCameraVisualizationConfig;
+  const selectedVisualCameraConfig = visualCameraCalibrationEnabled
+    ? resolvedCameraVisualizationConfig
+    : activeCameraVisualizationConfig;
   const { cameraRef, controlsRef, rendererRef, sceneRef } = useThreeScene(
     containerRef,
     resolvedConfig,
@@ -128,6 +151,7 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
   useThreeCamera(
     cameraRef,
     controlsRef,
+    sceneRef,
     resolvedConfig.camera,
     resolvedConfig.controls,
   );
@@ -136,7 +160,7 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
   const {
     getCameraAtClientPoint: pickCameraAtClientPoint,
     setHoveredCameraId,
-  } = useThreeCameraVisualization(sceneRef, activeCameraVisualizationConfig);
+  } = useThreeCameraVisualization(sceneRef, sceneCameraVisualizationConfig);
   useEffect(() => {
     if (modelFile) {
       setInternalModelFile(modelFile);
@@ -160,26 +184,51 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
     },
     [modelFile, onModelFileChange],
   );
-  const selectedCameraForPreview = useMemo(() => {
+  const selectedVisualCamera = useMemo(() => {
     if (
-      hideCameraVisualization ||
-      !showCameraOverlays ||
-      !activeCameraVisualizationConfig.selectedCameraId
+      !selectedVisualCameraConfig.selectedCameraId
     ) {
       return undefined;
     }
 
     return getConfiguredCameraPreset(
-      activeCameraVisualizationConfig.selectedCameraId,
-      activeCameraVisualizationConfig,
+      selectedVisualCameraConfig.selectedCameraId,
+      selectedVisualCameraConfig,
     );
   }, [
-    activeCameraVisualizationConfig.customFovs,
-    activeCameraVisualizationConfig.customPositions,
-    activeCameraVisualizationConfig.selectedCameraId,
-    hideCameraVisualization,
-    showCameraOverlays,
+    selectedVisualCameraConfig.customFovs,
+    selectedVisualCameraConfig.customPositions,
+    selectedVisualCameraConfig.customTargets,
+    selectedVisualCameraConfig.selectedCameraId,
   ]);
+  const selectedCameraForPreview =
+    showCameraOverlays && !visualCameraCalibrationEnabled
+      ? selectedVisualCamera
+      : undefined;
+  const visualCameraCalibrationPreview = useMemo(() => {
+    if (
+      !visualCameraCalibrationEnabled ||
+      !selectedVisualCamera?.sampleImagePath
+    ) {
+      return null;
+    }
+
+    return {
+      cameraId: selectedVisualCamera.id,
+      fov: selectedVisualCamera.fov,
+      imageUrl: selectedVisualCamera.sampleImagePath,
+      label: selectedVisualCamera.name,
+      worldCamera: selectedVisualCamera,
+    };
+  }, [selectedVisualCamera, visualCameraCalibrationEnabled]);
+  const visualCameraCalibrationImageOpacity =
+    clampVisualCalibrationImageOpacity(
+      selectedVisualCameraConfig.calibrationImageOpacity,
+    );
+  const isVisualCalibrationImageHidden =
+    selectedVisualCameraConfig.hideCalibrationImage === true;
+  const isVisualCalibrationMeshHidden =
+    selectedVisualCameraConfig.hideCalibrationMesh === true;
   const selectedCameraIdForPreview = selectedCameraForPreview?.id;
   const selectedThermalCameraIdForPreview =
     thermalCameraOverlay?.selectedCameraId ?? null;
@@ -191,25 +240,29 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
     thermalCameraOverlay?.selectedFramePreview ?? null;
   const isThermalTileFramePreview =
     rawThermalFramePreview?.presentation === "tile-popup";
+  const isThermalCalibrationFramePreview =
+    rawThermalFramePreview?.presentation === "calibration-overlay";
+  const isSelectedThermalCameraFramePreview = Boolean(
+    selectedThermalCameraIdForPreview &&
+      rawThermalFramePreview?.cameraId === selectedThermalCameraIdForPreview,
+  );
   const selectedThermalFramePreview =
     rawThermalFramePreview &&
     (isThermalTileFramePreview ||
-      (selectedThermalCameraIdForPreview &&
-        rawThermalFramePreview.cameraId === selectedThermalCameraIdForPreview))
+      isSelectedThermalCameraFramePreview)
       ? rawThermalFramePreview
       : null;
-  const selectedThermalViewerFramePreview = isThermalTileFramePreview
-    ? null
-    : selectedThermalFramePreview;
+  const selectedThermalViewerFramePreview =
+    isThermalTileFramePreview || isThermalCalibrationFramePreview
+      ? null
+      : selectedThermalFramePreview;
   const selectedThermalTileFramePreview = isThermalTileFramePreview
     ? selectedThermalFramePreview
     : null;
-  const isAnalysisTileMode = Boolean(
-    analysisViewMode === "tiles" &&
-      !hideCameraVisualization &&
-      showCameraOverlays &&
-      activeCameraVisualizationConfig.enabled,
-  );
+  const selectedThermalCalibrationFramePreview =
+    isThermalCalibrationFramePreview
+      ? selectedThermalFramePreview
+      : null;
   const expandedAnalysisCamera = useMemo(() => {
     if (!isAnalysisTileMode || !expandedAnalysisCameraId) {
       return null;
@@ -258,7 +311,26 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
       selectedThermalViewerFramePreview,
     ],
   );
+  const {
+    handlePointerDown: handleWorldPopupPointerDown,
+    handlePointerMove: handleWorldPopupPointerMove,
+    handlePointerUp: handleWorldPopupPointerUp,
+    popupRef: worldPopupRef,
+    position: worldPopupPos,
+  } = useWorldPreviewPopup(containerRef, selectedImagePreview?.cameraId);
   const shouldRenderCameraImagePreview = Boolean(selectedImagePreview);
+  const shouldRenderVisualCameraCalibrationOverlay = Boolean(
+    visualCameraCalibrationPreview && !isVisualCalibrationImageHidden,
+  );
+  const shouldRenderThermalCameraCalibrationOverlay = Boolean(
+    selectedThermalCalibrationFramePreview?.imageUrl &&
+      !selectedThermalCalibrationFramePreview?.hideCalibrationImage,
+  );
+  const isThermalCalibrationMeshHidden =
+    selectedThermalCalibrationFramePreview?.hideCalibrationMesh === true;
+  const thermalCameraCalibrationImageOpacity =
+    selectedThermalCalibrationFramePreview?.calibrationImageOpacity ??
+    visualCameraCalibrationImageOpacity;
   const shouldRenderExpandedAnalysisSurface = Boolean(
     expandedAnalysisCamera || selectedThermalTileFramePreview,
   );
@@ -305,7 +377,9 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
     activeCameraVisualizationConfig.enabled &&
     !isAnalysisTileMode;
   const shouldRenderThermalCameraListOverlay = Boolean(
-    thermalCameraOverlay?.cameras?.length,
+    analysisViewMode !== "tiles" &&
+      thermalCameraOverlay?.showCameraListOverlay !== false &&
+      thermalCameraOverlay?.cameras?.length,
   );
   const shouldRenderEventLayer = canCreateAnalysisTarget;
   const shouldRenderAnalysisModeToolbar = Boolean(
@@ -512,6 +586,26 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
       sceneRef,
     ],
   );
+  const captureCurrentWorldSnapshot = useCallback(() => {
+    const camera = cameraRef.current;
+    const renderer = rendererRef.current;
+    const scene = sceneRef.current;
+    if (!camera || !renderer || !scene) {
+      return "";
+    }
+
+    forceRendererSizeToContainer({
+      camera,
+      container: containerRef.current,
+      renderer,
+    });
+    renderer.render(scene, camera);
+    try {
+      return renderer.domElement.toDataURL("image/png");
+    } catch {
+      return "";
+    }
+  }, [cameraRef, rendererRef, sceneRef]);
   const resetToOverviewCamera = useCallback(() => {
     const overviewCamera =
       initialConfig.camera ?? DEFAULT_VIEWER_3D_CONFIG.camera;
@@ -572,11 +666,13 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
   }, [resetToOverviewCamera, selectedThermalCameraIdForPreview]);
   const switchToCamera = useCallback(
     (cameraId) => {
-      const camera = getConfiguredCameraPreset(
-        cameraId,
-        resolvedCameraVisualizationConfig,
-      );
-      if (!camera) {
+      const camera = cameraId
+        ? getConfiguredCameraPreset(
+            cameraId,
+            resolvedCameraVisualizationConfig,
+          )
+        : null;
+      if (cameraId && !camera) {
         return;
       }
       const focusedWorldCamera = isAnalysisTileMode
@@ -588,7 +684,7 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
               initialConfig.camera ?? DEFAULT_VIEWER_3D_CONFIG.camera,
             renderer: rendererRef.current,
             resolvedCamera: resolvedConfig.camera,
-            selectedCamera: camera,
+            selectedCamera: camera ?? null,
           })
         : null;
 
@@ -616,8 +712,8 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
         cameraVisualization: {
           ...resolvedCameraVisualizationConfig,
           enabled: true,
-          selectedCameraId: cameraId,
-          showAll: false,
+          selectedCameraId: camera?.id ?? null,
+          showAll: !camera,
         },
       });
     },
@@ -654,6 +750,35 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
       const targetExtent = getThermalFocusExtent(modelRef.current);
       const thermalDistance = Math.max(0.001, viewDirection.length());
       const backOffsetScale = Math.max(1, Number(pose.backOffsetScale) || 1);
+
+      if (pose.useWorldPreviewFraming === true) {
+        const focusedWorldCamera = getWorldPreviewCameraConfig({
+          backOffsetScale,
+          container: containerRef.current,
+          model: modelRef.current,
+          overviewCamera:
+            initialConfig.camera ?? DEFAULT_VIEWER_3D_CONFIG.camera,
+          renderer,
+          resolvedCamera: resolvedConfig.camera,
+          selectedCamera: {
+            fov: pose.fov,
+            position: toPlainVector3(thermalPosition),
+            target: toPlainVector3(thermalLookAt),
+          },
+        });
+
+        applyRuntimeCameraConfig(camera, controls, focusedWorldCamera);
+        handleConfigChange({
+          ...resolvedConfig,
+          autoRotate: false,
+          camera: {
+            ...resolvedConfig.camera,
+            ...focusedWorldCamera,
+          },
+        });
+        return;
+      }
+
       const backOffset = Math.max(
         targetExtent * 0.18,
         thermalDistance * 0.35,
@@ -698,6 +823,7 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
       cameraRef,
       controlsRef,
       handleConfigChange,
+      initialConfig.camera,
       modelRef,
       rendererRef,
       resolvedConfig,
@@ -728,9 +854,88 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
       setExpandedAnalysisCameraId(null);
     }
   }, [isAnalysisTileMode]);
-  useLayoutEffect(() => {
-    setWorldPopupPos(null);
-  }, [selectedImagePreview?.cameraId]);
+  useEffect(() => {
+    const renderer = rendererRef.current;
+    if (!renderer) {
+      return undefined;
+    }
+
+    const previousPauseRender = renderer.domElement.dataset.pauseRender;
+
+    if (shouldSuspendWorldRenderForTiles) {
+      renderer.domElement.dataset.pauseRender = "true";
+    } else if (previousPauseRender === "true") {
+      delete renderer.domElement.dataset.pauseRender;
+    }
+
+    return () => {
+      if (previousPauseRender === undefined) {
+        delete renderer.domElement.dataset.pauseRender;
+      } else {
+        renderer.domElement.dataset.pauseRender = previousPauseRender;
+      }
+    };
+  }, [rendererRef, shouldSuspendWorldRenderForTiles]);
+  useEffect(() => {
+    if (!isAnalysisTileMode || loadState.isLoading || loadState.error) {
+      setAnalysisTileWorldSnapshot("");
+      return undefined;
+    }
+
+    const container = containerRef.current;
+    if (!container) {
+      return undefined;
+    }
+
+    let isActive = true;
+    let frameId = 0;
+    const retryTimeoutIds = [];
+    const captureSnapshot = () => {
+      const snapshot = captureCurrentWorldSnapshot();
+      if (isActive && snapshot) {
+        setAnalysisTileWorldSnapshot(snapshot);
+      }
+    };
+    const scheduleSnapshot = () => {
+      if (frameId) {
+        window.cancelAnimationFrame(frameId);
+      }
+      frameId = window.requestAnimationFrame(() => {
+        frameId = 0;
+        captureSnapshot();
+      });
+    };
+    const scheduleDelayedSnapshot = (delay) => {
+      const timeoutId = window.setTimeout(scheduleSnapshot, delay);
+      retryTimeoutIds.push(timeoutId);
+    };
+    const resizeObserver = new ResizeObserver(scheduleSnapshot);
+    resizeObserver.observe(container);
+    setAnalysisTileWorldSnapshot("");
+    scheduleSnapshot();
+    scheduleDelayedSnapshot(250);
+    scheduleDelayedSnapshot(900);
+
+    return () => {
+      isActive = false;
+      resizeObserver.disconnect();
+      retryTimeoutIds.forEach((timeoutId) => window.clearTimeout(timeoutId));
+      if (frameId) {
+        window.cancelAnimationFrame(frameId);
+      }
+    };
+  }, [
+    captureCurrentWorldSnapshot,
+    isAnalysisTileMode,
+    loadState.error,
+    loadState.isLoading,
+    resolvedConfig.camera,
+    activeCameraVisualizationConfig.selectedCameraId,
+    activeCameraVisualizationConfig.customFovs,
+    activeCameraVisualizationConfig.customPositions,
+    activeCameraVisualizationConfig.customTargets,
+    tileLayoutConfig,
+  ]);
   useLayoutEffect(() => {
     if (!selectedImagePreview?.worldCamera) {
       setWorldPreviewSnapshot("");
@@ -802,6 +1007,175 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
     modelRef,
     rendererRef,
     selectedImagePreview,
+  ]);
+  useLayoutEffect(() => {
+    const selectedCamera = visualCameraCalibrationPreview?.worldCamera;
+    const camera = cameraRef.current;
+    const controls = controlsRef.current;
+    const renderer = rendererRef.current;
+    const scene = sceneRef.current;
+
+    if (
+      !selectedCamera ||
+      !camera ||
+      !controls ||
+      !renderer ||
+      !scene ||
+      loadState.isLoading ||
+      loadState.error
+    ) {
+      return;
+    }
+
+    const position = toThreeVector3(selectedCamera.position);
+    const target = toThreeVector3(selectedCamera.target);
+    const targetExtent = getThermalFocusExtent(modelRef.current);
+    const distanceToTarget = Math.max(0.001, position.distanceTo(target));
+    const nextCamera = {
+      ...resolvedConfig.camera,
+      fov: selectedCamera.fov ?? camera.fov,
+      maxDistance: Math.max(
+        resolvedConfig.camera?.maxDistance ??
+          DEFAULT_VIEWER_3D_CONFIG.camera.maxDistance,
+        targetExtent * 8,
+        distanceToTarget * 4,
+      ),
+      minDistance:
+        resolvedConfig.camera?.minDistance ??
+        DEFAULT_VIEWER_3D_CONFIG.camera.minDistance,
+      position: toPlainVector3(position),
+      target: toPlainVector3(target),
+    };
+
+    forceRendererSizeToContainer({
+      camera,
+      container: containerRef.current,
+      renderer,
+    });
+    applyRuntimeCameraConfig(camera, controls, nextCamera);
+    renderer.render(scene, camera);
+  }, [
+    cameraRef,
+    controlsRef,
+    loadState.error,
+    loadState.isLoading,
+    modelRef,
+    rendererRef,
+    resolvedConfig.camera,
+    sceneRef,
+    visualCameraCalibrationPreview?.worldCamera,
+  ]);
+  useLayoutEffect(() => {
+    const selectedCamera = selectedThermalCalibrationFramePreview?.worldCamera;
+    const camera = cameraRef.current;
+    const controls = controlsRef.current;
+    const renderer = rendererRef.current;
+    const scene = sceneRef.current;
+
+    if (
+      !selectedCamera?.position ||
+      !selectedCamera?.target ||
+      !camera ||
+      !controls ||
+      !renderer ||
+      !scene ||
+      loadState.isLoading ||
+      loadState.error
+    ) {
+      return;
+    }
+
+    const position = toThreeVector3(selectedCamera.position);
+    const target = toThreeVector3(selectedCamera.target);
+    const targetExtent = getThermalFocusExtent(modelRef.current);
+    const distanceToTarget = Math.max(0.001, position.distanceTo(target));
+    const nextCamera = {
+      ...resolvedConfig.camera,
+      fov: selectedCamera.fov ?? camera.fov,
+      maxDistance: Math.max(
+        resolvedConfig.camera?.maxDistance ??
+          DEFAULT_VIEWER_3D_CONFIG.camera.maxDistance,
+        targetExtent * 8,
+        distanceToTarget * 4,
+      ),
+      minDistance:
+        resolvedConfig.camera?.minDistance ??
+        DEFAULT_VIEWER_3D_CONFIG.camera.minDistance,
+      position: toPlainVector3(position),
+      target: toPlainVector3(target),
+    };
+
+    forceRendererSizeToContainer({
+      camera,
+      container: containerRef.current,
+      renderer,
+    });
+    applyRuntimeCameraConfig(camera, controls, nextCamera);
+    renderer.render(scene, camera);
+  }, [
+    cameraRef,
+    controlsRef,
+    loadState.error,
+    loadState.isLoading,
+    modelRef,
+    rendererRef,
+    resolvedConfig.camera,
+    sceneRef,
+    selectedThermalCalibrationFramePreview?.worldCamera,
+  ]);
+  useEffect(() => {
+    const controls = controlsRef.current;
+
+    if (
+      !controls ||
+      (!visualCameraCalibrationPreview &&
+        !selectedThermalCalibrationFramePreview)
+    ) {
+      return undefined;
+    }
+
+    const previousEnabled = controls.enabled;
+    controls.enabled = false;
+
+    return () => {
+      controls.enabled = previousEnabled;
+    };
+  }, [
+    controlsRef,
+    selectedThermalCalibrationFramePreview,
+    visualCameraCalibrationPreview,
+  ]);
+  useEffect(() => {
+    const model = modelRef.current;
+    const hasCalibrationPreview = Boolean(
+      visualCameraCalibrationPreview || selectedThermalCalibrationFramePreview,
+    );
+
+    if (!hasCalibrationPreview || !model) {
+      return undefined;
+    }
+
+    const previousVisible = model.visible;
+    model.visible = !(
+      isVisualCalibrationMeshHidden || isThermalCalibrationMeshHidden
+    );
+    renderCurrentThreeScene({ cameraRef, rendererRef, sceneRef });
+
+    return () => {
+      if (modelRef.current === model) {
+        model.visible = previousVisible;
+        renderCurrentThreeScene({ cameraRef, rendererRef, sceneRef });
+      }
+    };
+  }, [
+    cameraRef,
+    isThermalCalibrationMeshHidden,
+    isVisualCalibrationMeshHidden,
+    modelRef,
+    rendererRef,
+    sceneRef,
+    selectedThermalCalibrationFramePreview,
+    visualCameraCalibrationPreview,
   ]);
   const handleCameraSelect = useCallback(
     (cameraId) => {
@@ -904,58 +1278,6 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
     pickThermalMeshAtClientPoint,
     rendererRef,
   ]);
-  const handleWorldPopupPointerDown = useCallback((event) => {
-    if (event.button !== 0) return;
-    event.preventDefault();
-    const popup = worldPopupRef.current;
-    const container = containerRef.current;
-    if (!popup || !container) return;
-    const popupRect = popup.getBoundingClientRect();
-    const containerRect = container.getBoundingClientRect();
-    worldPopupDragRef.current = {
-      startX: event.clientX,
-      startY: event.clientY,
-      origLeft: popupRect.left - containerRect.left,
-      origTop: popupRect.top - containerRect.top,
-    };
-    popup.setPointerCapture(event.pointerId);
-  }, []);
-  const handleWorldPopupPointerMove = useCallback((event) => {
-    const drag = worldPopupDragRef.current;
-    const popup = worldPopupRef.current;
-    const container = containerRef.current;
-    if (!drag || !popup || !container) return;
-    const containerRect = container.getBoundingClientRect();
-    const popupRect = popup.getBoundingClientRect();
-    const dx = event.clientX - drag.startX;
-    const dy = event.clientY - drag.startY;
-    const rawLeft = drag.origLeft + dx;
-    const rawTop = drag.origTop + dy;
-    const clampedLeft = Math.max(
-      0,
-      Math.min(rawLeft, containerRect.width - popupRect.width),
-    );
-    const clampedTop = Math.max(
-      0,
-      Math.min(rawTop, containerRect.height - popupRect.height),
-    );
-    setWorldPopupPos({ left: clampedLeft, top: clampedTop });
-  }, []);
-  const handleWorldPopupPointerUp = useCallback((event) => {
-    const drag = worldPopupDragRef.current;
-    worldPopupDragRef.current = null;
-    if (worldPopupRef.current?.hasPointerCapture(event.pointerId)) {
-      worldPopupRef.current.releasePointerCapture(event.pointerId);
-    }
-    if (drag) {
-      setWorldPopupPos((pos) => {
-        if (pos) {
-          saveWorldPopupPosition(pos);
-        }
-        return pos;
-      });
-    }
-  }, []);
   useEffect(() => {
     if (!resolvedCameraVisualizationConfig.enabled || activeAnalysisMode) {
       return;
@@ -1204,10 +1526,41 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
             ref={containerRef}
             className={cn(
               "Three3DViewer Three3DViewer__canvas-host-1 absolute inset-0 z-0 h-full min-h-0 w-full",
-              shouldRenderCameraImagePreview &&
+              (shouldRenderCameraImagePreview ||
+                shouldSuspendWorldRenderForTiles) &&
                 "pointer-events-none opacity-0",
             )}
           />
+          {shouldRenderVisualCameraCalibrationOverlay ? (
+            <div
+              className="Three3DViewer Three3DViewer__visual-calibration-image-1 pointer-events-none absolute inset-0 z-20 mix-blend-screen"
+              aria-hidden="true"
+              style={{ opacity: visualCameraCalibrationImageOpacity }}
+            >
+              <CameraImageCanvas
+                canvasRef={cameraImageCanvasRef}
+                imageElementRef={cameraImageElementRef}
+                imageUrl={visualCameraCalibrationPreview.imageUrl}
+                label={visualCameraCalibrationPreview.label}
+                onFrameChange={handleCameraImageFrameChange}
+              />
+            </div>
+          ) : null}
+          {shouldRenderThermalCameraCalibrationOverlay ? (
+            <div
+              className="Three3DViewer Three3DViewer__thermal-calibration-image-1 pointer-events-none absolute inset-0 z-20 mix-blend-screen"
+              aria-hidden="true"
+              style={{ opacity: thermalCameraCalibrationImageOpacity }}
+            >
+              <CameraImageCanvas
+                canvasRef={cameraImageCanvasRef}
+                imageElementRef={cameraImageElementRef}
+                imageUrl={selectedThermalCalibrationFramePreview.imageUrl}
+                label={selectedThermalCalibrationFramePreview.cameraName}
+                onFrameChange={handleCameraImageFrameChange}
+              />
+            </div>
+          ) : null}
           {shouldRenderCameraImagePreview ? (
             <CameraImageCanvas
               canvasRef={cameraImageCanvasRef}
@@ -1225,9 +1578,12 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
               expandedCamera={expandedAnalysisCamera}
               imageElementRef={cameraImageElementRef}
               selectedCameraId={selectedCameraForPreview?.id}
+              tileLayoutConfig={tileLayoutConfig}
+              worldSnapshot={analysisTileWorldSnapshot}
               onCameraImageFrameChange={handleCameraImageFrameChange}
               onCameraSelect={switchToCamera}
               onExpandedCameraChange={setExpandedAnalysisCameraId}
+              onTileLayoutChange={onTileLayoutChange}
             />
           ) : null}
           {selectedThermalTileFramePreview ? (
@@ -1242,67 +1598,18 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
             />
           ) : null}
           {shouldRenderCameraImagePreview ? (
-            <div
-              ref={worldPopupRef}
-              className="Three3DViewer Three3DViewer__world-host-1 pointer-events-auto absolute z-40 w-[min(38%,416px)] max-w-[calc(100%-1.5rem)] overflow-hidden rounded-md border border-cyan-200/50 bg-neutral-950/90 p-2 shadow-2xl backdrop-blur-sm"
-              style={
-                worldPopupPos
-                  ? { left: worldPopupPos.left, top: worldPopupPos.top }
-                  : { left: "0.75rem", top: "0.75rem" }
-              }
+            <WorldPreviewPopup
+              popupRef={worldPopupRef}
+              position={worldPopupPos}
+              preview={selectedImagePreview}
+              snapshot={worldPreviewSnapshot}
+              snapshotFailed={worldPreviewSnapshotFailed}
+              onClose={handleCameraPreviewClose}
+              onPointerCancel={handleWorldPopupPointerUp}
               onPointerDown={handleWorldPopupPointerDown}
               onPointerMove={handleWorldPopupPointerMove}
               onPointerUp={handleWorldPopupPointerUp}
-              onPointerCancel={handleWorldPopupPointerUp}
-            >
-              <div className="Three3DViewer Three3DViewer__world-preview-header-1 mb-2 flex min-w-0 cursor-grab items-start justify-between gap-2 text-cyan-100 active:cursor-grabbing select-none">
-                <div className="min-w-0">
-                  <p className="truncate text-xs font-semibold">
-                    {selectedImagePreview.label}
-                  </p>
-                  <p className="sr-only">
-                    Live 3D world
-                  </p>
-                  <p className="truncate font-mono text-[10px] text-cyan-100/70">
-                    {formatWorldPreviewSubtitle(selectedImagePreview)}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  className="Three3DViewer Three3DViewer__world-preview-close-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-xs border border-cyan-200/20 bg-white/5 p-0 text-cyan-100/70 leading-none transition hover:bg-cyan-300/15 hover:text-cyan-50"
-                  onClick={handleCameraPreviewClose}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  title="카메라 보기 닫기"
-                  aria-label="카메라 보기 닫기"
-                >
-                  X
-                </button>
-              </div>
-              <div className="Three3DViewer Three3DViewer__world-snapshot-frame-1 flex max-h-full items-center justify-center overflow-hidden rounded-sm border border-cyan-200/30 bg-neutral-950">
-                {worldPreviewSnapshot ? (
-                  <img
-                    alt={`${selectedImagePreview.label} world snapshot`}
-                    className="Three3DViewer Three3DViewer__world-snapshot-1 block max-h-full max-w-full object-contain"
-                    src={worldPreviewSnapshot}
-                  />
-                ) : worldPreviewSnapshotFailed ? (
-                  <div
-                    className="Three3DViewer Three3DViewer__world-snapshot-fallback-1 flex aspect-video w-full items-center justify-center text-cyan-100/55"
-                    aria-label="World snapshot unavailable"
-                    role="img"
-                  >
-                    <Box className="h-5 w-5" aria-hidden="true" />
-                  </div>
-                ) : (
-                  <div className="Three3DViewer Three3DViewer__world-snapshot-loader-frame-1 flex aspect-video w-full items-center justify-center">
-                    <Loader2
-                      className="Three3DViewer Three3DViewer__world-snapshot-loader-1 h-5 w-5 animate-spin text-cyan-100/70"
-                      aria-hidden="true"
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
+            />
           ) : null}
           {loadState.isLoading || loadState.error ? (
             <ViewerLoadState
@@ -1373,316 +1680,24 @@ export const Three3DViewer = forwardRef(function Three3DViewer(
   );
 });
 
-function AnalysisCameraTileOverlay({
-  analysisCaptureLayer,
-  analysisOverlay,
-  canvasRef,
-  expandedCamera,
-  imageElementRef,
-  onCameraImageFrameChange,
-  onCameraSelect,
-  onExpandedCameraChange,
-  selectedCameraId,
-}) {
-  const cameras = useMemo(
-    () => getAllCameraPresets().slice(0, ANALYSIS_CAMERA_TILE_COUNT),
-    [],
-  );
-  const cells = [
-    cameras[0],
-    cameras[1],
-    cameras[2],
-    cameras[3],
-    { type: "world" },
-    cameras[4],
-    cameras[5],
-    cameras[6],
-    cameras[7],
-  ];
+function renderCurrentThreeScene({ cameraRef, rendererRef, sceneRef }) {
+  const camera = cameraRef.current;
+  const renderer = rendererRef.current;
+  const scene = sceneRef.current;
 
-  return (
-    <div className="Three3DViewer Three3DViewer__analysis-tile-overlay-1 pointer-events-none absolute inset-0 z-[45] grid min-h-0 min-w-0 p-3">
-      <div className="Three3DViewer Three3DViewer__analysis-tile-grid-1 grid min-h-0 min-w-0 grid-cols-3 grid-rows-3 gap-2">
-        {cells.map((cell, index) =>
-          cell?.type === "world" ? (
-            <AnalysisWorldTile key="world" />
-          ) : (
-            <AnalysisCameraImageTile
-              key={cell?.id ?? `analysis-camera-empty-${index}`}
-              active={cell?.id === selectedCameraId}
-              camera={cell}
-              onExpand={(camera) => onExpandedCameraChange?.(camera?.id)}
-              onSelect={onCameraSelect}
-            />
-          ),
-        )}
-      </div>
-      {expandedCamera ? (
-        <AnalysisExpandedCameraTile
-          analysisCaptureLayer={analysisCaptureLayer}
-          analysisOverlay={analysisOverlay}
-          canvasRef={canvasRef}
-          camera={expandedCamera}
-          imageElementRef={imageElementRef}
-          onCameraImageFrameChange={onCameraImageFrameChange}
-          onClose={() => onExpandedCameraChange?.(null)}
-        />
-      ) : null}
-    </div>
-  );
+  if (camera && renderer && scene) {
+    renderer.render(scene, camera);
+  }
 }
 
-function AnalysisWorldTile() {
-  return (
-    <div className="Three3DViewer Three3DViewer__analysis-world-tile-1 pointer-events-none relative min-h-0 min-w-0 overflow-hidden rounded-md border-2 border-cyan-200/70 bg-cyan-950/10 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12),0_0_26px_rgba(34,211,238,0.22)]">
-      <div className="absolute inset-0 opacity-35 [background-image:linear-gradient(135deg,rgba(103,232,249,0.22)_0,rgba(103,232,249,0.22)_1px,transparent_1px,transparent_12px)]" />
-      <div className="absolute inset-2 rounded-sm border border-dashed border-cyan-100/50" />
-      <div className="absolute left-2 top-2 inline-flex max-w-[calc(100%-1rem)] items-center gap-1.5 rounded-sm border border-cyan-100/50 bg-neutral-950/82 px-2 py-1 text-[10px] font-bold text-cyan-50 shadow-[0_0_18px_rgba(34,211,238,0.18)] backdrop-blur-sm">
-        <Box className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-        <span className="truncate">3D VIEWER</span>
-      </div>
-      <div className="absolute inset-x-7 top-1/2 h-px -translate-y-1/2 bg-cyan-100/40" />
-      <div className="absolute inset-y-7 left-1/2 w-px -translate-x-1/2 bg-cyan-100/40" />
-      <div className="absolute bottom-2 right-2 rounded-sm border border-cyan-100/35 bg-neutral-950/72 px-2 py-0.5 font-mono text-[10px] font-semibold text-cyan-100/80 backdrop-blur-sm">
-        WORLD
-      </div>
-    </div>
-  );
-}
+function clampVisualCalibrationImageOpacity(value) {
+  const numericValue = Number(value);
 
-function AnalysisCameraImageTile({ active, camera, onExpand, onSelect }) {
-  const handleSelect = () => {
-    if (camera?.id) {
-      onSelect?.(camera.id);
-    }
-  };
-  const handleKeyDown = (event) => {
-    if (event.key !== "Enter" && event.key !== " ") {
-      return;
-    }
-
-    event.preventDefault();
-    handleSelect();
-  };
-
-  return (
-    <div
-      role="button"
-      tabIndex={camera ? 0 : -1}
-      aria-pressed={active}
-      className={cn(
-        "Three3DViewer Three3DViewer__analysis-camera-tile-1 pointer-events-auto relative min-h-0 min-w-0 overflow-hidden rounded-md border bg-neutral-950/88 text-left shadow-2xl outline-none transition",
-        camera
-          ? "cursor-pointer hover:border-cyan-200/55 hover:shadow-[0_0_24px_rgba(103,232,249,0.2)] focus-visible:ring-2 focus-visible:ring-cyan-200/60"
-          : "cursor-default opacity-70",
-        active
-          ? "border-red-400 ring-2 ring-red-400/80 shadow-[0_0_24px_rgba(248,113,113,0.32)]"
-          : "border-white/15",
-      )}
-      title={camera?.name ?? "Camera"}
-      onClick={handleSelect}
-      onKeyDown={handleKeyDown}
-    >
-      {camera?.sampleImagePath ? (
-        <img
-          alt={camera.name}
-          className="h-full w-full object-cover"
-          draggable={false}
-          src={camera.sampleImagePath}
-        />
-      ) : (
-        <div className="grid h-full w-full place-items-center bg-neutral-950 text-[11px] font-semibold text-white/45">
-          No camera
-        </div>
-      )}
-      <div className="absolute left-2 top-2 rounded-sm border border-white/15 bg-black/72 px-1.5 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
-        {camera?.id ?? "-"}
-      </div>
-      <button
-        type="button"
-        className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-sm border border-white/20 bg-black/72 text-white/80 backdrop-blur-sm transition hover:border-cyan-200/50 hover:bg-cyan-300/20 hover:text-cyan-50 disabled:cursor-not-allowed disabled:opacity-40"
-        disabled={!camera?.sampleImagePath}
-        title="Expand camera frame"
-        aria-label={`${camera?.name ?? "Camera"} expand`}
-        onClick={(event) => {
-          event.stopPropagation();
-          onExpand?.(camera);
-        }}
-      >
-        <Maximize2 className="h-3.5 w-3.5" aria-hidden="true" />
-      </button>
-    </div>
-  );
-}
-
-function AnalysisExpandedCameraTile({
-  analysisCaptureLayer,
-  analysisOverlay,
-  camera,
-  canvasRef,
-  imageElementRef,
-  onCameraImageFrameChange,
-  onClose,
-}) {
-  return (
-    <div
-      className="Three3DViewer Three3DViewer__analysis-expanded-preview-1 pointer-events-auto absolute inset-0 z-20 grid place-items-center bg-black/76 p-3 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-      aria-label={camera?.name ?? "Camera preview"}
-      onClick={onClose}
-    >
-      <div
-        className="relative grid max-h-[calc(100dvh-1.5rem)] w-[min(96vw,68rem)] max-w-full grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-md border border-cyan-200/35 bg-neutral-950 shadow-2xl"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="flex min-w-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-white">
-              {camera?.name ?? "Camera"}
-            </p>
-            <p className="truncate font-mono text-[11px] text-white/55">
-              FOV {camera?.fov ?? "-"} deg
-            </p>
-          </div>
-          <button
-            type="button"
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-white/15 bg-white/[0.06] text-white/70 transition hover:bg-white/[0.12] hover:text-white"
-            title="Close"
-            aria-label="Close expanded camera frame"
-            onClick={onClose}
-          >
-            <X className="h-4 w-4" aria-hidden="true" />
-          </button>
-        </div>
-        <div className="relative h-[min(64dvh,34rem)] min-h-[14rem] overflow-hidden bg-black md:h-[min(74dvh,40rem)]">
-          {camera?.sampleImagePath ? (
-            <>
-              <CameraImageCanvas
-                canvasRef={canvasRef}
-                imageElementRef={imageElementRef}
-                imageUrl={camera.sampleImagePath}
-                label={camera.name}
-                onFrameChange={onCameraImageFrameChange}
-              />
-              {analysisOverlay}
-              {analysisCaptureLayer}
-            </>
-          ) : (
-            <div className="grid min-h-[16rem] place-items-center text-sm font-semibold text-white/50">
-              No camera frame
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AnalysisExpandedThermalFramePreview({
-  analysisCaptureLayer,
-  analysisOverlay,
-  canvasRef,
-  framePreview,
-  imageElementRef,
-  onCameraImageFrameChange,
-  onClose,
-}) {
-  return (
-    <div
-      className="Three3DViewer Three3DViewer__thermal-analysis-expanded-preview-1 pointer-events-auto absolute inset-0 z-[80] grid place-items-center bg-black/76 p-3 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-      aria-label={framePreview?.cameraName ?? "Thermal frame preview"}
-      onClick={onClose}
-    >
-      <div
-        className="relative grid max-h-[calc(100dvh-1.5rem)] w-[min(96vw,68rem)] max-w-full grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-md border border-cyan-200/35 bg-neutral-950 shadow-2xl"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="flex min-w-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-white">
-              {framePreview?.cameraName ?? "Thermal camera"}
-            </p>
-            <p className="truncate font-mono text-[11px] text-white/55">
-              {framePreview?.width && framePreview?.height
-                ? `${framePreview.width}x${framePreview.height}`
-                : "No frame"}
-            </p>
-          </div>
-          <button
-            type="button"
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-white/15 bg-white/[0.06] text-white/70 transition hover:bg-white/[0.12] hover:text-white"
-            title="Close"
-            aria-label="Close expanded thermal frame"
-            onClick={onClose}
-          >
-            <X className="h-4 w-4" aria-hidden="true" />
-          </button>
-        </div>
-        <div className="relative h-[min(64dvh,34rem)] min-h-[14rem] overflow-hidden bg-black md:h-[min(74dvh,40rem)]">
-          {framePreview?.imageUrl ? (
-            <>
-              <CameraImageCanvas
-                canvasRef={canvasRef}
-                imageElementRef={imageElementRef}
-                imageUrl={framePreview.imageUrl}
-                label={framePreview.cameraName}
-                onFrameChange={onCameraImageFrameChange}
-              />
-              {analysisOverlay}
-              {analysisCaptureLayer}
-            </>
-          ) : (
-            <div className="grid min-h-[16rem] place-items-center text-sm font-semibold text-white/50">
-              No frame
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function formatWorldPreviewSubtitle(preview) {
-  const fov = Number(preview?.fov);
-
-  if (Number.isFinite(fov)) {
-    return `World snapshot · FOV ${Math.round(fov * 10) / 10}°`;
+  if (!Number.isFinite(numericValue)) {
+    return 0.55;
   }
 
-  return "World snapshot";
-}
-
-function loadWorldPopupPosition() {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  try {
-    const saved = window.localStorage.getItem(WORLD_POPUP_POS_KEY);
-    if (!saved) {
-      return null;
-    }
-
-    const parsed = JSON.parse(saved);
-    if (typeof parsed?.left === "number" && typeof parsed?.top === "number") {
-      return parsed;
-    }
-  } catch {}
-
-  return null;
-}
-
-function saveWorldPopupPosition(position) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  try {
-    window.localStorage.setItem(WORLD_POPUP_POS_KEY, JSON.stringify(position));
-  } catch {}
+  return Math.min(1, Math.max(0.1, numericValue));
 }
 
 function toThreeVector3(vector) {
@@ -1714,6 +1729,9 @@ function getConfiguredCameraPreset(cameraId, cameraVisualizationConfig = {}) {
     position:
       cameraVisualizationConfig.customPositions?.[cameraId] ??
       camera.position,
+    target:
+      cameraVisualizationConfig.customTargets?.[cameraId] ??
+      camera.target,
   };
 }
 

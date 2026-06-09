@@ -9,6 +9,7 @@ import {
   THERMAL_CAPTURE_VERTICAL_FOV_MAX_DEGREES,
   THERMAL_CAPTURE_VERTICAL_FOV_MIN_DEGREES,
 } from "@/lib/thermal-mapping";
+import { invalidateThreeScene } from "@/lib/three-scene-invalidation";
 import {
   getThermalTargetMetrics,
   resolveThermalCameraPose,
@@ -18,19 +19,31 @@ const PREVIEW_GROUP_NAME = "ThermalCameraPreviewPlanes";
 const CAMERA_LASER_COLOR = 0x67e8f9;
 const CAMERA_LASER_HOVER_COLOR = 0xfacc15;
 const CAMERA_LASER_SELECTED_COLOR = 0xa3e635;
+const CAMERA_LASER_COMPARISON_COLOR = 0xf97316;
+const CAMERA_LASER_COMPARISON_DELTA_COLOR = 0xfacc15;
 const COVERAGE_GRID_SEGMENTS_ALL = 12;
 const COVERAGE_GRID_SEGMENTS_SELECTED = 22;
 const THERMAL_PROJECTION_NORMAL_CUTOFF = 0.5;
+const THERMAL_CAMERA_IMAGE_MARKER_ASPECT = 4 / 3;
+const THERMAL_CAMERA_IMAGE_MARKER_MIN_HEIGHT = 0.12;
+const THERMAL_CAMERA_IMAGE_MARKER_MAX_HEIGHT = 0.34;
+const THERMAL_CAMERA_IMAGE_MARKER_HEIGHT_RATIO = 0.16;
+const THERMAL_CAMERA_MARKER_SCALE = 1;
+const THERMAL_CAMERA_MARKER_HOVER_SCALE = 1.06;
+const THERMAL_CAMERA_MARKER_SELECTED_SCALE = 1.12;
+const WORLD_UP_VECTOR = new THREE.Vector3(0, 1, 0);
+const FALLBACK_ROLL_UP_VECTOR = new THREE.Vector3(1, 0, 0);
 
 export function useThermalCameraPreviewPlanes({
   cameras = [],
   enabled = false,
   framesByCameraId = {},
   hoveredCameraId,
+  comparisonPose,
   requireSelection = false,
+  renderTexturePreview = true,
   scene,
   selectedCameraId,
-  showLaserGuide = true,
   targetObject,
 }) {
   const groupRef = useRef(null);
@@ -53,7 +66,7 @@ export function useThermalCameraPreviewPlanes({
             ? Boolean(selectedCameraId) && camera.cameraId === selectedCameraId
             : !selectedCameraId || camera.cameraId === selectedCameraId,
       )
-      .filter((entry) => entry.frame);
+      .filter((entry) => !renderTexturePreview || entry.frame);
 
     if (!entries.length) {
       return undefined;
@@ -67,23 +80,54 @@ export function useThermalCameraPreviewPlanes({
     group.userData.isThermalCameraPreviewPlanes = true;
 
     entries.forEach(({ camera, frame, index }) => {
+      const coverageGridSegments = selectedCameraId
+        ? COVERAGE_GRID_SEGMENTS_SELECTED
+        : COVERAGE_GRID_SEGMENTS_ALL;
       const planeGroup = createPreviewPlaneGroup({
         camera,
-        coverageGridSegments: selectedCameraId
-          ? COVERAGE_GRID_SEGMENTS_SELECTED
-          : COVERAGE_GRID_SEGMENTS_ALL,
+        coverageGridSegments,
         coverageRaycastTargets,
         frame,
         index,
+        renderTexturePreview,
         targetObject,
         targetMetrics,
         totalCount: cameras.length,
         selectedCameraId,
-        showLaserGuide,
       });
 
       if (planeGroup) {
         group.add(planeGroup);
+      }
+
+      if (
+        !renderTexturePreview &&
+        comparisonPose &&
+        selectedCameraId &&
+        camera.cameraId === selectedCameraId
+      ) {
+        const comparisonGroup = createThermalComparisonPoseGroup({
+          aspectRatio: getThermalFrameAspectRatio(frame),
+          camera,
+          coverageGridSegments,
+          coverageRaycastTargets,
+          currentPose: resolveThermalCameraPose({
+            camera,
+            index,
+            targetMetrics,
+            totalCount: cameras.length,
+          }),
+          frame,
+          index,
+          poseConfig: comparisonPose,
+          targetMetrics,
+          targetObject,
+          totalCount: cameras.length,
+        });
+
+        if (comparisonGroup) {
+          group.add(comparisonGroup);
+        }
       }
     });
 
@@ -95,29 +139,36 @@ export function useThermalCameraPreviewPlanes({
 
     scene.add(group);
     groupRef.current = group;
+    invalidateThreeScene(scene, "thermal-preview-planes");
 
     return () => {
       scene.remove(group);
       groupRef.current = null;
       disposeObject3D(group);
+      invalidateThreeScene(scene, "thermal-preview-planes-cleanup");
     };
   }, [
     cameras,
     enabled,
     framesByCameraId,
+    comparisonPose,
     requireSelection,
+    renderTexturePreview,
     scene,
     selectedCameraId,
-    showLaserGuide,
     targetObject,
   ]);
 
   useEffect(() => {
-    updateThermalProjectionLaserVisualState({
+    updateThermalCameraInteractionState({
       group: groupRef.current,
       hoveredCameraId,
       selectedCameraId,
     });
+    invalidateThreeScene(
+      groupRef.current?.parent,
+      "thermal-preview-interaction",
+    );
   }, [hoveredCameraId, selectedCameraId]);
 }
 
@@ -127,29 +178,12 @@ function createPreviewPlaneGroup({
   coverageRaycastTargets,
   frame,
   index,
+  renderTexturePreview,
   targetObject,
   targetMetrics,
   totalCount,
   selectedCameraId,
-  showLaserGuide,
 }) {
-  const canvas = createThermalCanvasFromFrame(frame, {
-    paletteMaxTemperature: frame.maxTemperature,
-    paletteMinTemperature: frame.minTemperature,
-  });
-
-  if (!canvas) {
-    return null;
-  }
-
-  const texture = createThermalTextureFromCanvas(canvas, {
-    flipY: false,
-  });
-
-  if (!texture) {
-    return null;
-  }
-
   const pose = resolveThermalCameraPose({
     camera,
     index,
@@ -157,74 +191,104 @@ function createPreviewPlaneGroup({
     totalCount,
   });
   const { lookAt, position } = pose;
-  const aspectRatio = frame.width && frame.height ? frame.width / frame.height : 4 / 3;
+  const aspectRatio = getThermalFrameAspectRatio(frame);
   const viewDirection = lookAt.clone().sub(position).normalize();
-  const targetDistance = Math.max(0.01, position.distanceTo(lookAt));
-  const previewDistance = Math.max(
-    targetMetrics.extent * 0.04,
-    Math.min(targetDistance * 0.28, targetMetrics.extent * 0.18),
-  );
-  const planeHeight = getThermalPreviewPlaneHeight({
-    pose,
-    previewDistance,
-    targetMetrics,
-  });
-  const planeWidth = planeHeight * aspectRatio;
-  const geometry = new THREE.PlaneGeometry(planeWidth, planeHeight);
-  const material = new THREE.MeshBasicMaterial({
-    color: 0xffffff,
-    depthTest: true,
-    depthWrite: false,
-    map: texture,
-    opacity: 0.84,
-    side: THREE.DoubleSide,
-    toneMapped: false,
-    transparent: true,
-  });
-  const plane = new THREE.Mesh(geometry, material);
-  plane.name = `${camera.cameraName} thermal preview plane`;
-  plane.position.copy(position).addScaledVector(viewDirection, previewDistance);
-  plane.lookAt(lookAt);
-  plane.renderOrder = 35;
-  plane.userData.cameraId = camera.cameraId;
 
   const group = new THREE.Group();
   group.name = `${camera.cameraName} preview`;
   group.userData.cameraId = camera.cameraId;
-  group.add(plane);
-  group.add(createPreviewBorder(plane));
 
   const laserVisualState = getCameraLaserVisualState({
     cameraId: camera.cameraId,
     selectedCameraId,
   });
+  let texture = null;
+
+  if (renderTexturePreview) {
+    const canvas = frame
+      ? createThermalCanvasFromFrame(frame, {
+          paletteMaxTemperature: frame.maxTemperature,
+          paletteMinTemperature: frame.minTemperature,
+        })
+      : null;
+
+    if (!canvas) {
+      return null;
+    }
+
+    texture = createThermalTextureFromCanvas(canvas, {
+      flipY: false,
+    });
+
+    if (!texture) {
+      return null;
+    }
+
+    const targetDistance = Math.max(0.01, position.distanceTo(lookAt));
+    const previewDistance = Math.max(
+      targetMetrics.extent * 0.04,
+      Math.min(targetDistance * 0.28, targetMetrics.extent * 0.18),
+    );
+    const planeHeight = getThermalPreviewPlaneHeight({
+      pose,
+      previewDistance,
+      targetMetrics,
+    });
+    const planeWidth = planeHeight * aspectRatio;
+    const geometry = new THREE.PlaneGeometry(planeWidth, planeHeight);
+    const material = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      depthTest: true,
+      depthWrite: false,
+      map: texture,
+      opacity: 0.84,
+      side: THREE.DoubleSide,
+      toneMapped: false,
+      transparent: true,
+    });
+    const plane = new THREE.Mesh(geometry, material);
+    plane.name = `${camera.cameraName} thermal preview plane`;
+    plane.position.copy(position).addScaledVector(viewDirection, previewDistance);
+    plane.lookAt(lookAt);
+    plane.renderOrder = 35;
+    plane.userData.cameraId = camera.cameraId;
+    plane.userData.isThermalCameraHoverScalable = true;
+
+    group.add(plane);
+    const border = createPreviewBorder(plane);
+    border.userData.cameraId = camera.cameraId;
+    border.userData.isThermalCameraHoverScalable = true;
+    group.add(border);
+  } else {
+    group.add(
+      createThermalCameraPoseMarker({
+        cameraId: camera.cameraId,
+        frame,
+        label: camera.cameraIndex ?? "",
+        pose,
+        position,
+        targetMetrics,
+        visualState: laserVisualState,
+      }),
+    );
+
+  }
 
   group.add(
     createProjectionLaserGuide({
       aspectRatio,
       cameraId: camera.cameraId,
+      cameraName: camera.cameraName,
       coverageGridSegments,
       coverageRaycastTargets,
       frame,
       pose,
-      showLaserGuide,
       targetMetrics,
       targetObject,
       texture,
       visualState: laserVisualState,
     }),
   );
-
-  if (showLaserGuide) {
-    group.add(
-      createPreviewSightLine(
-        position,
-        lookAt,
-        laserVisualState,
-        camera.cameraId,
-      ),
-    );
-  }
 
   return group;
 }
@@ -240,6 +304,15 @@ function getThermalPreviewPlaneHeight({ pose, previewDistance, targetMetrics }) 
   const fovHeight = 2 * Math.tan(fovRadians / 2) * previewDistance;
 
   return Math.max(targetMetrics.extent * 0.08, fovHeight);
+}
+
+function getThermalFrameAspectRatio(frame) {
+  const width = Number(frame?.width);
+  const height = Number(frame?.height);
+
+  return Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0
+    ? width / height
+    : 4 / 3;
 }
 
 function createPreviewBorder(plane) {
@@ -259,23 +332,458 @@ function createPreviewBorder(plane) {
   return border;
 }
 
-function createPreviewSightLine(position, lookAt, visualState, cameraId) {
-  const lineGeometry = new THREE.BufferGeometry().setFromPoints([
-    position.clone(),
-    lookAt.clone(),
-  ]);
-  const lineMaterial = new THREE.LineBasicMaterial({
-    color: visualState.color,
-    depthTest: true,
-    transparent: true,
-    opacity: visualState.sightLineOpacity,
+function createThermalComparisonPoseGroup({
+  aspectRatio,
+  camera,
+  coverageGridSegments,
+  coverageRaycastTargets,
+  currentPose,
+  frame,
+  index,
+  poseConfig,
+  targetMetrics,
+  targetObject,
+  totalCount,
+}) {
+  if (!camera?.cameraId || !poseConfig) {
+    return null;
+  }
+
+  const comparisonCamera = {
+    ...camera,
+    worldPose: poseConfig,
+  };
+  const pose = resolveThermalCameraPose({
+    camera: comparisonCamera,
+    index,
+    targetMetrics,
+    totalCount,
   });
-  const line = new THREE.Line(lineGeometry, lineMaterial);
-  line.name = "thermal preview sight line";
-  line.renderOrder = 34;
+
+  if (
+    !pose?.position?.isVector3 ||
+    !pose?.lookAt?.isVector3 ||
+    pose.position.distanceToSquared(pose.lookAt) <= 0
+  ) {
+    return null;
+  }
+
+  const visualState = getThermalComparisonLaserVisualState();
+  const group = new THREE.Group();
+  group.name = `${camera.cameraName} thermal comparison clone`;
+  group.userData.cameraId = camera.cameraId;
+  group.userData.isThermalProjectionComparison = true;
+
+  group.add(
+    createThermalCameraPoseMarker({
+      cameraId: camera.cameraId,
+      frame,
+      isComparison: true,
+      label: "BEFORE",
+      pose,
+      position: pose.position,
+      targetMetrics,
+      visualState,
+    }),
+  );
+
+  group.add(
+    createProjectionLaserGuide({
+      aspectRatio,
+      cameraId: camera.cameraId,
+      cameraName: `${camera.cameraName} before`,
+      coverageGridSegments,
+      coverageRaycastTargets,
+      frame,
+      isComparison: true,
+      pose,
+      targetMetrics,
+      targetObject,
+      texture: null,
+      visualState,
+    }),
+  );
+
+  if (currentPose?.position?.isVector3) {
+    group.add(
+      createThermalComparisonDeltaLine({
+        cameraId: camera.cameraId,
+        currentPosition: currentPose.position,
+        previousPosition: pose.position,
+      }),
+    );
+  }
+
+  return group;
+}
+
+function createThermalCameraPoseMarker({
+  cameraId,
+  frame,
+  isComparison = false,
+  label,
+  pose,
+  position,
+  targetMetrics,
+  visualState,
+}) {
+  const markerSize = getThermalCameraImageMarkerSize({
+    aspectRatio: getThermalFrameAspectRatio(frame),
+    targetMetrics,
+  });
+  const group = new THREE.Group();
+  group.name = isComparison
+    ? `thermal camera comparison marker ${cameraId}`
+    : `thermal camera marker ${cameraId}`;
+  group.position.copy(position);
+  group.userData.cameraId = cameraId;
+  group.userData.isThermalProjectionComparison = isComparison;
+  group.userData.isThermalCameraPoseMarkerRoot = !isComparison;
+
+  const forward =
+    pose?.lookAt?.isVector3 && position.distanceToSquared(pose.lookAt) > 0
+      ? pose.lookAt.clone().sub(position).normalize()
+      : new THREE.Vector3(0, 0, 1);
+  applyStableThermalImageMarkerRotation(group, forward);
+
+  const texture = getThermalCameraMarkerTexture({
+    cameraId,
+    frame,
+    isComparison,
+  });
+  const imagePlane = createThermalCameraImagePlane({
+    cameraId,
+    isComparison,
+    markerSize,
+    renderOrder: isComparison ? 47 : 37,
+    side: THREE.FrontSide,
+    texture,
+    visualState,
+  });
+  imagePlane.name = isComparison
+    ? "thermal camera comparison image marker"
+    : "thermal camera image marker";
+  group.add(imagePlane);
+
+  const backImagePlane = createThermalCameraImagePlane({
+    cameraId,
+    flipHorizontal: true,
+    isComparison,
+    markerSize,
+    renderOrder: isComparison ? 47 : 37,
+    side: THREE.BackSide,
+    texture,
+    visualState,
+  });
+  backImagePlane.name = isComparison
+    ? "thermal camera comparison image marker back"
+    : "thermal camera image marker back";
+  group.add(backImagePlane);
+
+  const frameLine = createThermalCameraImageFrame({
+    cameraId,
+    isComparison,
+    markerSize,
+    visualState,
+  });
+  group.add(frameLine);
+
+  if (label) {
+    const labelPlane = createThermalCameraPoseLabel({
+      isComparison,
+      label: String(label),
+      markerSize,
+      side: THREE.FrontSide,
+      visualState,
+    });
+    labelPlane.position.set(
+      -markerSize.width / 2 + markerSize.badgeWidth / 2 + markerSize.badgePad,
+      markerSize.height / 2 - markerSize.badgeHeight / 2 - markerSize.badgePad,
+      markerSize.depthOffset,
+    );
+    labelPlane.userData.cameraId = cameraId;
+    labelPlane.userData.isThermalProjectionComparison = isComparison;
+    group.add(labelPlane);
+
+    const backLabelPlane = createThermalCameraPoseLabel({
+      flipHorizontal: true,
+      isComparison,
+      label: String(label),
+      markerSize,
+      side: THREE.BackSide,
+      visualState,
+    });
+    backLabelPlane.position.set(
+      markerSize.width / 2 - markerSize.badgeWidth / 2 - markerSize.badgePad,
+      markerSize.height / 2 - markerSize.badgeHeight / 2 - markerSize.badgePad,
+      -markerSize.depthOffset,
+    );
+    backLabelPlane.userData.cameraId = cameraId;
+    backLabelPlane.userData.isThermalProjectionComparison = isComparison;
+    group.add(backLabelPlane);
+  }
+
+  return group;
+}
+
+function getThermalCameraImageMarkerSize({ aspectRatio, targetMetrics }) {
+  const height = THREE.MathUtils.clamp(
+    targetMetrics.extent * THERMAL_CAMERA_IMAGE_MARKER_HEIGHT_RATIO,
+    THERMAL_CAMERA_IMAGE_MARKER_MIN_HEIGHT,
+    THERMAL_CAMERA_IMAGE_MARKER_MAX_HEIGHT,
+  );
+  const width =
+    height *
+    (Number.isFinite(aspectRatio) && aspectRatio > 0
+      ? aspectRatio
+      : THERMAL_CAMERA_IMAGE_MARKER_ASPECT);
+
+  return {
+    badgeHeight: height * 0.22,
+    badgePad: height * 0.055,
+    badgeWidth: width * 0.34,
+    depthOffset: Math.max(0.001, height * 0.018),
+    height,
+    width,
+  };
+}
+
+function getThermalCameraMarkerTexture({ cameraId, frame, isComparison }) {
+  const canvas = frame
+    ? createThermalCanvasFromFrame(frame, {
+        paletteMaxTemperature: frame.maxTemperature,
+        paletteMinTemperature: frame.minTemperature,
+      })
+    : createThermalCameraFallbackCanvas(cameraId, isComparison);
+  const texture = createThermalTextureFromCanvas(canvas, {
+    flipY: false,
+  });
+
+  if (texture) {
+    texture.name = `thermal-camera-marker-texture-${cameraId}`;
+  }
+
+  return texture;
+}
+
+function createThermalCameraImagePlane({
+  cameraId,
+  flipHorizontal = false,
+  isComparison = false,
+  markerSize,
+  renderOrder,
+  side,
+  texture,
+  visualState,
+}) {
+  const geometry = new THREE.PlaneGeometry(markerSize.width, markerSize.height);
+  if (flipHorizontal) {
+    flipGeometryUvHorizontally(geometry);
+  }
+
+  const plane = new THREE.Mesh(
+    geometry,
+    new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      depthTest: true,
+      depthWrite: false,
+      map: texture,
+      opacity: visualState.markerImageOpacity ?? 0.92,
+      side,
+      toneMapped: false,
+      transparent: true,
+    }),
+  );
+  plane.renderOrder = renderOrder;
+  plane.userData.cameraId = cameraId;
+  plane.userData.isThermalProjectionLaserVisual = true;
+  plane.userData.isThermalProjectionComparison = isComparison;
+  plane.userData.thermalProjectionLaserRole = "marker-image";
+  plane.raycast = () => {};
+
+  return plane;
+}
+
+function createThermalCameraImageFrame({
+  cameraId,
+  isComparison,
+  markerSize,
+  visualState,
+}) {
+  const halfWidth = markerSize.width / 2;
+  const halfHeight = markerSize.height / 2;
+  const depthOffset = markerSize.depthOffset * 1.2;
+  const geometry = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(-halfWidth, -halfHeight, depthOffset),
+    new THREE.Vector3(halfWidth, -halfHeight, depthOffset),
+    new THREE.Vector3(halfWidth, halfHeight, depthOffset),
+    new THREE.Vector3(-halfWidth, halfHeight, depthOffset),
+    new THREE.Vector3(-halfWidth, -halfHeight, depthOffset),
+  ]);
+  const line = new THREE.Line(
+    geometry,
+    new THREE.LineBasicMaterial({
+      color: visualState.color,
+      depthTest: true,
+      depthWrite: false,
+      opacity: visualState.markerFrameOpacity ?? 0.88,
+      transparent: true,
+    }),
+  );
+  line.name = isComparison
+    ? "thermal camera comparison image frame"
+    : "thermal camera image frame";
+  line.renderOrder = isComparison ? 48 : 38;
   line.userData.cameraId = cameraId;
   line.userData.isThermalProjectionLaserVisual = true;
-  line.userData.thermalProjectionLaserRole = "sight";
+  line.userData.isThermalProjectionComparison = isComparison;
+  line.userData.thermalProjectionLaserRole = "marker-frame";
+  line.raycast = () => {};
+
+  return line;
+}
+
+function createThermalCameraFallbackCanvas(cameraId, isComparison) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 320;
+  canvas.height = 240;
+  const context = canvas.getContext("2d");
+
+  if (context) {
+    const gradient = context.createLinearGradient(0, 0, canvas.width, canvas.height);
+    gradient.addColorStop(0, isComparison ? "#431407" : "#020617");
+    gradient.addColorStop(0.38, "#1e3a8a");
+    gradient.addColorStop(0.72, "#dc2626");
+    gradient.addColorStop(1, "#facc15");
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = "rgba(2, 6, 23, 0.64)";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.strokeStyle = isComparison ? "#f97316" : "#67e8f9";
+    context.lineWidth = 8;
+    context.strokeRect(5, 5, canvas.width - 10, canvas.height - 10);
+    context.font = "700 36px Arial, sans-serif";
+    context.fillStyle = "#ffffff";
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillText(`THERMAL ${cameraId ?? ""}`, canvas.width / 2, canvas.height / 2);
+  }
+
+  return canvas;
+}
+
+function applyStableThermalImageMarkerRotation(marker, forward) {
+  const upSeed =
+    Math.abs(forward.dot(WORLD_UP_VECTOR)) > 0.96
+      ? FALLBACK_ROLL_UP_VECTOR
+      : WORLD_UP_VECTOR;
+  const right = new THREE.Vector3().crossVectors(upSeed, forward).normalize();
+  const up = new THREE.Vector3().crossVectors(forward, right).normalize();
+  const rotationMatrix = new THREE.Matrix4().makeBasis(right, up, forward);
+
+  marker.quaternion.setFromRotationMatrix(rotationMatrix);
+}
+
+function flipGeometryUvHorizontally(geometry) {
+  const uv = geometry.attributes.uv;
+  for (let index = 0; index < uv.count; index += 1) {
+    uv.setX(index, 1 - uv.getX(index));
+  }
+  uv.needsUpdate = true;
+}
+
+function createThermalCameraPoseLabel({
+  flipHorizontal = false,
+  isComparison,
+  label,
+  markerSize,
+  side,
+  visualState,
+}) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 192;
+  canvas.height = 80;
+
+  const context = canvas.getContext("2d");
+  if (context) {
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = isComparison
+      ? "rgba(124, 45, 18, 0.86)"
+      : "rgba(8, 47, 73, 0.82)";
+    context.strokeStyle = `#${visualState.color.toString(16).padStart(6, "0")}`;
+    context.lineWidth = 4;
+    context.beginPath();
+    context.roundRect?.(20, 18, 152, 44, 12);
+    if (!context.roundRect) {
+      context.rect(20, 18, 152, 44);
+    }
+    context.fill();
+    context.stroke();
+    context.font = "700 24px Arial, sans-serif";
+    context.fillStyle = "#ffffff";
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillText(label, 96, 40);
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.needsUpdate = true;
+  const geometry = new THREE.PlaneGeometry(
+    markerSize.badgeWidth,
+    markerSize.badgeHeight,
+  );
+  if (flipHorizontal) {
+    flipGeometryUvHorizontally(geometry);
+  }
+
+  const labelMesh = new THREE.Mesh(
+    geometry,
+    new THREE.MeshBasicMaterial({
+      depthTest: false,
+      depthWrite: false,
+      map: texture,
+      side,
+      transparent: true,
+    }),
+  );
+  labelMesh.name = isComparison
+    ? "thermal camera comparison label"
+    : "thermal camera label";
+  labelMesh.renderOrder = isComparison ? 49 : 39;
+  labelMesh.userData.isThermalProjectionLaserVisual = true;
+  labelMesh.userData.thermalProjectionLaserRole = "marker-label";
+  return labelMesh;
+}
+
+function createThermalComparisonDeltaLine({
+  cameraId,
+  currentPosition,
+  previousPosition,
+}) {
+  if (previousPosition.distanceToSquared(currentPosition) <= 0.000001) {
+    return new THREE.Group();
+  }
+
+  const line = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([
+      previousPosition.clone(),
+      currentPosition.clone(),
+    ]),
+    new THREE.LineBasicMaterial({
+      color: CAMERA_LASER_COMPARISON_DELTA_COLOR,
+      depthTest: false,
+      depthWrite: false,
+      opacity: 0.94,
+      transparent: true,
+    }),
+  );
+
+  line.name = `thermal camera comparison delta ${cameraId}`;
+  line.renderOrder = 49;
+  line.userData.cameraId = cameraId;
+  line.userData.isThermalProjectionComparison = true;
+  line.raycast = () => {};
 
   return line;
 }
@@ -283,19 +791,21 @@ function createPreviewSightLine(position, lookAt, visualState, cameraId) {
 function createProjectionLaserGuide({
   aspectRatio,
   cameraId,
+  cameraName,
   coverageGridSegments,
   coverageRaycastTargets,
   frame,
+  isComparison = false,
   pose,
-  showLaserGuide,
   targetMetrics,
   targetObject,
   texture,
   visualState,
 }) {
   const group = new THREE.Group();
-  group.name = `${frame.cameraName} thermal projection laser guide`;
+  group.name = `${cameraName ?? frame?.cameraName ?? "Thermal camera"} thermal projection laser guide`;
   group.userData.isThermalProjectionLaserGuide = true;
+  group.userData.isThermalProjectionComparison = isComparison;
 
   if (
     !targetObject ||
@@ -325,19 +835,11 @@ function createProjectionLaserGuide({
     texture,
     visualState,
     cameraId,
-  );
-  const coverageLine = createThermalCoverageLine(
-    coverageGeometry.boundaryPoints,
-    visualState,
-    cameraId,
+    isComparison,
   );
 
   if (coverageFill) {
     group.add(coverageFill);
-  }
-
-  if (showLaserGuide && coverageLine) {
-    group.add(coverageLine);
   }
 
   return group;
@@ -579,6 +1081,7 @@ function createThermalCoverageFill(
   texture,
   visualState,
   cameraId,
+  isComparison = false,
 ) {
   if (!points.length) {
     return null;
@@ -617,33 +1120,12 @@ function createThermalCoverageFill(
   mesh.renderOrder = 41;
   mesh.userData.cameraId = cameraId;
   mesh.userData.isThermalProjectionLaserVisual = true;
+  mesh.userData.isThermalProjectionComparison = isComparison;
   mesh.userData.thermalProjectionLaserRole = texture
     ? "coverage-texture"
     : "coverage-fill";
 
   return mesh;
-}
-
-function createThermalCoverageLine(points, visualState, cameraId) {
-  if (!points.length) {
-    return null;
-  }
-
-  const geometry = new THREE.BufferGeometry().setFromPoints(points);
-  const material = new THREE.LineBasicMaterial({
-    color: visualState.color,
-    depthTest: true,
-    transparent: true,
-    opacity: visualState.coverageLineOpacity,
-  });
-  const line = new THREE.LineSegments(geometry, material);
-  line.name = "thermal texture coverage outline";
-  line.renderOrder = 42;
-  line.userData.cameraId = cameraId;
-  line.userData.isThermalProjectionLaserVisual = true;
-  line.userData.thermalProjectionLaserRole = "coverage-line";
-
-  return line;
 }
 
 function getHitWorldNormal(hit, fallbackDirection) {
@@ -676,10 +1158,59 @@ function getCameraLaserVisualState({
       ? CAMERA_LASER_SELECTED_COLOR
       : CAMERA_LASER_COLOR,
     coverageFillOpacity: isHovered ? 0.28 : isSelected ? 0.24 : 0.18,
-    coverageLineOpacity: isHovered ? 1 : isSelected ? 0.98 : 0.88,
     coverageTextureOpacity: isHovered ? 0.88 : isSelected ? 0.8 : 0.68,
-    sightLineOpacity: isHovered ? 0.46 : isSelected ? 0.42 : 0.32,
+    markerFrameOpacity: isHovered ? 1 : isSelected ? 0.96 : 0.84,
+    markerImageOpacity: isHovered ? 1 : isSelected ? 0.94 : 0.86,
+    markerLabelOpacity: isHovered ? 1 : isSelected ? 0.96 : 0.9,
   };
+}
+
+function getThermalComparisonLaserVisualState() {
+  return {
+    color: CAMERA_LASER_COMPARISON_COLOR,
+    coverageFillOpacity: 0.22,
+    coverageTextureOpacity: 0,
+    markerFrameOpacity: 0.92,
+    markerImageOpacity: 0.74,
+    markerLabelOpacity: 0.92,
+  };
+}
+
+function updateThermalCameraInteractionState({
+  group,
+  hoveredCameraId,
+  selectedCameraId,
+}) {
+  updateThermalProjectionLaserVisualState({
+    group,
+    hoveredCameraId,
+    selectedCameraId,
+  });
+
+  if (!group) {
+    return;
+  }
+
+  group.traverse?.((object) => {
+    if (
+      object.userData?.isThermalProjectionComparison ||
+      (!object.userData?.isThermalCameraHoverScalable &&
+        !object.userData?.isThermalCameraPoseMarkerRoot)
+    ) {
+      return;
+    }
+
+    const cameraId = object.userData?.cameraId;
+    const isHovered = Boolean(hoveredCameraId && cameraId === hoveredCameraId);
+    const isSelected = Boolean(selectedCameraId && cameraId === selectedCameraId);
+    const scale = isSelected
+      ? THERMAL_CAMERA_MARKER_SELECTED_SCALE
+      : isHovered
+      ? THERMAL_CAMERA_MARKER_HOVER_SCALE
+      : THERMAL_CAMERA_MARKER_SCALE;
+
+    object.scale.setScalar(scale);
+  });
 }
 
 function updateThermalProjectionLaserVisualState({
@@ -692,7 +1223,11 @@ function updateThermalProjectionLaserVisualState({
   }
 
   group.traverse?.((object) => {
-    if (!object.userData?.isThermalProjectionLaserVisual || !object.material) {
+    if (
+      object.userData?.isThermalProjectionComparison ||
+      !object.userData?.isThermalProjectionLaserVisual ||
+      !object.material
+    ) {
       return;
     }
 
@@ -703,15 +1238,18 @@ function updateThermalProjectionLaserVisualState({
     });
     const opacityByRole = {
       "coverage-fill": visualState.coverageFillOpacity,
-      "coverage-line": visualState.coverageLineOpacity,
       "coverage-texture": visualState.coverageTextureOpacity,
-      sight: visualState.sightLineOpacity,
+      "marker-frame": visualState.markerFrameOpacity,
+      "marker-image": visualState.markerImageOpacity,
+      "marker-label": visualState.markerLabelOpacity,
     };
     const shouldTintMaterial =
-      object.userData.thermalProjectionLaserRole !== "coverage-texture";
+      !["coverage-texture", "marker-image", "marker-label"].includes(
+        object.userData.thermalProjectionLaserRole,
+      );
     const opacity =
       opacityByRole[object.userData.thermalProjectionLaserRole] ??
-      visualState.coverageLineOpacity;
+      visualState.markerFrameOpacity;
 
     applyLaserMaterialVisualState(
       object.material,

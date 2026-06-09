@@ -8,6 +8,12 @@ const WORLD_PREVIEW_CAMERA_MIN_BACK_OFFSET = 18;
 const WORLD_PREVIEW_CAMERA_PADDING = 1.18;
 const WORLD_PREVIEW_MIN_RADIUS = 82;
 const WORLD_PREVIEW_DEFAULT_BACK_OFFSET_SCALE = 1;
+const WORLD_PREVIEW_SELECTED_CAMERA_FOV = 42;
+const WORLD_PREVIEW_SELECTED_CAMERA_BACK_OFFSET_RATIO = 0.48;
+const WORLD_PREVIEW_SELECTED_CAMERA_MIN_BACK_OFFSET = 24;
+const WORLD_PREVIEW_SELECTED_CAMERA_MAX_BACK_OFFSET = 52;
+const WORLD_PREVIEW_SELECTED_CAMERA_MIN_RADIUS = 16;
+const WORLD_PREVIEW_SELECTED_CAMERA_MAX_RADIUS = 30;
 
 export function getRuntimeCameraConfig(camera, controls) {
   return {
@@ -63,14 +69,22 @@ export function getWorldPreviewCameraConfig({
   const baseCamera = resolvedCamera ?? DEFAULT_VIEWER_3D_CONFIG.camera;
   const overview = overviewCamera ?? DEFAULT_VIEWER_3D_CONFIG.camera;
   const modelBounds = getWorldPreviewModelBounds(model);
-  const target = getWorldPreviewTarget(modelBounds, overview);
-  const radius = getWorldPreviewRadius({
-    modelBounds,
-    selectedCamera,
-    target,
-  });
+  const selectedCameraPosition = selectedCamera?.position
+    ? toWorldPreviewVector3(selectedCamera.position)
+    : null;
+  const target =
+    selectedCameraPosition ?? getWorldPreviewTarget(modelBounds, overview);
+  const radius = selectedCameraPosition
+    ? getSelectedCameraPreviewRadius(selectedCamera)
+    : getWorldPreviewRadius({
+        modelBounds,
+        selectedCamera,
+        target,
+      });
   const aspect = getRendererAspect({ container, renderer });
-  const fov = Math.max(WORLD_PREVIEW_CAMERA_FOV, baseCamera.fov ?? 0);
+  const fov = selectedCameraPosition
+    ? WORLD_PREVIEW_SELECTED_CAMERA_FOV
+    : Math.max(WORLD_PREVIEW_CAMERA_FOV, baseCamera.fov ?? 0);
   const verticalFov = THREE.MathUtils.degToRad(fov);
   const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * aspect);
   const fitFov = Math.max(
@@ -85,20 +99,20 @@ export function getWorldPreviewCameraConfig({
     baseCamera.maxDistance ?? DEFAULT_VIEWER_3D_CONFIG.camera.maxDistance,
     fitDistance * 1.2,
   );
-  const selectedDistance = selectedCamera
-    ? new THREE.Vector3(
-        selectedCamera.position.x,
-        selectedCamera.position.y,
-        selectedCamera.position.z,
-      ).distanceTo(target)
+  const selectedDistance = selectedCamera?.position
+    ? toWorldPreviewVector3(selectedCamera.position).distanceTo(target)
     : 0;
-  const backOffset = Math.max(
-    WORLD_PREVIEW_CAMERA_MIN_BACK_OFFSET,
-    radius * WORLD_PREVIEW_CAMERA_BACK_OFFSET_RATIO,
-  ) * Math.max(WORLD_PREVIEW_DEFAULT_BACK_OFFSET_SCALE, backOffsetScale);
-  const distance = selectedCamera
-    ? selectedDistance + backOffset
-    : Math.max(fitDistance, minDistance + radius * 0.35);
+  const backOffset = selectedCameraPosition
+    ? getSelectedCameraBackOffset(selectedCamera, backOffsetScale)
+    : Math.max(
+        WORLD_PREVIEW_CAMERA_MIN_BACK_OFFSET,
+        radius * WORLD_PREVIEW_CAMERA_BACK_OFFSET_RATIO,
+      ) * Math.max(WORLD_PREVIEW_DEFAULT_BACK_OFFSET_SCALE, backOffsetScale);
+  const distance = selectedCameraPosition
+    ? backOffset
+    : selectedCamera
+      ? selectedDistance + backOffset
+      : Math.max(fitDistance, minDistance + radius * 0.35);
   const direction = getWorldPreviewDirection(selectedCamera, overview);
   const position = target.clone().addScaledVector(direction, distance);
 
@@ -180,18 +194,45 @@ function getWorldPreviewRadius({ modelBounds, selectedCamera, target }) {
   return Math.max(WORLD_PREVIEW_MIN_RADIUS, radius);
 }
 
+function getSelectedCameraPreviewRadius(selectedCamera) {
+  const cameraDistance = getSelectedCameraTargetDistance(selectedCamera);
+  return THREE.MathUtils.clamp(
+    cameraDistance * 0.34,
+    WORLD_PREVIEW_SELECTED_CAMERA_MIN_RADIUS,
+    WORLD_PREVIEW_SELECTED_CAMERA_MAX_RADIUS,
+  );
+}
+
+function getSelectedCameraBackOffset(selectedCamera, backOffsetScale) {
+  const cameraDistance = getSelectedCameraTargetDistance(selectedCamera);
+  const baseBackOffset = Math.max(
+    WORLD_PREVIEW_SELECTED_CAMERA_MIN_BACK_OFFSET,
+    cameraDistance * WORLD_PREVIEW_SELECTED_CAMERA_BACK_OFFSET_RATIO,
+  );
+  const scaledBackOffset =
+    baseBackOffset *
+    Math.sqrt(Math.max(WORLD_PREVIEW_DEFAULT_BACK_OFFSET_SCALE, backOffsetScale));
+
+  return Math.min(
+    WORLD_PREVIEW_SELECTED_CAMERA_MAX_BACK_OFFSET,
+    scaledBackOffset,
+  );
+}
+
+function getSelectedCameraTargetDistance(selectedCamera) {
+  if (!selectedCamera?.position || !selectedCamera?.target) {
+    return WORLD_PREVIEW_SELECTED_CAMERA_MIN_BACK_OFFSET;
+  }
+
+  return toWorldPreviewVector3(selectedCamera.position).distanceTo(
+    toWorldPreviewVector3(selectedCamera.target),
+  );
+}
+
 function getWorldPreviewDirection(selectedCamera, overviewCamera) {
   if (selectedCamera) {
-    const cameraPosition = new THREE.Vector3(
-      selectedCamera.position.x,
-      selectedCamera.position.y,
-      selectedCamera.position.z,
-    );
-    const cameraTarget = new THREE.Vector3(
-      selectedCamera.target.x,
-      selectedCamera.target.y,
-      selectedCamera.target.z,
-    );
+    const cameraPosition = toWorldPreviewVector3(selectedCamera.position);
+    const cameraTarget = toWorldPreviewVector3(selectedCamera.target);
     const selectedDirection = cameraPosition.sub(cameraTarget);
 
     if (selectedDirection.lengthSq() > 0.0001) {
@@ -218,6 +259,14 @@ function getWorldPreviewDirection(selectedCamera, overviewCamera) {
   }
 
   return direction.normalize();
+}
+
+function toWorldPreviewVector3(vector) {
+  return new THREE.Vector3(
+    Number(vector?.x) || 0,
+    Number(vector?.y) || 0,
+    Number(vector?.z) || 0,
+  );
 }
 
 function getRendererAspect({ container, renderer }) {

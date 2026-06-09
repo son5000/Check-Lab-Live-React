@@ -154,7 +154,7 @@ export function MainLayout({ activeNodeId = "overview", children, clockOverride,
     };
     return (<section className="MainLayout MainLayout__section-1 relative flex h-screen max-h-screen min-h-0 overflow-hidden bg-background text-foreground [height:100dvh] [max-height:100dvh]" aria-label="공정 관제 대시보드">
       <div className="MainLayout MainLayout__container-1 MainLayoutFrame flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden">
-        <MainHeader headerState={liveHeaderState} currentDate={clockOverride?.currentDate ?? currentDate} currentTime={clockOverride?.currentTime ?? currentTime} isDarkMode={isDarkMode} isSidebarCollapsed={isSidebarCollapsed} isMobileSidebarOpen={isMobileSidebarOpen} onMenuToggle={handleMenuToggle} onThemeToggle={onThemeToggle}/>
+        <MainHeader headerState={liveHeaderState} currentDate={currentDate} currentTime={clockOverride?.currentTime ?? currentTime} isDarkMode={isDarkMode} isSidebarCollapsed={isSidebarCollapsed} isMobileSidebarOpen={isMobileSidebarOpen} onMenuToggle={handleMenuToggle} onThemeToggle={onThemeToggle}/>
 
         <DashboardNotificationsProvider value={notificationsController}>
           <DashboardHeaderStateProvider value={{ setHeaderState: setLiveHeaderState }}>

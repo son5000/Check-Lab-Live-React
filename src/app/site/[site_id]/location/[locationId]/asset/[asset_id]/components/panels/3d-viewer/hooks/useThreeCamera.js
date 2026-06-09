@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { CameraController } from "../modules/CameraController";
-export function useThreeCamera(cameraRef, controlsRef, cameraConfig, controlConfig) {
+import { invalidateThreeScene } from "../utils/sceneRenderInvalidation";
+export function useThreeCamera(cameraRef, controlsRef, sceneRef, cameraConfig, controlConfig) {
     useEffect(() => {
         const camera = cameraRef.current;
         const controls = controlsRef.current;
@@ -8,11 +9,12 @@ export function useThreeCamera(cameraRef, controlsRef, cameraConfig, controlConf
             return;
         }
         CameraController.applyConfig(camera, controls, cameraConfig);
+        invalidateThreeScene(sceneRef.current, "camera");
         if (!controls) {
             return;
         }
         controls.enablePan = controlConfig?.enablePan ?? true;
         controls.enableRotate = controlConfig?.enableRotate ?? true;
         controls.enableZoom = controlConfig?.enableZoom ?? true;
-    }, [cameraConfig, cameraRef, controlConfig, controlsRef]);
+    }, [cameraConfig, cameraRef, controlConfig, controlsRef, sceneRef]);
 }

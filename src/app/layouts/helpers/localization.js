@@ -231,7 +231,7 @@ const ENGLISH_EXACT_TEXT = new Map([
 
   ["관심 영역 리스트", "ROI List"],
   ["관심 영역", "ROI"],
-  ["카메라 크게 보기에서 관심 영역을 등록하면 이 목록에 표시됩니다.", "ROIs registered in the enlarged camera view will appear here."],
+  ["관심 영역을 등록하면 이 목록에 표시됩니다.", "Registered ROIs will appear here."],
   ["감지 범위 산출 대기", "Waiting for Detection Range"],
   ["3D 영역", "3D Area"],
   ["3D 포인트", "3D Point"],

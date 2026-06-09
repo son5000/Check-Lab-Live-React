@@ -113,14 +113,6 @@ export function CameraVisualizationControls({
           ) : null}
         </div>
 
-        {selectedCamera && !showAll ? (
-          <div className="rounded-md border border-border/50 bg-muted/30 p-2">
-            <p className="text-xs font-semibold text-foreground">
-              {getCameraDisplayName(selectedCamera, language)}
-            </p>
-          </div>
-        ) : null}
-
         {selectedCamera && !showAll && onResetView && !requireSelection ? (
           <button
             className={cn(
@@ -135,13 +127,7 @@ export function CameraVisualizationControls({
           </button>
         ) : null}
 
-        {showAll ? (
-          <div className="rounded-md border border-border/50 bg-muted/30 p-2">
-            <p className="text-xs font-semibold text-foreground">
-              {getAllCameraVisibleTitle(language)}
-            </p>
-          </div>
-        ) : requireSelection && !selectedCamera ? (
+        {requireSelection && !selectedCamera ? (
           <div className="rounded-md border border-dashed border-border bg-muted/20 px-2 py-3 text-center text-[11px] font-semibold text-muted-foreground">
             {getCameraRequiredMessage(language)}
           </div>
@@ -163,11 +149,6 @@ export function CameraVisualizationControls({
 function getAllCameraLabel(language) {
   return language === "en" ? "All cameras" : "모든 카메라";
 }
-
-function getAllCameraVisibleTitle(language) {
-  return language === "en" ? "All cameras visible" : "모든 카메라 표시";
-}
-
 
 function getCameraDisplayName(camera, language) {
   if (!camera?.name) {

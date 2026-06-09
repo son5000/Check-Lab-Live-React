@@ -2,6 +2,10 @@ import { useEffect, useRef } from "react";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { CameraController } from "../modules/CameraController";
 import { SceneBuilder } from "../modules/SceneBuilder";
+import {
+    getThreeSceneRenderVersion,
+    invalidateThreeScene,
+} from "../utils/sceneRenderInvalidation";
 import { disposeObject3D } from "../utils/threeDisposal";
 
 export function useThreeScene(containerRef, config) {
@@ -35,6 +39,8 @@ export function useThreeScene(containerRef, config) {
         let animationFrameId = 0;
         let resizeFrameId = 0;
         let lastRendererSizeKey = "";
+        let lastRenderedSceneVersion = -1;
+        let controlsDirty = true;
         renderer.domElement.className = "h-full w-full";
         controls.enableDamping = true;
         controls.dampingFactor = 0.08;
@@ -45,6 +51,15 @@ export function useThreeScene(containerRef, config) {
         rendererRef.current = renderer;
         SceneBuilder.applyBackground(scene, initialConfig.background);
         CameraController.applyConfig(camera, controls, initialConfig.camera);
+        invalidateThreeScene(scene, "init");
+        const renderScene = () => {
+            lastRenderedSceneVersion = getThreeSceneRenderVersion(scene);
+            renderer.render(scene, camera);
+        };
+        const markControlsDirty = () => {
+            controlsDirty = true;
+        };
+        controls.addEventListener("change", markControlsDirty);
         const resizeRendererToContainer = () => {
             const bounds = container.getBoundingClientRect();
             const nextWidth = Math.max(Math.round(bounds.width), 1);
@@ -60,7 +75,8 @@ export function useThreeScene(containerRef, config) {
             camera.aspect = nextWidth / nextHeight;
             camera.updateProjectionMatrix();
             controls.update();
-            renderer.render(scene, camera);
+            invalidateThreeScene(scene, "resize");
+            renderScene();
         };
         const scheduleResize = () => {
             if (resizeFrameId) {
@@ -80,13 +96,31 @@ export function useThreeScene(containerRef, config) {
         window.addEventListener("resize", scheduleResize);
         const animate = () => {
             const animationConfig = animationConfigRef.current;
+            const isRenderPaused =
+                renderer.domElement.dataset.pauseRender === "true";
+            const isAutoRotatePaused =
+                renderer.domElement.dataset.pauseAutoRotate === "true";
+            const autoRotateEnabled =
+                !isRenderPaused && !isAutoRotatePaused && animationConfig.autoRotate;
             controls.autoRotate =
-                renderer.domElement.dataset.pauseAutoRotate === "true"
+                isRenderPaused || isAutoRotatePaused
                     ? false
                     : animationConfig.autoRotate;
             controls.autoRotateSpeed = animationConfig.autoRotateSpeed;
-            controls.update();
-            renderer.render(scene, camera);
+            if (!isRenderPaused) {
+                const controlsUpdated = controls.update();
+                const sceneRenderVersion = getThreeSceneRenderVersion(scene);
+                // OrbitControls still ticks, but GPU rendering waits for real changes.
+                const shouldRender =
+                    controlsDirty ||
+                        controlsUpdated ||
+                        autoRotateEnabled ||
+                        sceneRenderVersion !== lastRenderedSceneVersion;
+                if (shouldRender) {
+                    controlsDirty = false;
+                    renderScene();
+                }
+            }
             animationFrameId = window.requestAnimationFrame(animate);
         };
         animate();
@@ -97,6 +131,7 @@ export function useThreeScene(containerRef, config) {
             }
             window.removeEventListener("resize", scheduleResize);
             resizeObserver.disconnect();
+            controls.removeEventListener("change", markControlsDirty);
             controls.dispose();
             if (renderer.domElement.parentNode === container) {
                 container.removeChild(renderer.domElement);

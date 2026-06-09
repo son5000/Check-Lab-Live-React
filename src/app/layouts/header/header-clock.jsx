@@ -38,5 +38,6 @@ function removeWeekdayFromDateLabel(value) {
         .replace(/\s*\([^)]*\)\s*$/, "")
         .replace(/^[A-Za-z]{3,},\s*/, "")
         .replace(/,\s*[A-Za-z]{3,}\s*$/, "")
+        .replace(/\s*\.\s*$/, "")
         .trim();
 }

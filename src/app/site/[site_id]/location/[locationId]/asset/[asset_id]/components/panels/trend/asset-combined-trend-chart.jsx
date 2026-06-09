@@ -58,19 +58,19 @@ export function AssetCombinedTrendChart({
   );
   const legendItems = [
     {
-      label: "초음파 평균",
+      label: "평균",
       stroke: PALETTE.ultrasound,
       tone: "series",
       unit: "dB",
     },
     {
-      label: "온도 평균",
+      label: "평균",
       stroke: PALETTE.temperature,
       tone: "series",
       unit: "℃",
     },
-    ...buildReferenceLegendItems("온도 임계", temperatureReferenceLines, "℃"),
-    ...buildReferenceLegendItems("초음파 임계", ultrasoundReferenceLines, "dB"),
+    ...buildReferenceLegendItems("임계", temperatureReferenceLines, "℃"),
+    ...buildReferenceLegendItems("임계", ultrasoundReferenceLines, "dB"),
   ];
   return (
     <div
@@ -720,7 +720,7 @@ function InlineLegend({ items }) {
               whiteSpace: "nowrap",
             }}
           >
-            {item.label} ({item.unit})
+            {formatLegendItemText(item)}
           </span>
         </div>
       ))}
@@ -734,6 +734,15 @@ function buildReferenceLegendItems(labelPrefix, referenceLines, unit) {
     tone: "reference",
     unit,
   }));
+}
+function formatLegendItemText(item) {
+  if (!item.unit) {
+    return item.label;
+  }
+
+  return /\d$/.test(item.label)
+    ? `${item.label}${item.unit}`
+    : `${item.label} ${item.unit}`;
 }
 function formatReferenceValue(value) {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);

@@ -192,18 +192,6 @@ function TrendChartCard({
               {formatReferenceChipLabel(referenceLine, unit)}
             </div>
           ))}
-          <span
-            className="AssetUltrasoundTrend3D AssetUltrasoundTrend3D__unit-1"
-            style={{
-              color: PALETTE.muted,
-              fontFamily: "'JetBrains Mono', monospace",
-              fontSize: 11,
-              fontWeight: 700,
-              letterSpacing: 0,
-            }}
-          >
-            {unit}
-          </span>
         </div>
       </div>
 
@@ -707,6 +695,9 @@ function formatReferenceChipLabel(referenceLine, unit) {
   return `${getCompactReferenceLabel(referenceLine.label)} ${formatReferenceValue(referenceLine.value)}${unit}`;
 }
 function getCompactReferenceLabel(label) {
+  if (label === "초음파 임계" || label === "온도 임계") {
+    return "임계치";
+  }
   if (label === "요주의 기준") {
     return "주의";
   }

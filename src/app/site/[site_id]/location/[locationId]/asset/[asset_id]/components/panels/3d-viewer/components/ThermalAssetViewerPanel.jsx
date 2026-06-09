@@ -7,7 +7,6 @@ import {
   Crosshair,
   Flame,
   Grid3X3,
-  Maximize2,
   RotateCcw,
   Thermometer,
   X,
@@ -39,10 +38,14 @@ import {
   getThermalTargetMetrics,
   resolveThermalCameraPose,
 } from "@/app/monitoring/thermal-mapping/utils/thermalCameraPose";
+import { CameraPositionControls } from "../controls/CameraPositionControls";
+import { invalidateThreeScene } from "../utils/sceneRenderInvalidation";
+import { getThermalFrameImageDataUrl } from "../utils/thermalFrameImageUtils";
+import { ThermalCameraTileOverlay } from "./ThermalCameraTileOverlay";
 
-const THERMAL_TILE_CAMERA_COUNT = 8;
 const THERMAL_PROJECTION_DEPTH_MAP_HEIGHT = 512;
-const THERMAL_TILE_WORLD_CAMERA_BACK_OFFSET_SCALE = 2.4;
+const THERMAL_TILE_WORLD_CAMERA_BACK_OFFSET_SCALE = 1;
+const DEFAULT_THERMAL_CALIBRATION_IMAGE_OPACITY = 0.55;
 const THERMAL_VIEW_MODES = Object.freeze({
   TILES: "tiles",
   WORLD: "viewer",
@@ -96,22 +99,23 @@ function ThermalAssetViewerContent({
   isPickingMesh,
   materialRecordsRef,
   onCameraHover,
-  onShowLaserGuideChange,
   onSelectedCameraChange,
   onSelectedFramePreviewChange,
   onPickMesh,
+  onTileLayoutChange,
   onViewModeChange,
   panelMode = "view",
+  projectionCamera,
   projectionRenderer,
   projectionScene,
   requireCameraSelection = false,
   selectedCameraId: controlledSelectedCameraId,
   selectedTargetLabel,
   selectedTargetObject,
-  showLaserGuide: controlledShowLaserGuide,
   showOverlaySection = true,
   showViewSettings = true,
   storageKey,
+  tileLayoutConfig,
   viewMode: controlledViewMode,
   viewerRef,
   worldOverlayHost,
@@ -181,34 +185,6 @@ function ThermalAssetViewerContent({
     },
     [isThermalViewModeControlled, onViewModeChange],
   );
-  const isShowThermalLaserGuideControlled =
-    controlledShowLaserGuide !== undefined;
-  const [
-    uncontrolledShowThermalLaserGuide,
-    setUncontrolledShowThermalLaserGuide,
-  ] = useState(true);
-  const showThermalLaserGuide = isShowThermalLaserGuideControlled
-    ? controlledShowLaserGuide
-    : uncontrolledShowThermalLaserGuide;
-  const setShowThermalLaserGuide = useCallback(
-    (nextValue) => {
-      const resolvedValue =
-        typeof nextValue === "function"
-          ? nextValue(showThermalLaserGuide)
-          : nextValue;
-
-      if (!isShowThermalLaserGuideControlled) {
-        setUncontrolledShowThermalLaserGuide(resolvedValue);
-      }
-
-      onShowLaserGuideChange?.(resolvedValue);
-    },
-    [
-      isShowThermalLaserGuideControlled,
-      onShowLaserGuideChange,
-      showThermalLaserGuide,
-    ],
-  );
   const localMaterialRecordsRef = useRef(new Map());
   const thermalMaterialRecordsRef =
     materialRecordsRef ?? localMaterialRecordsRef;
@@ -218,6 +194,14 @@ function ThermalAssetViewerContent({
   const [cameraPoseOverrides, setCameraPoseOverrides] = useState(() =>
     loadThermalCameraPoseOverrides(poseStorageKey),
   );
+  const [thermalCalibrationDisplayConfig, setThermalCalibrationDisplayConfig] =
+    useState({
+      calibrationImageOpacity: DEFAULT_THERMAL_CALIBRATION_IMAGE_OPACITY,
+      hideCalibrationImage: false,
+      hideCalibrationMesh: false,
+    });
+  const [thermalPoseComparison, setThermalPoseComparison] = useState(null);
+  const [thermalTileWorldSnapshot, setThermalTileWorldSnapshot] = useState("");
   const { getAlignment, resetAlignment, updateAlignment } = useThermalAlignment({
     storageKey,
   });
@@ -279,6 +263,51 @@ function ThermalAssetViewerContent({
   const selectedFrame = selectedCameraId
     ? framesByCameraId[selectedCameraId]
     : undefined;
+  const activeThermalPoseComparison =
+    thermalPoseComparison?.cameraId === selectedCameraId
+      ? thermalPoseComparison.pose
+      : null;
+  const thermalCameraPositionPresets = useMemo(
+    () =>
+      cameras.map((camera, index) => {
+        const basePose = getThermalCameraBasePose(
+          camera,
+          index,
+          cameras.length,
+        );
+
+        return {
+          fov: basePose.projectorFov,
+          id: camera.cameraId,
+          name: camera.cameraName ?? `Thermal camera ${index + 1}`,
+          position: toPlainThermalVector(basePose.position),
+          target: toPlainThermalVector(basePose.lookAt),
+        };
+      }),
+    [cameras],
+  );
+  const thermalCameraPositionConfig = useMemo(
+    () =>
+      buildThermalCameraPositionConfig({
+        calibrationImageOpacity:
+          thermalCalibrationDisplayConfig.calibrationImageOpacity,
+        hideCalibrationImage:
+          thermalCalibrationDisplayConfig.hideCalibrationImage,
+        hideCalibrationMesh:
+          thermalCalibrationDisplayConfig.hideCalibrationMesh,
+        comparisonPose: activeThermalPoseComparison,
+        overrides: cameraPoseOverrides,
+        selectedCameraId,
+      }),
+    [
+      activeThermalPoseComparison,
+      cameraPoseOverrides,
+      selectedCameraId,
+      thermalCalibrationDisplayConfig.calibrationImageOpacity,
+      thermalCalibrationDisplayConfig.hideCalibrationImage,
+      thermalCalibrationDisplayConfig.hideCalibrationMesh,
+    ],
+  );
   const selectedFrameImageDataUrl = useMemo(() => {
     return getThermalFrameImageDataUrl(selectedFrame);
   }, [selectedFrame]);
@@ -313,15 +342,25 @@ function ThermalAssetViewerContent({
   );
   const thermalTileEntries = useMemo(
     () =>
-      resolvedThermalCameras
-        .slice(0, THERMAL_TILE_CAMERA_COUNT)
-        .map((camera, index) => ({
-          camera,
-          frame: framesByCameraId[camera.cameraId],
-          index,
-        })),
+      resolvedThermalCameras.map((camera, index) => ({
+        camera,
+        frame: framesByCameraId[camera.cameraId],
+        index,
+      })),
     [framesByCameraId, resolvedThermalCameras],
   );
+  const captureThermalWorldTileSnapshot = useCallback(() => {
+    if (!projectionCamera || !projectionRenderer || !projectionScene) {
+      return "";
+    }
+
+    projectionRenderer.render(projectionScene, projectionCamera);
+    try {
+      return projectionRenderer.domElement.toDataURL("image/png");
+    } catch {
+      return "";
+    }
+  }, [projectionCamera, projectionRenderer, projectionScene]);
   const [expandedTileEntry, setExpandedTileEntry] = useState(null);
   const handleThermalViewModeChange = useCallback(
     (nextMode) => {
@@ -330,23 +369,70 @@ function ThermalAssetViewerContent({
     [setThermalViewMode],
   );
 
+  useEffect(() => {
+    if (!shouldRenderThermalTileOverlay || !worldOverlayHost) {
+      setThermalTileWorldSnapshot("");
+      return undefined;
+    }
+
+    let isActive = true;
+    let frameId = 0;
+    const captureSnapshot = () => {
+      const snapshot = captureThermalWorldTileSnapshot();
+      if (isActive && snapshot) {
+        setThermalTileWorldSnapshot(snapshot);
+      }
+    };
+    const scheduleSnapshot = () => {
+      if (frameId) {
+        window.cancelAnimationFrame(frameId);
+      }
+      frameId = window.requestAnimationFrame(() => {
+        frameId = 0;
+        captureSnapshot();
+      });
+    };
+    const resizeObserver = new ResizeObserver(scheduleSnapshot);
+    resizeObserver.observe(worldOverlayHost);
+    setThermalTileWorldSnapshot("");
+    scheduleSnapshot();
+
+    return () => {
+      isActive = false;
+      resizeObserver.disconnect();
+      if (frameId) {
+        window.cancelAnimationFrame(frameId);
+      }
+    };
+  }, [
+    captureThermalWorldTileSnapshot,
+    selectedCameraId,
+    selectedResolvedPose,
+    shouldRenderThermalTileOverlay,
+    tileLayoutConfig,
+    worldOverlayHost,
+  ]);
+
   useThermalCameraPreviewPlanes({
     cameras: resolvedThermalCameras,
+    comparisonPose: isSettingsMode ? activeThermalPoseComparison : null,
     enabled:
       !showOverlaySection &&
+      !isSettingsMode &&
       Boolean(projectionScene && selectedTargetObject),
     framesByCameraId,
     hoveredCameraId,
     requireSelection: requireCameraSelection,
+    renderTexturePreview: !isSettingsMode,
     scene: projectionScene,
     selectedCameraId,
-    showLaserGuide: showThermalLaserGuide,
     targetObject: selectedTargetObject,
   });
 
   useEffect(() => {
     if (
       showOverlaySection ||
+      isSettingsMode ||
       !selectedCameraId ||
       selectedCameraIndex < 0 ||
       !selectedTargetObject ||
@@ -370,9 +456,12 @@ function ThermalAssetViewerContent({
       fov: selectedResolvedPose.projectorFov,
       lookAt: toPlainThermalVector(selectedResolvedPose.lookAt),
       position: toPlainThermalVector(selectedResolvedPose.position),
+      useWorldPreviewFraming:
+        activeThermalViewMode === THERMAL_VIEW_MODES.TILES,
     });
   }, [
     activeThermalViewMode,
+    isSettingsMode,
     selectedCameraId,
     selectedResolvedPose,
     selectedTargetObject,
@@ -383,7 +472,7 @@ function ThermalAssetViewerContent({
   const selectedFramePreview = useMemo(() => {
     if (
       showOverlaySection ||
-      activeThermalViewMode !== THERMAL_VIEW_MODES.WORLD ||
+      (!isSettingsMode && activeThermalViewMode !== THERMAL_VIEW_MODES.WORLD) ||
       !selectedCameraId ||
       !selectedFrame ||
       !selectedFrameImageDataUrl
@@ -398,7 +487,14 @@ function ThermalAssetViewerContent({
       capturedAt: selectedFrame.capturedAt,
       fov: selectedResolvedPose?.projectorFov,
       height: selectedFrame.height,
+      calibrationImageOpacity:
+        thermalCalibrationDisplayConfig.calibrationImageOpacity,
+      hideCalibrationImage:
+        thermalCalibrationDisplayConfig.hideCalibrationImage,
+      hideCalibrationMesh:
+        thermalCalibrationDisplayConfig.hideCalibrationMesh,
       imageUrl: selectedFrameImageDataUrl,
+      presentation: isSettingsMode ? "calibration-overlay" : undefined,
       width: selectedFrame.width,
       worldCamera: selectedResolvedPose
         ? {
@@ -410,11 +506,15 @@ function ThermalAssetViewerContent({
     };
   }, [
     activeThermalViewMode,
+    isSettingsMode,
     selectedCameraId,
     selectedFrame,
     selectedFrameImageDataUrl,
     selectedResolvedPose,
     showOverlaySection,
+    thermalCalibrationDisplayConfig.calibrationImageOpacity,
+    thermalCalibrationDisplayConfig.hideCalibrationImage,
+    thermalCalibrationDisplayConfig.hideCalibrationMesh,
   ]);
   const expandedTileFramePreview = useMemo(() => {
     const frame = expandedTileEntry?.frame;
@@ -471,6 +571,10 @@ function ThermalAssetViewerContent({
   }, [cameraPoseOverrides, poseStorageKey]);
 
   useEffect(() => {
+    setThermalPoseComparison(null);
+  }, [selectedCameraId]);
+
+  useEffect(() => {
     if (!cameras.length && selectedCameraId) {
       setSelectedCameraId(null);
       return;
@@ -521,24 +625,108 @@ function ThermalAssetViewerContent({
         return;
       }
 
+      const baselinePose = selectedVirtualPose ?? selectedBasePose;
+      setThermalPoseComparison((currentComparison) => {
+        if (currentComparison?.cameraId === selectedCameraId) {
+          return currentComparison;
+        }
+
+        if (!baselinePose) {
+          return currentComparison;
+        }
+
+        return {
+          cameraId: selectedCameraId,
+          pose: normalizeThermalCameraPoseConfig(baselinePose),
+        };
+      });
       setCameraPoseOverrides((currentOverrides) => ({
         ...currentOverrides,
         [selectedCameraId]: normalizeThermalCameraPoseConfig(nextPose),
       }));
     },
-    [selectedCameraId],
+    [selectedBasePose, selectedCameraId, selectedVirtualPose],
   );
   const handleVirtualPoseReset = useCallback(() => {
     if (!selectedCameraId) {
       return;
     }
 
+    const baselinePose = selectedVirtualPose ?? selectedBasePose;
+    setThermalPoseComparison((currentComparison) => {
+      if (currentComparison?.cameraId === selectedCameraId) {
+        return currentComparison;
+      }
+
+      if (!baselinePose) {
+        return currentComparison;
+      }
+
+      return {
+        cameraId: selectedCameraId,
+        pose: normalizeThermalCameraPoseConfig(baselinePose),
+      };
+    });
     setCameraPoseOverrides((currentOverrides) => {
       const nextOverrides = { ...currentOverrides };
       delete nextOverrides[selectedCameraId];
       return nextOverrides;
     });
-  }, [selectedCameraId]);
+  }, [selectedBasePose, selectedCameraId, selectedVirtualPose]);
+  const handleThermalCameraPositionConfigChange = useCallback(
+    (nextConfig) => {
+      setThermalCalibrationDisplayConfig({
+        calibrationImageOpacity: clampThermalCalibrationImageOpacity(
+          nextConfig?.calibrationImageOpacity,
+        ),
+        hideCalibrationImage: nextConfig?.hideCalibrationImage === true,
+        hideCalibrationMesh: nextConfig?.hideCalibrationMesh === true,
+      });
+
+      if (!selectedCameraId || !selectedBasePose) {
+        return;
+      }
+
+      const comparisonPose = getThermalCameraPositionComparisonPose(
+        nextConfig?.editComparison,
+        selectedBasePose,
+        selectedCameraId,
+      );
+
+      if (comparisonPose) {
+        setThermalPoseComparison({
+          cameraId: selectedCameraId,
+          pose: comparisonPose,
+        });
+      }
+
+      if (!hasThermalCameraPositionOverride(nextConfig, selectedCameraId)) {
+        handleVirtualPoseReset();
+        return;
+      }
+
+      handleVirtualPoseChange(
+        getThermalCameraPoseFromPositionConfig(
+          nextConfig,
+          selectedCameraId,
+          selectedBasePose,
+        ),
+      );
+    },
+    [
+      handleVirtualPoseChange,
+      handleVirtualPoseReset,
+      selectedBasePose,
+      selectedCameraId,
+    ],
+  );
+  const handleThermalCameraPositionSave = useCallback(
+    (nextConfig) => {
+      handleThermalCameraPositionConfigChange(nextConfig);
+      setThermalPoseComparison(null);
+    },
+    [handleThermalCameraPositionConfigChange],
+  );
 
   const restoreThermalTextureForTarget = useCallback(
     (targetObject, { silent = false, updateState = true } = {}) => {
@@ -579,6 +767,7 @@ function ThermalAssetViewerContent({
         thermalMaterialRecordsRef.current.delete(record.meshUuid);
       });
       texturesToDispose.forEach((texture) => texture?.dispose?.());
+      invalidateThreeScene(projectionScene, "thermal-material-restore");
       if (updateState) {
         setTextureActionVersion((version) => version + 1);
       }
@@ -591,7 +780,7 @@ function ThermalAssetViewerContent({
 
       return restoredEntries.length;
     },
-    [thermalMaterialRecordsRef],
+    [projectionScene, thermalMaterialRecordsRef],
   );
 
   useEffect(() => {
@@ -722,7 +911,13 @@ function ThermalAssetViewerContent({
           targetName: targetLabel,
         });
       });
+      setThermalPoseComparison((currentComparison) =>
+        currentComparison?.cameraId === selectedCameraId
+          ? null
+          : currentComparison,
+      );
       setTextureActionVersion((version) => version + 1);
+      invalidateThreeScene(projectionScene, "thermal-material-layer-apply");
       setMeshTextureMessage(
         `${targetLabel}에 ${nextLayers.length}개 열화상 camera layer를 적용했습니다.`,
       );
@@ -749,7 +944,13 @@ function ThermalAssetViewerContent({
         targetName: targetLabel,
       });
     });
+    setThermalPoseComparison((currentComparison) =>
+      currentComparison?.cameraId === selectedCameraId
+        ? null
+        : currentComparison,
+    );
     setTextureActionVersion((version) => version + 1);
+    invalidateThreeScene(projectionScene, "thermal-material-apply");
     setMeshTextureMessage(
       `${targetLabel}에 ${result.appliedEntries.length}개 thermal material을 적용했습니다.`,
     );
@@ -796,10 +997,6 @@ function ThermalAssetViewerContent({
             mode={activeThermalViewMode}
             onChange={handleThermalViewModeChange}
           />
-          <ThermalLaserToggle
-            checked={showThermalLaserGuide}
-            onChange={setShowThermalLaserGuide}
-          />
         </div>
       ) : null}
       {shouldRenderThermalCameraSettings ? (
@@ -840,13 +1037,22 @@ function ThermalAssetViewerContent({
             onReset={handleAlignmentReset}
           />
         ) : isSettingsMode ? (
-          <ThermalCameraPoseCalibrationControls
-            basePose={selectedBasePose}
-            disabled={!selectedCameraId || !selectedFrame || !selectedTargetObject}
-            virtualPose={selectedVirtualPose}
-            onApply={handleApplyThermalTexture}
-            onChange={handleVirtualPoseChange}
-            onReset={handleVirtualPoseReset}
+          <CameraPositionControls
+            cameraPresets={thermalCameraPositionPresets}
+            config={thermalCameraPositionConfig}
+            defaultNudgeStep={0.05}
+            fovMax={THERMAL_CAPTURE_VERTICAL_FOV_MAX_DEGREES}
+            fovMin={THERMAL_CAPTURE_VERTICAL_FOV_MIN_DEGREES}
+            onChange={handleThermalCameraPositionConfigChange}
+            onSave={handleThermalCameraPositionSave}
+            renderSection={false}
+            showCalibrationVisibility
+            showCameraSelector={false}
+            stepPresets={[
+              { label: "Fine", value: 0.01 },
+              { label: "Normal", value: 0.05 },
+              { label: "Wide", value: 0.15 },
+            ]}
           />
         ) : null}
 
@@ -895,8 +1101,11 @@ function ThermalAssetViewerContent({
               entries={thermalTileEntries}
               loading={loading}
               selectedCameraId={selectedCameraId}
+              tileLayoutConfig={tileLayoutConfig}
+              worldSnapshot={thermalTileWorldSnapshot}
               onCameraSelect={setSelectedCameraId}
               onExpandedEntryChange={setExpandedTileEntry}
+              onTileLayoutChange={onTileLayoutChange}
             />,
             worldOverlayHost,
           )
@@ -950,178 +1159,6 @@ function ThermalViewModeButton({ active, icon: Icon, label, onClick, title }) {
   );
 }
 
-function ThermalLaserToggle({ checked, onChange }) {
-  return (
-    <label className="Three3DViewer__thermal-laser-toggle-1 flex min-w-0 cursor-pointer items-center justify-between gap-2 rounded-md border border-white/10 bg-white/[0.045] px-2 py-1.5">
-      <span className="truncate text-[11px] font-semibold text-white/66">
-        레이저 표시
-      </span>
-      <input
-        type="checkbox"
-        className="h-4 w-4 shrink-0 accent-cyan-300"
-        checked={checked}
-        onChange={(event) => onChange?.(event.target.checked)}
-      />
-    </label>
-  );
-}
-
-function ThermalCameraTileOverlay({
-  entries,
-  loading,
-  onCameraSelect,
-  onExpandedEntryChange,
-  selectedCameraId,
-}) {
-  const cells = [
-    entries[0],
-    entries[1],
-    entries[2],
-    entries[3],
-    { type: "world" },
-    entries[4],
-    entries[5],
-    entries[6],
-    entries[7],
-  ];
-
-  return (
-    <div className="Three3DViewer__thermal-tile-overlay-1 pointer-events-none absolute inset-0 z-[55] grid min-h-0 min-w-0 p-3">
-      <div className="Three3DViewer__thermal-tile-grid-1 grid min-h-0 min-w-0 grid-cols-3 grid-rows-3 gap-2">
-        {cells.map((cell, index) =>
-          cell?.type === "world" ? (
-            <ThermalWorldTile key="world" />
-          ) : (
-            <ThermalCameraImageTile
-              key={cell?.camera?.cameraId ?? `thermal-empty-${index}`}
-              active={cell?.camera?.cameraId === selectedCameraId}
-              entry={cell}
-              loading={loading}
-              onExpand={(entry) => onExpandedEntryChange?.(entry)}
-              onSelect={onCameraSelect}
-            />
-          ),
-        )}
-      </div>
-    </div>
-  );
-}
-
-function ThermalWorldTile() {
-  return (
-    <div className="Three3DViewer__thermal-world-tile-1 pointer-events-none relative min-h-0 min-w-0 overflow-hidden rounded-md border-2 border-cyan-200/70 bg-cyan-950/10 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12),0_0_26px_rgba(34,211,238,0.22)]">
-      <div className="absolute inset-0 opacity-35 [background-image:linear-gradient(135deg,rgba(103,232,249,0.22)_0,rgba(103,232,249,0.22)_1px,transparent_1px,transparent_12px)]" />
-      <div className="absolute inset-2 rounded-sm border border-dashed border-cyan-100/50" />
-      <div className="absolute left-2 top-2 inline-flex max-w-[calc(100%-1rem)] items-center gap-1.5 rounded-sm border border-cyan-100/50 bg-neutral-950/82 px-2 py-1 text-[10px] font-bold text-cyan-50 shadow-[0_0_18px_rgba(34,211,238,0.18)] backdrop-blur-sm">
-        <Box className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-        <span className="truncate">3D VIEWER</span>
-      </div>
-      <div className="absolute inset-x-7 top-1/2 h-px -translate-y-1/2 bg-cyan-100/40" />
-      <div className="absolute inset-y-7 left-1/2 w-px -translate-x-1/2 bg-cyan-100/40" />
-      <div className="absolute bottom-2 right-2 rounded-sm border border-cyan-100/35 bg-neutral-950/72 px-2 py-0.5 font-mono text-[10px] font-semibold text-cyan-100/80 backdrop-blur-sm">
-        WORLD
-      </div>
-    </div>
-  );
-}
-
-function ThermalCameraImageTile({
-  active,
-  entry,
-  loading,
-  onExpand,
-  onSelect,
-}) {
-  const imageDataUrl = useMemo(() => {
-    return getThermalFrameImageDataUrl(entry?.frame);
-  }, [entry?.frame]);
-  const camera = entry?.camera;
-  const frame = entry?.frame;
-  const cameraLabel = camera?.cameraIndex ?? (
-    Number.isFinite(entry?.index) ? entry.index + 1 : "-"
-  );
-  const handleSelect = () => {
-    if (camera?.cameraId) {
-      onSelect?.(camera.cameraId);
-    }
-  };
-  const handleKeyDown = (event) => {
-    if (event.key !== "Enter" && event.key !== " ") {
-      return;
-    }
-
-    event.preventDefault();
-    handleSelect();
-  };
-
-  return (
-    <div
-      role="button"
-      tabIndex={camera ? 0 : -1}
-      aria-pressed={active}
-      className={[
-        "Three3DViewer__thermal-image-tile-1 pointer-events-auto relative min-h-0 min-w-0 overflow-hidden rounded-md border bg-neutral-950/88 text-left shadow-2xl outline-none transition",
-        camera
-          ? "cursor-pointer hover:border-cyan-200/55 hover:shadow-[0_0_24px_rgba(103,232,249,0.2)] focus-visible:ring-2 focus-visible:ring-cyan-200/60"
-          : "cursor-default opacity-70",
-        active
-          ? "border-red-400 ring-2 ring-red-400/80 shadow-[0_0_24px_rgba(248,113,113,0.32)]"
-          : "border-white/15",
-      ].join(" ")}
-      title={camera?.cameraName ?? "Thermal camera"}
-      onClick={handleSelect}
-      onKeyDown={handleKeyDown}
-    >
-      {imageDataUrl ? (
-        <img
-          alt={camera?.cameraName ?? "Thermal frame"}
-          className="h-full w-full object-cover"
-          draggable={false}
-          src={imageDataUrl}
-        />
-      ) : (
-        <div className="grid h-full w-full place-items-center bg-neutral-950 text-[11px] font-semibold text-white/45">
-          {loading ? "Loading" : "No frame"}
-        </div>
-      )}
-      <div className="absolute left-2 top-2 rounded-sm border border-white/15 bg-black/72 px-1.5 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
-        {cameraLabel}
-      </div>
-      <button
-        type="button"
-        className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-sm border border-white/20 bg-black/72 text-white/80 backdrop-blur-sm transition hover:border-cyan-200/50 hover:bg-cyan-300/20 hover:text-cyan-50 disabled:cursor-not-allowed disabled:opacity-40"
-        disabled={!imageDataUrl}
-        title="Expand thermal frame"
-        aria-label={`${camera?.cameraName ?? "Thermal camera"} expand`}
-        onClick={(event) => {
-          event.stopPropagation();
-          onExpand?.(entry);
-        }}
-      >
-        <Maximize2 className="h-3.5 w-3.5" aria-hidden="true" />
-      </button>
-      {frame ? (
-        <div className="absolute bottom-2 right-2 rounded-sm border border-white/15 bg-black/72 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-white/80 backdrop-blur-sm">
-          {frame.width}x{frame.height}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function getThermalFrameImageDataUrl(frame) {
-  if (!frame) {
-    return "";
-  }
-
-  const canvas = createThermalCanvasFromFrame(frame, {
-    paletteMaxTemperature: frame.maxTemperature,
-    paletteMinTemperature: frame.minTemperature,
-  });
-
-  return canvas?.toDataURL("image/png") ?? "";
-}
-
 function getFallbackThermalCameraPoseKeySource(cameraIndex, totalCameraCount) {
   const angle = ((Math.PI * 2) / Math.max(1, totalCameraCount)) * cameraIndex;
 
@@ -1144,6 +1181,87 @@ function toPlainThermalVector(vector) {
     y: toFiniteNumber(vector?.y, 0),
     z: toFiniteNumber(vector?.z, 0),
   };
+}
+
+function buildThermalCameraPositionConfig({
+  calibrationImageOpacity,
+  hideCalibrationImage,
+  hideCalibrationMesh,
+  comparisonPose,
+  overrides,
+  selectedCameraId,
+}) {
+  const customFovs = {};
+  const customPositions = {};
+  const customTargets = {};
+
+  Object.entries(overrides ?? {}).forEach(([cameraId, pose]) => {
+    const normalizedPose = normalizeThermalCameraPoseConfig(pose);
+    customFovs[cameraId] = normalizedPose.projectorFov;
+    customPositions[cameraId] = toPlainThermalVector(normalizedPose.position);
+    customTargets[cameraId] = toPlainThermalVector(normalizedPose.lookAt);
+  });
+
+  return {
+    calibrationImageOpacity: clampThermalCalibrationImageOpacity(
+      calibrationImageOpacity,
+    ),
+    customFovs,
+    customPositions,
+    customTargets,
+    editComparison:
+      comparisonPose && selectedCameraId
+        ? {
+            cameraId: selectedCameraId,
+            fov: comparisonPose.projectorFov,
+            position: toPlainThermalVector(comparisonPose.position),
+            target: toPlainThermalVector(comparisonPose.lookAt),
+          }
+        : undefined,
+    enabled: true,
+    hideCalibrationImage: hideCalibrationImage === true,
+    hideCalibrationMesh: hideCalibrationMesh === true,
+    selectedCameraId,
+    showAll: false,
+  };
+}
+
+function hasThermalCameraPositionOverride(config, cameraId) {
+  if (!cameraId) {
+    return false;
+  }
+
+  return Boolean(
+    config?.customPositions?.[cameraId] ||
+      config?.customTargets?.[cameraId] ||
+      config?.customFovs?.[cameraId] !== undefined,
+  );
+}
+
+function getThermalCameraPoseFromPositionConfig(config, cameraId, basePose) {
+  return normalizeThermalCameraPoseConfig({
+    ...basePose,
+    lookAt: config?.customTargets?.[cameraId] ?? basePose.lookAt,
+    position: config?.customPositions?.[cameraId] ?? basePose.position,
+    projectorFov: config?.customFovs?.[cameraId] ?? basePose.projectorFov,
+  });
+}
+
+function getThermalCameraPositionComparisonPose(
+  editComparison,
+  basePose,
+  cameraId,
+) {
+  if (!editComparison || editComparison.cameraId !== cameraId) {
+    return null;
+  }
+
+  return normalizeThermalCameraPoseConfig({
+    ...basePose,
+    lookAt: editComparison.target ?? basePose.lookAt,
+    position: editComparison.position ?? basePose.position,
+    projectorFov: editComparison.fov ?? basePose.projectorFov,
+  });
 }
 
 function createThermalCameraPoseProjectionOptions({
@@ -1370,6 +1488,16 @@ function clampThermalCaptureFov(value) {
   );
 }
 
+function clampThermalCalibrationImageOpacity(value) {
+  const numericValue = Number(value);
+
+  if (!Number.isFinite(numericValue)) {
+    return DEFAULT_THERMAL_CALIBRATION_IMAGE_OPACITY;
+  }
+
+  return Math.min(1, Math.max(0.1, numericValue));
+}
+
 function getThermalCameraPoseDelta(basePose, virtualPose) {
   return {
     distance:
@@ -1459,6 +1587,7 @@ function formatInputNumber(value) {
 
 function ThermalCameraPoseCalibrationControls({
   basePose,
+  comparisonPose,
   disabled,
   onApply,
   onChange,
@@ -1474,6 +1603,13 @@ function ThermalCameraPoseCalibrationControls({
   const poseDelta =
     safeBasePose && safeVirtualPose
       ? getThermalCameraPoseDelta(safeBasePose, safeVirtualPose)
+      : null;
+  const safeComparisonPose = comparisonPose
+    ? normalizeThermalCameraPoseConfig(comparisonPose)
+    : null;
+  const comparisonDelta =
+    safeComparisonPose && safeVirtualPose
+      ? getThermalCameraPoseDelta(safeComparisonPose, safeVirtualPose)
       : null;
 
   const updateVector = (key, axis, value) => {
@@ -1550,6 +1686,10 @@ function ThermalCameraPoseCalibrationControls({
         <PoseDeltaRow label="Δ Distance" value={formatSignedNumber(poseDelta.distance, 3)} />
         <PoseDeltaRow label="Δ FOV" value={`${formatSignedNumber(poseDelta.projectorFov, 1)} deg`} />
       </dl>
+
+      {comparisonDelta ? (
+        <ThermalPoseCloneComparisonSummary delta={comparisonDelta} />
+      ) : null}
 
       <div className="grid grid-cols-2 gap-2">
         <button
@@ -1653,6 +1793,42 @@ function PoseDeltaRow({ label, value }) {
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-2">
       <dt className="truncate text-white/55">{label}</dt>
       <dd className="min-w-0 truncate font-mono font-semibold text-cyan-50">
+        {value}
+      </dd>
+    </div>
+  );
+}
+
+function ThermalPoseCloneComparisonSummary({ delta }) {
+  return (
+    <dl className="ThermalCameraPoseCalibrationControls__comparison-1 grid gap-1.5 rounded-md border border-amber-300/35 bg-amber-300/10 p-2 text-[11px]">
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-2">
+        <dt className="truncate font-semibold text-amber-50">Before clone</dt>
+        <dd className="min-w-0 truncate font-mono font-semibold text-amber-200">
+          {formatSignedNumber(delta.distance, 3)}
+        </dd>
+      </div>
+      <ThermalPoseCloneDeltaRow
+        label="Position"
+        value={formatPoseVectorDelta(delta.position)}
+      />
+      <ThermalPoseCloneDeltaRow
+        label="Look at"
+        value={formatPoseVectorDelta(delta.lookAt)}
+      />
+      <ThermalPoseCloneDeltaRow
+        label="FOV"
+        value={`${formatSignedNumber(delta.projectorFov, 1)} deg`}
+      />
+    </dl>
+  );
+}
+
+function ThermalPoseCloneDeltaRow({ label, value }) {
+  return (
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-2">
+      <dt className="truncate text-amber-50/68">{label}</dt>
+      <dd className="min-w-0 truncate font-mono font-semibold text-amber-50">
         {value}
       </dd>
     </div>

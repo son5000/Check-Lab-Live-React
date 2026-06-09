@@ -110,10 +110,10 @@ function MetricInfoRow({ label, tone, value }) {
             background: "linear-gradient(90deg, color-mix(in oklch, var(--accent) 9%, transparent), color-mix(in oklch, var(--background) 82%, transparent) 72%)",
             borderLeftColor: "var(--accent)",
         }}>
-      <dt className="ValueMetric ValueMetric__info-label-1 min-w-0 shrink-0 truncate font-mono text-[10px] font-semibold uppercase tracking-normal text-muted-foreground">
+      <dt className="ValueMetric ValueMetric__info-label-1 min-w-0 shrink-0 truncate font-mono text-[11px] font-semibold uppercase tracking-normal text-muted-foreground">
         {label}
       </dt>
-      <dd className={cn("ValueMetric ValueMetric__info-value-1 min-w-0 truncate text-right font-mono text-[15px] font-black leading-none text-foreground", tone === "above" && "text-red-500 dark:text-red-400", tone === "below" && "text-emerald-500 dark:text-emerald-400", tone === "same" && "text-muted-foreground")}>
+      <dd className={cn("ValueMetric ValueMetric__info-value-1 min-w-0 truncate text-right font-mono text-[17px] font-black leading-none text-foreground", tone === "above" && "text-red-500 dark:text-red-400", tone === "below" && "text-emerald-500 dark:text-emerald-400", tone === "same" && "text-muted-foreground")}>
         {value}
       </dd>
     </div>);
@@ -133,8 +133,8 @@ function MetricArcValue({ accentColor, delta, progress, statusLabel, thresholdPr
     </div>);
 }
 function MetricStatusBadge({ accentColor, delta, label, }) {
-    return (<div className="absolute right-1 top-1 z-20 grid max-w-[5.9rem] justify-items-end gap-1">
-      <span className="inline-flex max-w-full items-center gap-1 rounded-sm border border-border/60 bg-background/90 px-1.5 py-0.5 font-mono text-[10px] font-black leading-none shadow-sm backdrop-blur" style={{ color: accentColor }} title={label}>
+    return (<div className="pointer-events-none absolute right-2 top-2 z-30 grid max-w-[7.2rem] justify-items-end gap-1.5">
+      <span className="inline-flex max-w-full items-center gap-1 rounded-sm px-2 py-1 font-mono text-[13px] font-black leading-none shadow-sm backdrop-blur" style={{ color: accentColor }} title={label}>
         <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: accentColor }}/>
         <span className="min-w-0 truncate">{label}</span>
       </span>
@@ -207,7 +207,7 @@ function getMetricArcPoint(progress, radius) {
     };
 }
 function ThresholdDeltaLine({ delta }) {
-    return (<span className={cn("max-w-full truncate rounded-sm border border-border/50 bg-background/85 px-1.5 py-0.5 text-right font-mono text-[9px] font-black leading-none shadow-sm backdrop-blur", delta.direction === "above" && "text-red-500 dark:text-red-400", delta.direction === "below" && "text-emerald-500 dark:text-emerald-400", delta.direction === "same" && "text-muted-foreground")} title={delta.title}>
+    return (<span className={cn("max-w-full truncate rounded-sm px-2 py-1 text-right font-mono text-[12px] font-black leading-none shadow-sm backdrop-blur", delta.direction === "above" && "text-red-500 dark:text-red-400", delta.direction === "below" && "text-emerald-500 dark:text-emerald-400", delta.direction === "same" && "text-muted-foreground")} title={delta.title}>
       {delta.label}
     </span>);
 }
@@ -219,14 +219,14 @@ function buildThresholdDelta({ threshold, unit, value, }) {
     if (value > threshold) {
         return {
             direction: "above",
-            label: `+${difference}${unit} 높음`,
+            label: `+${difference}${unit}`,
             title: `임계치보다 ${difference}${unit} 높음`,
         };
     }
     if (value < threshold) {
         return {
             direction: "below",
-            label: `-${difference}${unit} 낮음`,
+            label: `-${difference}${unit}`,
             title: `임계치보다 ${difference}${unit} 낮음`,
         };
     }
@@ -260,17 +260,9 @@ function AvgTemperatureIcon({ className, ...props }) {
       <line x1="14" y1="11" x2="16" y2="11" strokeWidth="1.5"/>
     </svg>);
 }
-/** 초음파 — 음파 방사 원형 + 중심 진동 도트 */
 function UltrasoundIcon({ className, ...props }) {
-    return (<svg className={className} fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.1" viewBox="0 0 24 24" {...props}>
-      {/* 중심 진동자 */}
-      <rect x="10" y="8" width="4" height="8" rx="2"/>
-      {/* 왼쪽 음파 */}
-      <path d="M7 9.5a5 5 0 0 0 0 5"/>
-      <path d="M4.5 7.5a8 8 0 0 0 0 9"/>
-      {/* 오른쪽 음파 */}
-      <path d="M17 9.5a5 5 0 0 1 0 5"/>
-      <path d="M19.5 7.5a8 8 0 0 1 0 9"/>
+    return (<svg className={className} fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" viewBox="0 0 24 24" {...props}>
+      <path d="M2 12h2l3-8 4 16 3-10 3 4h5"/>
     </svg>);
 }
 function roundOne(value) {

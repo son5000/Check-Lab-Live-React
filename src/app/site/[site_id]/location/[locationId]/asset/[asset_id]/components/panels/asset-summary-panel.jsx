@@ -510,8 +510,6 @@ export function AssetSummaryPanel({
               onDirtyChange={onThresholdEditorDirtyChange}
               saveError={thresholdSaveError}
               thresholds={assetThresholds}
-              temperatureExceeded={isTemperatureExceeded}
-              ultrasoundExceeded={isUltrasoundExceeded}
               onClose={() => setIsThresholdEditorOpen(false)}
               onSave={onAssetThresholdSave}
             />
@@ -608,9 +606,6 @@ function AssetAssetInfoSection({ asset }) {
           <h2 className="AssetAssetInfoSection AssetAssetInfoSection__title-1 truncate text-xs font-semibold">
             설비 기본 정보
           </h2>
-          <p className="AssetAssetInfoSection AssetAssetInfoSection__subtitle-1 truncate text-[10px] font-medium text-muted-foreground">
-            {asset.name}
-          </p>
         </div>
         <span
           className={cn(
@@ -717,7 +712,7 @@ function AssetPartMetricCarousel({
       <div className="UltrasoundMetricCard MetricPlaceholderCard relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-md border border-border/60 bg-background/80">
         <div className="h-[3px] w-full shrink-0 bg-muted-foreground/25" />
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 border-b border-border/40 px-3 py-1.5">
-          <p className="min-w-0 flex-1 truncate text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+          <p className="min-w-0 flex-1 truncate text-xs font-bold uppercase tracking-widest text-foreground">
             관심 영역
           </p>
           {slideOptions ? (
@@ -733,7 +728,7 @@ function AssetPartMetricCarousel({
         <div className="grid min-h-0 flex-1 place-items-center px-3 text-center">
           <button
             type="button"
-            className="inline-flex h-8 max-w-full items-center justify-center rounded-md border border-primary/35 bg-primary/10 px-3 text-[11px] font-semibold text-primary transition hover:border-primary/60 hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
+            className="inline-flex h-10 max-w-full items-center justify-center rounded-md border border-primary/35 bg-primary/10 px-5 text-[13px] font-semibold text-primary transition hover:border-primary/60 hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
             onClick={onAddInterestArea}
           >
             관심 영역 추가하기

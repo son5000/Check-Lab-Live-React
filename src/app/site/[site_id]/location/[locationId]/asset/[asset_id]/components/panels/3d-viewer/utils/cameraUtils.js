@@ -5,20 +5,21 @@ const CAMERA_MARKER_COLOR = 0x22d3ee;
 const CAMERA_MARKER_HOVER_COLOR = 0xfacc15;
 const CAMERA_MARKER_SELECTED_COLOR = 0xa3e635;
 const CAMERA_MARKER_SCALE = 1;
-const CAMERA_MARKER_HOVER_SCALE = 1.22;
-const CAMERA_MARKER_SELECTED_SCALE = 1.38;
+const CAMERA_MARKER_HOVER_SCALE = 1.06;
+const CAMERA_MARKER_SELECTED_SCALE = 1.12;
 const CAMERA_MARKER_HIT_RADIUS = 5.8;
 const CAMERA_MARKER_PICK_RADIUS_PX = 42;
 const CAMERA_MARKER_STICKY_RADIUS_PX = 76;
-const CAMERA_FOV_COLOR = 0x00bfff;
-const CAMERA_FOV_HOVER_COLOR = 0xfacc15;
-const CAMERA_FOV_SELECTED_COLOR = 0xa3e635;
-const CAMERA_LASER_COLOR = 0x67e8f9;
-const CAMERA_LASER_HOVER_COLOR = 0xfacc15;
-const CAMERA_LASER_SELECTED_COLOR = 0xa3e635;
+const CAMERA_COMPARISON_COLOR = 0xf97316;
+const CAMERA_COMPARISON_DELTA_COLOR = 0xfacc15;
+const CAMERA_IMAGE_MARKER_ASPECT = 16 / 9;
+const CAMERA_IMAGE_MARKER_MIN_HEIGHT = 6.5;
+const CAMERA_IMAGE_MARKER_MAX_HEIGHT = 14;
+const WORLD_UP_VECTOR = new THREE.Vector3(0, 1, 0);
+const FALLBACK_ROLL_UP_VECTOR = new THREE.Vector3(0, 0, 1);
 const CAMERA_VISUALIZATION_PREFIXES = [
+  "viewer-camera-comparison-",
   "viewer-camera-fov-",
-  "viewer-camera-laser-",
   "viewer-camera-marker-",
 ];
 
@@ -36,7 +37,8 @@ export function updateCameraVisualizationObjects(
   visibleCameraIds,
   customPositions = {},
   customFovs = {},
-  showLaserBeams = true,
+  customTargets = {},
+  editComparison,
 ) {
   const knownCameraIds = new Set(cameras.map((camera) => camera.id));
   const visibleCameraIdSet = new Set(visibleCameraIds);
@@ -47,49 +49,42 @@ export function updateCameraVisualizationObjects(
       scene.remove(object);
       disposeObject3D(object);
     });
+  hideCameraComparisonObjects(scene);
 
   cameras.forEach((camera) => {
     const cameraId = camera.id;
     const isSelected = cameraId === selectedCameraId;
     const isVisible = visibleCameraIdSet.has(cameraId);
     const position = customPositions?.[cameraId] ?? camera.position;
+    const target = customTargets?.[cameraId] ?? camera.target;
     const fov = customFovs?.[cameraId] ?? camera.fov ?? 60;
     const resolvedCamera = {
       ...camera,
       fov,
       position,
+      target,
     };
-    const transformKey = getCameraTransformKey(resolvedCamera, position);
+    removeVisualizationObject(scene, `viewer-camera-fov-${cameraId}`);
 
-    const laserBeam = getOrReplaceVisualizationObject({
-      cacheKey: transformKey,
-      createObject: () =>
-        createCameraLaserBeam(resolvedCamera, cameraId, position, isSelected),
-      name: `viewer-camera-laser-${cameraId}`,
-      scene,
-    });
-    laserBeam.visible = showLaserBeams && isVisible;
-    applyCameraLaserVisualState(laserBeam, isSelected, false);
-
-    const cone = getOrReplaceVisualizationObject({
-      cacheKey: transformKey,
-      createObject: () =>
-        createCameraFOVCone(resolvedCamera, cameraId, isSelected),
-      name: `viewer-camera-fov-${cameraId}`,
-      scene,
-    });
-    applyCameraFOVTransform(cone, resolvedCamera, position);
-    cone.visible = showLaserBeams && isVisible;
-    applyCameraFOVVisualState(cone, isSelected, false);
-
-    const marker = getOrCreateVisualizationObject({
-      createObject: () => createCameraMarker(cameraId, isSelected),
+    const marker = getOrReplaceVisualizationObject({
+      cacheKey: getCameraImageMarkerKey(resolvedCamera),
+      createObject: () => createCameraMarker(resolvedCamera, cameraId),
       name: `viewer-camera-marker-${cameraId}`,
       scene,
     });
-    marker.position.set(position.x, position.y, position.z);
+    applyCameraMarkerTransform(marker, resolvedCamera, position);
     marker.visible = isVisible;
     applyCameraMarkerVisualState(marker, isSelected, false);
+
+    updateCameraComparisonObjects({
+      camera,
+      cameraId,
+      currentPosition: position,
+      editComparison,
+      isSelected,
+      isVisible,
+      scene,
+    });
   });
 }
 
@@ -109,14 +104,6 @@ export function updateCameraMarkerInteractionState(
 
     if (object.userData?.isCameraMarker) {
       applyCameraMarkerVisualState(object, isSelected, isHovered);
-    }
-
-    if (object.userData?.isCameraFOV) {
-      applyCameraFOVVisualState(object, isSelected, isHovered);
-    }
-
-    if (object.userData?.isCameraLaser) {
-      applyCameraLaserVisualState(object, isSelected, isHovered);
     }
   });
 }
@@ -222,48 +209,10 @@ export function pickCameraMarkerFromClientPoint({
   return nearest.distance <= nearest.pickRadius ? nearest.id : null;
 }
 
-function createCameraFOVCone(camera, cameraId, isSelected = false) {
-  const fov = camera.fov || 60;
-  const far = 100;
-  const verticalFov = THREE.MathUtils.degToRad(fov);
-  const coneHeight = far;
-  const coneRadiusBottom = Math.tan(verticalFov / 2) * far;
-  const coneGeometry = new THREE.ConeGeometry(
-    coneRadiusBottom,
-    coneHeight,
-    32,
-    1,
-    true,
-  );
-
-  coneGeometry.rotateX(-Math.PI / 2);
-  coneGeometry.translate(0, 0, coneHeight / 2);
-
-  const material = new THREE.MeshPhongMaterial({
-    color: isSelected ? CAMERA_FOV_SELECTED_COLOR : CAMERA_FOV_COLOR,
-    emissive: isSelected ? CAMERA_FOV_SELECTED_COLOR : CAMERA_FOV_COLOR,
-    emissiveIntensity: 0.5,
-    opacity: isSelected ? 0.3 : 0.15,
-    side: THREE.FrontSide,
-    transparent: true,
-  });
-  const cone = new THREE.Mesh(coneGeometry, material);
-
-  cone.name = `viewer-camera-fov-${cameraId}`;
-  cone.userData.cameraId = cameraId;
-  cone.userData.isCameraFOV = true;
-  cone.userData.isCameraVisualization = true;
-  cone.userData.isInteractive = false;
-  cone.raycast = () => {};
-  cone.castShadow = false;
-  cone.receiveShadow = false;
-  applyCameraFOVVisualState(cone, isSelected, false);
-
-  return cone;
-}
-
-function createCameraMarker(cameraId, isSelected = false) {
+function createCameraMarker(camera, cameraId) {
   const group = new THREE.Group();
+  const size = getCameraImageMarkerSize(camera.fov);
+  const texture = getCameraMarkerTexture(camera, cameraId);
 
   group.name = `viewer-camera-marker-${cameraId}`;
   group.userData.cameraId = cameraId;
@@ -271,22 +220,27 @@ function createCameraMarker(cameraId, isSelected = false) {
   group.userData.isCameraVisualization = true;
   group.userData.isInteractive = true;
 
-  const sphere = new THREE.Mesh(
-    new THREE.SphereGeometry(2.4, 24, 16),
-    new THREE.MeshPhongMaterial({
-      color: isSelected ? CAMERA_MARKER_SELECTED_COLOR : CAMERA_MARKER_COLOR,
-      emissive: isSelected ? CAMERA_MARKER_SELECTED_COLOR : CAMERA_MARKER_COLOR,
-      emissiveIntensity: isSelected ? 1.25 : 0.85,
-      opacity: isSelected ? 1 : 0.88,
-      transparent: true,
-    }),
-  );
-  sphere.name = `viewer-camera-marker-sphere-${cameraId}`;
-  sphere.userData.cameraId = cameraId;
-  sphere.userData.isCameraMarkerVisual = true;
-  sphere.castShadow = false;
-  sphere.receiveShadow = false;
-  group.add(sphere);
+  const imagePlane = createCameraImagePlane({
+    cameraId,
+    side: THREE.FrontSide,
+    size,
+    texture,
+  });
+  imagePlane.name = `viewer-camera-marker-image-${cameraId}`;
+  group.add(imagePlane);
+
+  const backImagePlane = createCameraImagePlane({
+    cameraId,
+    flipHorizontal: true,
+    side: THREE.BackSide,
+    size,
+    texture,
+  });
+  backImagePlane.name = `viewer-camera-marker-image-back-${cameraId}`;
+  group.add(backImagePlane);
+
+  const frame = createCameraImageFrame(cameraId, size);
+  group.add(frame);
 
   const hitTarget = new THREE.Mesh(
     new THREE.SphereGeometry(CAMERA_MARKER_HIT_RADIUS, 16, 12),
@@ -304,68 +258,312 @@ function createCameraMarker(cameraId, isSelected = false) {
   hitTarget.renderOrder = -1;
   group.add(hitTarget);
 
-  const label = createCameraNumberLabel(cameraId);
-  label.name = `viewer-camera-marker-label-${cameraId}`;
-  label.position.set(0, 4.8, 0);
-  label.userData.cameraId = cameraId;
-  label.userData.isCameraMarkerLabel = true;
-  group.add(label);
+  const badge = createCameraImageBadge(cameraId, {
+    side: THREE.FrontSide,
+  });
+  badge.name = `viewer-camera-marker-label-${cameraId}`;
+  badge.position.set(
+    -size.width / 2 + 1.45,
+    size.height / 2 - 0.95,
+    0.2,
+  );
+  badge.userData.cameraId = cameraId;
+  badge.userData.isCameraMarkerLabel = true;
+  group.add(badge);
 
-  applyCameraMarkerVisualState(group, isSelected, false);
+  const backBadge = createCameraImageBadge(cameraId, {
+    flipHorizontal: true,
+    side: THREE.BackSide,
+  });
+  backBadge.name = `viewer-camera-marker-label-back-${cameraId}`;
+  backBadge.position.set(size.width / 2 - 1.45, size.height / 2 - 0.95, -0.2);
+  backBadge.userData.cameraId = cameraId;
+  backBadge.userData.isCameraMarkerLabel = true;
+  group.add(backBadge);
 
   return group;
 }
 
-function createCameraLaserBeam(camera, cameraId, position, isSelected = false) {
-  const start = new THREE.Vector3(position.x, position.y, position.z);
-  const end = new THREE.Vector3(
-    camera.target.x,
-    camera.target.y,
-    camera.target.z,
-  );
-  const direction = end.clone().sub(start);
-  const length = direction.length();
-  const group = new THREE.Group();
-
-  group.name = `viewer-camera-laser-${cameraId}`;
-  group.userData.cameraId = cameraId;
-  group.userData.isCameraLaser = true;
-  group.userData.isCameraVisualization = true;
-  group.userData.isInteractive = false;
-
-  if (!length) {
-    return group;
+function createCameraImagePlane({
+  cameraId,
+  flipHorizontal = false,
+  side,
+  size,
+  texture,
+}) {
+  const geometry = new THREE.PlaneGeometry(size.width, size.height);
+  if (flipHorizontal) {
+    flipGeometryUvHorizontally(geometry);
   }
 
-  direction.normalize();
-  const midpoint = start.clone().add(end).multiplyScalar(0.5);
-  const quaternion = new THREE.Quaternion();
-  quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
+  const imagePlane = new THREE.Mesh(
+    geometry,
+    new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      depthTest: false,
+      depthWrite: false,
+      map: texture,
+      opacity: 0.92,
+      side,
+      transparent: true,
+    }),
+  );
+  imagePlane.userData.cameraId = cameraId;
+  imagePlane.userData.isCameraMarkerVisual = true;
+  imagePlane.userData.isCameraImageMarker = true;
+  imagePlane.raycast = () => {};
+  imagePlane.renderOrder = 9;
 
-  [
-    createLaserBeamSegment({
-      cameraId,
-      length,
-      opacity: 0.12,
-      radius: 1.05,
-      role: "glow",
+  return imagePlane;
+}
+
+function flipGeometryUvHorizontally(geometry) {
+  const uv = geometry.attributes.uv;
+  for (let index = 0; index < uv.count; index += 1) {
+    uv.setX(index, 1 - uv.getX(index));
+  }
+  uv.needsUpdate = true;
+}
+
+function createCameraImageFrame(cameraId, size) {
+  const halfWidth = size.width / 2;
+  const halfHeight = size.height / 2;
+  const geometry = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(-halfWidth, -halfHeight, 0.1),
+    new THREE.Vector3(halfWidth, -halfHeight, 0.1),
+    new THREE.Vector3(halfWidth, halfHeight, 0.1),
+    new THREE.Vector3(-halfWidth, halfHeight, 0.1),
+    new THREE.Vector3(-halfWidth, -halfHeight, 0.1),
+  ]);
+  const frame = new THREE.Line(
+    geometry,
+    new THREE.LineBasicMaterial({
+      color: CAMERA_MARKER_COLOR,
+      depthTest: false,
+      depthWrite: false,
+      opacity: 0.84,
+      transparent: true,
     }),
-    createLaserBeamSegment({
-      cameraId,
-      length,
-      opacity: 0.58,
-      radius: 0.28,
-      role: "core",
-    }),
-  ].forEach((beam) => {
-    beam.position.copy(midpoint);
-    beam.quaternion.copy(quaternion);
-    group.add(beam);
+  );
+
+  frame.name = `viewer-camera-marker-frame-${cameraId}`;
+  frame.userData.cameraId = cameraId;
+  frame.userData.isCameraMarkerFrame = true;
+  frame.raycast = () => {};
+  frame.renderOrder = 10;
+
+  return frame;
+}
+
+function getCameraMarkerTexture(camera, cameraId) {
+  const imagePath = camera.sampleImagePath;
+
+  if (!imagePath) {
+    return createCameraImageFallbackTexture(cameraId);
+  }
+
+  const texture = new THREE.TextureLoader().load(
+    imagePath,
+    (loadedTexture) => {
+      loadedTexture.colorSpace = THREE.SRGBColorSpace;
+      loadedTexture.needsUpdate = true;
+    },
+  );
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.name = `viewer-camera-marker-texture-${cameraId}`;
+  return texture;
+}
+
+function createCameraImageFallbackTexture(cameraId) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 320;
+  canvas.height = 180;
+  const context = canvas.getContext("2d");
+
+  if (context) {
+    context.fillStyle = "#020617";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.strokeStyle = "#22d3ee";
+    context.lineWidth = 8;
+    context.strokeRect(4, 4, canvas.width - 8, canvas.height - 8);
+    context.font = "700 48px Arial, sans-serif";
+    context.fillStyle = "#cffafe";
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillText(`CAM ${cameraId}`, canvas.width / 2, canvas.height / 2);
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+function getCameraImageMarkerSize(fov = 60) {
+  const normalizedFov = THREE.MathUtils.clamp(toFiniteNumber(fov, 60), 25, 95);
+  const height = THREE.MathUtils.clamp(
+    6.8 + (normalizedFov - 25) * 0.1,
+    CAMERA_IMAGE_MARKER_MIN_HEIGHT,
+    CAMERA_IMAGE_MARKER_MAX_HEIGHT,
+  );
+
+  return {
+    height,
+    width: height * CAMERA_IMAGE_MARKER_ASPECT,
+  };
+}
+
+function getCameraImageMarkerKey(camera) {
+  return [
+    camera.id,
+    camera.sampleImagePath ?? "",
+    camera.position?.x ?? 0,
+    camera.position?.y ?? 0,
+    camera.position?.z ?? 0,
+    camera.target?.x ?? 0,
+    camera.target?.y ?? 0,
+    camera.target?.z ?? 0,
+    camera.fov ?? 60,
+  ].join(":");
+}
+
+function applyCameraMarkerTransform(marker, camera, position) {
+  marker.position.set(position.x, position.y, position.z);
+
+  const direction = new THREE.Vector3(
+    camera.target.x - position.x,
+    camera.target.y - position.y,
+    camera.target.z - position.z,
+  );
+
+  if (direction.lengthSq() <= 0.0001) {
+    direction.set(0, 0, 1);
+  } else {
+    direction.normalize();
+  }
+
+  applyStableImagePlaneRotation(marker, direction);
+}
+
+function applyStableImagePlaneRotation(marker, forward) {
+  const upSeed =
+    Math.abs(forward.dot(WORLD_UP_VECTOR)) > 0.96
+      ? FALLBACK_ROLL_UP_VECTOR
+      : WORLD_UP_VECTOR;
+  const right = new THREE.Vector3().crossVectors(upSeed, forward).normalize();
+  const up = new THREE.Vector3().crossVectors(forward, right).normalize();
+  const rotationMatrix = new THREE.Matrix4().makeBasis(right, up, forward);
+
+  marker.quaternion.setFromRotationMatrix(rotationMatrix);
+}
+
+function updateCameraComparisonObjects({
+  camera,
+  cameraId,
+  currentPosition,
+  editComparison,
+  isSelected,
+  isVisible,
+  scene,
+}) {
+  if (
+    !isVisible ||
+    !isSelected ||
+    editComparison?.cameraId !== cameraId ||
+    !editComparison.position
+  ) {
+    return;
+  }
+
+  const previousPosition = normalizeVector3(editComparison.position);
+
+  const marker = getOrCreateVisualizationObject({
+    createObject: () => createCameraComparisonMarker(cameraId),
+    name: `viewer-camera-comparison-marker-${cameraId}`,
+    scene,
   });
+  marker.position.set(
+    previousPosition.x,
+    previousPosition.y,
+    previousPosition.z,
+  );
+  marker.visible = true;
 
-  applyCameraLaserVisualState(group, isSelected, false);
+  const current = normalizeVector3(currentPosition);
+  const deltaKey = [
+    previousPosition.x,
+    previousPosition.y,
+    previousPosition.z,
+    current.x,
+    current.y,
+    current.z,
+  ].join(":");
+  const deltaLine = getOrReplaceVisualizationObject({
+    cacheKey: deltaKey,
+    createObject: () =>
+      createCameraComparisonDeltaLine(cameraId, previousPosition, current),
+    name: `viewer-camera-comparison-delta-${cameraId}`,
+    scene,
+  });
+  deltaLine.visible = getVectorDistance(previousPosition, current) > 0.001;
+}
+
+function createCameraComparisonMarker(cameraId) {
+  const group = new THREE.Group();
+  group.name = `viewer-camera-comparison-marker-${cameraId}`;
+  group.userData.cameraId = cameraId;
+  group.userData.isCameraComparison = true;
+  group.userData.isCameraComparisonMarker = true;
+  group.userData.isInteractive = false;
+
+  const sphere = new THREE.Mesh(
+    new THREE.SphereGeometry(3.1, 24, 16),
+    new THREE.MeshPhongMaterial({
+      color: CAMERA_COMPARISON_COLOR,
+      emissive: CAMERA_COMPARISON_COLOR,
+      emissiveIntensity: 0.95,
+      opacity: 0.58,
+      transparent: true,
+    }),
+  );
+  sphere.name = `viewer-camera-comparison-marker-sphere-${cameraId}`;
+  sphere.userData.cameraId = cameraId;
+  sphere.userData.isCameraComparison = true;
+  sphere.raycast = () => {};
+  group.add(sphere);
+
+  const label = createCameraComparisonLabel();
+  label.name = `viewer-camera-comparison-marker-label-${cameraId}`;
+  label.position.set(0, 6.1, 0);
+  label.userData.cameraId = cameraId;
+  label.userData.isCameraComparison = true;
+  group.add(label);
 
   return group;
+}
+
+function createCameraComparisonDeltaLine(cameraId, previousPosition, currentPosition) {
+  const geometry = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(previousPosition.x, previousPosition.y, previousPosition.z),
+    new THREE.Vector3(currentPosition.x, currentPosition.y, currentPosition.z),
+  ]);
+  const line = new THREE.Line(
+    geometry,
+    new THREE.LineBasicMaterial({
+      color: CAMERA_COMPARISON_DELTA_COLOR,
+      depthTest: false,
+      depthWrite: false,
+      opacity: 0.92,
+      transparent: true,
+    }),
+  );
+
+  line.name = `viewer-camera-comparison-delta-${cameraId}`;
+  line.userData.cameraId = cameraId;
+  line.userData.isCameraComparison = true;
+  line.raycast = () => {};
+  line.renderOrder = 11;
+  return line;
 }
 
 function getOrCreateVisualizationObject({ createObject, name, scene }) {
@@ -377,6 +575,17 @@ function getOrCreateVisualizationObject({ createObject, name, scene }) {
   const object = createObject();
   scene.add(object);
   return object;
+}
+
+function removeVisualizationObject(scene, name) {
+  const existing = scene.getObjectByName(name);
+
+  if (!existing) {
+    return;
+  }
+
+  scene.remove(existing);
+  disposeObject3D(existing);
 }
 
 function getOrReplaceVisualizationObject({
@@ -402,32 +611,16 @@ function getOrReplaceVisualizationObject({
   return object;
 }
 
-function applyCameraFOVTransform(cone, camera, position) {
-  cone.position.set(position.x, position.y, position.z);
-
-  const direction = new THREE.Vector3(
-    camera.target.x - position.x,
-    camera.target.y - position.y,
-    camera.target.z - position.z,
-  );
-  if (direction.lengthSq() <= 0.0001) {
-    direction.set(0, 0, 1);
-  } else {
-    direction.normalize();
-  }
-  const quaternion = new THREE.Quaternion();
-  quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), direction);
-  cone.quaternion.copy(quaternion);
-}
-
 function applyCameraMarkerVisualState(marker, isSelected, isHovered) {
-  const sphere =
-    marker.children?.find((child) => child.userData?.isCameraMarkerVisual) ??
-    marker;
-  const label = marker.children?.find(
+  const images = marker.children?.filter(
+    (child) => child.userData?.isCameraMarkerVisual,
+  );
+  const frame = marker.children?.find(
+    (child) => child.userData?.isCameraMarkerFrame,
+  );
+  const labels = marker.children?.filter(
     (child) => child.userData?.isCameraMarkerLabel,
   );
-  const material = sphere.material;
   const color = isSelected
     ? CAMERA_MARKER_SELECTED_COLOR
     : isHovered
@@ -439,119 +632,100 @@ function applyCameraMarkerVisualState(marker, isSelected, isHovered) {
     ? CAMERA_MARKER_HOVER_SCALE
     : CAMERA_MARKER_SCALE;
 
-  sphere.scale.setScalar(scale);
+  marker.scale.setScalar(scale);
 
-  if (label) {
-    const labelScale = isHovered || isSelected ? 4.9 : 4.3;
-    label.scale.set(labelScale, labelScale, 1);
-  }
-
-  if (!material) {
-    return;
-  }
-
-  material.color.setHex(color);
-  material.opacity = isSelected || isHovered ? 1 : 0.88;
-  material.emissive.setHex(color);
-  material.emissiveIntensity = isSelected ? 1.35 : isHovered ? 1.15 : 0.85;
-  material.needsUpdate = true;
-}
-
-function applyCameraFOVVisualState(cone, isSelected, isHovered) {
-  if (!cone.material) {
-    return;
-  }
-
-  const color = isHovered
-    ? CAMERA_FOV_HOVER_COLOR
-    : isSelected
-    ? CAMERA_FOV_SELECTED_COLOR
-    : CAMERA_FOV_COLOR;
-
-  cone.material.color.setHex(color);
-  cone.material.opacity = isHovered ? 0.34 : isSelected ? 0.3 : 0.15;
-  cone.material.emissive.setHex(color);
-  cone.material.emissiveIntensity = isHovered ? 1.15 : isSelected ? 1 : 0.5;
-  cone.material.needsUpdate = true;
-}
-
-function createLaserBeamSegment({ cameraId, length, opacity, radius, role }) {
-  const geometry = new THREE.CylinderGeometry(
-    radius,
-    radius,
-    length,
-    16,
-    1,
-    true,
-  );
-  const material = new THREE.MeshBasicMaterial({
-    blending: THREE.AdditiveBlending,
-    color: CAMERA_LASER_COLOR,
-    depthWrite: false,
-    opacity,
-    transparent: true,
-  });
-  const beam = new THREE.Mesh(geometry, material);
-
-  beam.name = `viewer-camera-laser-${role}-${cameraId}`;
-  beam.userData.cameraId = cameraId;
-  beam.userData.isCameraLaserVisual = true;
-  beam.userData.isInteractive = false;
-  beam.userData.laserRole = role;
-  beam.raycast = () => {};
-  beam.renderOrder = role === "core" ? 6 : 5;
-
-  return beam;
-}
-
-function applyCameraLaserVisualState(laser, isSelected, isHovered) {
-  const color = isHovered
-    ? CAMERA_LASER_HOVER_COLOR
-    : isSelected
-    ? CAMERA_LASER_SELECTED_COLOR
-    : CAMERA_LASER_COLOR;
-  const coreOpacity = isHovered ? 0.92 : isSelected ? 0.84 : 0.58;
-  const glowOpacity = isHovered ? 0.26 : isSelected ? 0.22 : 0.12;
-  const widthScale = isHovered ? 1.28 : isSelected ? 1.16 : 1;
-
-  laser.children?.forEach((beam) => {
-    if (!beam.userData?.isCameraLaserVisual || !beam.material) {
+  (images?.length ? images : [marker]).forEach((image) => {
+    const imageMaterial = image.material;
+    if (!imageMaterial) {
       return;
     }
 
-    beam.material.color.setHex(color);
-    beam.material.opacity =
-      beam.userData.laserRole === "core" ? coreOpacity : glowOpacity;
-    beam.material.needsUpdate = true;
-    beam.scale.set(widthScale, 1, widthScale);
+    imageMaterial.opacity = isSelected || isHovered ? 1 : 0.92;
+    imageMaterial.color.setHex(0xffffff);
+    imageMaterial.needsUpdate = true;
+  });
+
+  if (frame?.material) {
+    frame.material.color.setHex(color);
+    frame.material.opacity = isSelected || isHovered ? 1 : 0.84;
+    frame.material.needsUpdate = true;
+  }
+
+  const labelScale = isHovered || isSelected ? 1.08 : 1;
+  labels?.forEach((label) => {
+    label.scale.set(labelScale, labelScale, 1);
   });
 }
 
-function createCameraNumberLabel(cameraId) {
+function createCameraImageBadge(cameraId, { flipHorizontal = false, side } = {}) {
   const canvas = document.createElement("canvas");
-  canvas.width = 128;
-  canvas.height = 128;
+  canvas.width = 192;
+  canvas.height = 96;
 
   const context = canvas.getContext("2d");
   if (context) {
     context.clearRect(0, 0, canvas.width, canvas.height);
-    context.fillStyle = "rgba(2, 6, 23, 0.82)";
-    context.strokeStyle = "rgba(255, 255, 255, 0.9)";
-    context.lineWidth = 8;
+    context.fillStyle = "rgba(2, 6, 23, 0.86)";
+    context.strokeStyle = "rgba(103, 232, 249, 0.92)";
+    context.lineWidth = 5;
     context.beginPath();
-    context.arc(64, 64, 46, 0, Math.PI * 2);
+    roundRect(context, 14, 20, 164, 56, 14);
     context.fill();
     context.stroke();
-    context.font = "700 58px Arial, sans-serif";
-    context.fillStyle = "#ffffff";
+    context.font = "700 30px Arial, sans-serif";
+    context.fillStyle = "#ecfeff";
     context.textAlign = "center";
     context.textBaseline = "middle";
-    context.fillText(String(cameraId), 64, 67);
+    context.fillText(`CAM ${cameraId}`, 96, 50);
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.needsUpdate = true;
+  const geometry = new THREE.PlaneGeometry(3.4, 1.7);
+  if (flipHorizontal) {
+    flipGeometryUvHorizontally(geometry);
+  }
+
+  const badge = new THREE.Mesh(
+    geometry,
+    new THREE.MeshBasicMaterial({
+      depthTest: false,
+      depthWrite: false,
+      map: texture,
+      side,
+      transparent: true,
+    }),
+  );
+  badge.raycast = () => {};
+  badge.renderOrder = 10;
+  return badge;
+}
+
+function createCameraComparisonLabel() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 192;
+  canvas.height = 96;
+
+  const context = canvas.getContext("2d");
+  if (context) {
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = "rgba(124, 45, 18, 0.86)";
+    context.strokeStyle = "rgba(251, 191, 36, 0.92)";
+    context.lineWidth = 5;
+    context.beginPath();
+    roundRect(context, 18, 22, 156, 52, 14);
+    context.fill();
+    context.stroke();
+    context.font = "700 28px Arial, sans-serif";
+    context.fillStyle = "#fff7ed";
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillText("BEFORE", 96, 49);
   }
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.needsUpdate = true;
-
   const sprite = new THREE.Sprite(
     new THREE.SpriteMaterial({
       depthTest: false,
@@ -560,9 +734,15 @@ function createCameraNumberLabel(cameraId) {
       transparent: true,
     }),
   );
-  sprite.scale.set(4.3, 4.3, 1);
-  sprite.renderOrder = 10;
+  sprite.scale.set(7.2, 3.6, 1);
+  sprite.renderOrder = 12;
   return sprite;
+}
+
+function hideCameraComparisonObjects(scene) {
+  findCameraComparisonObjects(scene).forEach((object) => {
+    object.visible = false;
+  });
 }
 
 function findCameraVisualizationObjects(scene) {
@@ -573,17 +753,12 @@ function findCameraVisualizationObjects(scene) {
   );
 }
 
-function getCameraTransformKey(camera, position) {
-  return [
-    position.x,
-    position.y,
-    position.z,
-    camera.target.x,
-    camera.target.y,
-    camera.target.z,
-    camera.fov || 60,
-  ].join(":");
+function findCameraComparisonObjects(scene) {
+  return scene.children.filter((object) =>
+    object.name?.startsWith("viewer-camera-comparison-"),
+  );
 }
+
 
 function getScreenPositionFromProjectedPoint(projected, bounds) {
   return {
@@ -603,4 +778,37 @@ function isVisibleInHierarchy(object) {
   }
 
   return true;
+}
+
+function normalizeVector3(vector = {}) {
+  return {
+    x: toFiniteNumber(vector.x),
+    y: toFiniteNumber(vector.y),
+    z: toFiniteNumber(vector.z),
+  };
+}
+
+function getVectorDistance(first, second) {
+  return Math.hypot(
+    toFiniteNumber(first?.x) - toFiniteNumber(second?.x),
+    toFiniteNumber(first?.y) - toFiniteNumber(second?.y),
+    toFiniteNumber(first?.z) - toFiniteNumber(second?.z),
+  );
+}
+
+function toFiniteNumber(value, fallback = 0) {
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? numericValue : fallback;
+}
+
+function roundRect(context, x, y, width, height, radius) {
+  context.moveTo(x + radius, y);
+  context.lineTo(x + width - radius, y);
+  context.quadraticCurveTo(x + width, y, x + width, y + radius);
+  context.lineTo(x + width, y + height - radius);
+  context.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+  context.lineTo(x + radius, y + height);
+  context.quadraticCurveTo(x, y + height, x, y + height - radius);
+  context.lineTo(x, y + radius);
+  context.quadraticCurveTo(x, y, x + radius, y);
 }

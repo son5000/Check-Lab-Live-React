@@ -459,7 +459,7 @@ export function AssetDashboardPage({ asset_id, asset, initialEventId, site, loca
     return (<main className="AssetDashboardPage AssetDashboardPage__root-1 h-full min-h-0 min-w-0 flex-1 overflow-y-auto bg-muted/35 p-2 md:overflow-hidden">
       <div className="AssetDashboardPage AssetDashboardPage__layout-parts-1">
         <DashboardArea className="AssetDashboardPage__area-title">
-          <AssetStatusTitlePanel assetJudgement={assetJudgement} events={events} location={location} reportHref={reportHref} site={site} sample={sample} unresolvedAlarmCount={unresolvedAlarmCount} onReportOpen={persistCurrentReportDraft}/>
+          <AssetStatusTitlePanel assetJudgement={assetJudgement} location={location} reportHref={reportHref} site={site} sample={sample} onReportOpen={persistCurrentReportDraft}/>
         </DashboardArea>
 
         <DashboardArea className="AssetDashboardPage__area-camera">
@@ -699,9 +699,8 @@ function EventLogBlindDrawer({ asset_id, assetId, events, initialSelectedEventId
 function clampHandleTopPercent(topPercent) {
     return Math.min(Math.max(topPercent, EVENT_DRAWER_HANDLE_MIN_TOP_PERCENT), EVENT_DRAWER_HANDLE_MAX_TOP_PERCENT);
 }
-function AssetStatusTitlePanel({ assetJudgement, events, location, reportHref, site, sample, unresolvedAlarmCount, onReportOpen, }) {
-    const latestEventGrade = events[0]?.grade ?? "normal";
-    return (<section className={cn("AssetStatusTitlePanel AssetStatusTitlePanel__section-1 grid min-h-0 min-w-0 grid-cols-1 items-center gap-3 overflow-hidden rounded-md border border-border bg-card px-5 text-card-foreground sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:gap-4", assetStatusTitlePanelClassName[assetJudgement])}>
+function AssetStatusTitlePanel({ assetJudgement, location, reportHref, site, sample, onReportOpen, }) {
+    return (<section className={cn("AssetStatusTitlePanel AssetStatusTitlePanel__section-1 grid min-h-0 min-w-0 grid-cols-1 items-center gap-3 overflow-hidden rounded-md border border-border bg-card px-5 text-card-foreground sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:gap-4", assetStatusTitlePanelClassName[assetJudgement])}>
       <div className="AssetStatusTitlePanel AssetStatusTitlePanel__container-1 min-w-0">
         <p className="AssetStatusTitlePanel AssetStatusTitlePanel__text-1 truncate text-xs font-bold text-muted-foreground">
           {site.name} · {location.name}
@@ -712,25 +711,14 @@ function AssetStatusTitlePanel({ assetJudgement, events, location, reportHref, s
       </div>
 
       <div className="AssetStatusTitlePanel AssetStatusTitlePanel__container-2 flex min-w-36 items-center justify-start gap-3 sm:justify-end">
-        <span className="AssetStatusTitlePanel AssetStatusTitlePanel__text-2 text-xs font-bold uppercase text-muted-foreground">
-          현재 상태 판정
+        <span className="AssetStatusTitlePanel AssetStatusTitlePanel__text-2 text-[1.5rem] font-bold uppercase text-muted-foreground">
+          현재 상태
         </span>
         <span className={cn("AssetStatusTitlePanel AssetStatusTitlePanel__label-1 rounded-md border px-6 py-2.5 text-3xl font-black leading-none shadow-sm xl:text-4xl", judgementClassName[assetJudgement])}>
           {judgementLabel[assetJudgement]}
         </span>
       </div>
 
-      <div className="AssetStatusTitlePanel AssetStatusTitlePanel__container-3 grid min-w-36 justify-items-start gap-1 px-1 py-1 sm:justify-items-end">
-        <span className="AssetStatusTitlePanel AssetStatusTitlePanel__text-3 text-[11px] font-semibold text-muted-foreground">
-          실시간 이벤트 판정
-        </span>
-        <span className={cn("AssetStatusTitlePanel AssetStatusTitlePanel__label-2 rounded-sm border px-2 py-0.5 text-xs font-bold", eventGradeClassName[latestEventGrade])}>
-          {eventGradeLabel[latestEventGrade]}
-        </span>
-        <span className="AssetStatusTitlePanel AssetStatusTitlePanel__text-4 font-mono text-[11px] text-muted-foreground">
-          {events.length}건 · 미해결 {unresolvedAlarmCount}건
-        </span>
-      </div>
       <Link aria-label="보고서 생성 화면 열기" className="AssetStatusTitlePanel AssetStatusTitlePanel__report-link-1 inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-md border border-primary/35 bg-primary/10 px-4 text-xs font-extrabold text-primary shadow-sm transition hover:border-primary/60 hover:bg-primary/15 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35" href={reportHref} target="_blank" title="보고서 생성 화면 열기" onAuxClick={onReportOpen} onClick={onReportOpen}>
         <FileText className="AssetStatusTitlePanel AssetStatusTitlePanel__report-icon-1 h-3.5 w-3.5" aria-hidden="true"/>
         보고서 생성
@@ -1355,18 +1343,8 @@ const assetStatusTitlePanelClassName = {
     caution: "border-amber-500/45 bg-amber-500/10 shadow-[inset_0_1px_0_rgba(245,158,11,0.16),0_0_18px_rgba(245,158,11,0.12)]",
     abnormal: "border-red-500/45 bg-red-500/10 shadow-[inset_0_1px_0_rgba(239,68,68,0.16),0_0_20px_rgba(239,68,68,0.14)]",
 };
-const eventGradeLabel = {
-    normal: "정상",
-    caution: "주의",
-    abnormal: "이상",
-};
 const eventGradeWeight = {
     normal: 1,
     caution: 2,
     abnormal: 3,
-};
-const eventGradeClassName = {
-    normal: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-    caution: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
-    abnormal: "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300",
 };

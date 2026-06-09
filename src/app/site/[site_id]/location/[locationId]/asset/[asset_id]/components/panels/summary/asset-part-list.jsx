@@ -22,7 +22,7 @@ export function AssetPartList({ parts, partStates, selectedPartId, onPartSelect,
 
       <ul className="AssetPartList AssetPartList__container-4 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain pr-1 [scrollbar-gutter:stable] [scrollbar-width:thin]">
         {!parts.length ? (<li className="AssetPartList AssetPartList__item-empty-1 grid min-h-24 shrink-0 place-items-center rounded-md border border-dashed border-border bg-card px-3 text-center text-[11px] text-muted-foreground">
-            카메라 크게 보기에서 관심 영역을 등록하면 이 목록에 표시됩니다.
+            관심 영역을 등록하면 이 목록에 표시됩니다.
           </li>) : null}
         {parts.map((part) => {
             const partState = partStates.find((state) => state.partId === part.id);

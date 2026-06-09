@@ -6,10 +6,12 @@ import {
   updateCameraMarkerInteractionState,
   updateCameraVisualizationObjects,
 } from "../utils/cameraUtils";
+import { invalidateThreeScene } from "../utils/sceneRenderInvalidation";
 
 const CAMERA_PRESET_IDS = CAMERA_PRESETS.map((camera) => camera.id);
 const EMPTY_CUSTOM_POSITIONS = {};
 const EMPTY_CUSTOM_FOVS = {};
+const EMPTY_CUSTOM_TARGETS = {};
 
 export function useThreeCameraVisualization(sceneRef, config) {
   const hoveredCameraIdRef = useRef(null);
@@ -22,6 +24,7 @@ export function useThreeCameraVisualization(sceneRef, config) {
 
     if (config?.enabled === false) {
       removeAllCameraVisualizations(scene);
+      invalidateThreeScene(scene, "camera-visualization-disabled");
       return undefined;
     }
 
@@ -30,7 +33,6 @@ export function useThreeCameraVisualization(sceneRef, config) {
     const showAll = requireSelection
       ? false
       : config?.showAll !== false || !selectedCameraId;
-    const showLaserBeams = config?.showLaserBeams !== false;
     const visibleCameraIds = showAll
       ? CAMERA_PRESET_IDS
       : selectedCameraId
@@ -44,13 +46,15 @@ export function useThreeCameraVisualization(sceneRef, config) {
       visibleCameraIds,
       config?.customPositions ?? EMPTY_CUSTOM_POSITIONS,
       config?.customFovs ?? EMPTY_CUSTOM_FOVS,
-      showLaserBeams,
+      config?.customTargets ?? EMPTY_CUSTOM_TARGETS,
+      config?.editComparison,
     );
     updateCameraMarkerInteractionState(
       scene,
       selectedCameraId,
       hoveredCameraIdRef.current,
     );
+    invalidateThreeScene(scene, "camera-visualization");
 
     return undefined;
   }, [
@@ -61,7 +65,8 @@ export function useThreeCameraVisualization(sceneRef, config) {
     config?.enabled,
     config?.customPositions,
     config?.customFovs,
-    config?.showLaserBeams,
+    config?.customTargets,
+    config?.editComparison,
   ]);
 
   const setHoveredCameraId = useCallback(
@@ -82,6 +87,7 @@ export function useThreeCameraVisualization(sceneRef, config) {
         config?.selectedCameraId ?? null,
         cameraId,
       );
+      invalidateThreeScene(scene, "camera-hover");
     },
     [config?.selectedCameraId, sceneRef],
   );
