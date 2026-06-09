@@ -46,7 +46,7 @@ export function AssetTrendPanel({ activeRangeId, ranges, temperatureData, temper
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isAutoRangeEnabled, setIsAutoRangeEnabled] = useState(true);
     const [autoRangeIntervalSeconds, setAutoRangeIntervalSeconds] = useState(DEFAULT_AUTO_RANGE_INTERVAL_SECONDS);
-    const [displayMode, setDisplayMode] = useState("separate");
+    const [displayMode, setDisplayMode] = useState("combined");
     const activeRangeConfig = rangeAxisConfig[activeRangeId];
     const isCombinedDisplay = displayMode === "combined";
     useEffect(() => {
