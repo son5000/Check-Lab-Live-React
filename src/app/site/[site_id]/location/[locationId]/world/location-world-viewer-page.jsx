@@ -1,2406 +1,3690 @@
 "use client";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  ArrowDown,
-  ArrowLeft,
-  ArrowRight,
-  ArrowUp,
-  Camera,
+  Activity,
+  AlertTriangle,
+  Compass,
   Gauge,
-  Move3D,
-  Plus,
+  MapPin,
+  RadioTower,
   RotateCcw,
-  Save,
-  SlidersHorizontal,
-  Thermometer,
-  Trash2,
+  Wind,
   X,
+  Zap,
 } from "lucide-react";
 import * as THREE from "three";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { cn } from "@/lib/utils";
-import { ModelLoader } from "@/app/site/[site_id]/location/[locationId]/asset/[asset_id]/components/panels/3d-viewer/modules/ModelLoader";
-import { disposeObject3D } from "@/app/site/[site_id]/location/[locationId]/asset/[asset_id]/components/panels/3d-viewer/utils/threeDisposal";
-const WORLD_SIZE = { depth: 48, width: 72 };
-const WORLD_ASSET_BASE_Y = 0.08;
-const WORLD_GROUND_Y = -0.02;
-const WORLD_GROUND_MODEL_FILE = createWorldSampleModelFile({
-  id: "bg-sample-ground",
-  label: "Background Sample Ground",
-  normalizeSize: WORLD_SIZE.width,
-  plyUrl: "/3d/bg_sample.ply",
-  textureUrl: "/3d/bg_sample.png",
-});
-const WORLD_SAMPLE_MODEL_FILES = [
-  createWorldSampleModelFile({
-    id: "equipment-sample",
-    label: "Equipment Sample",
-    plyUrl: "/3d/equipment_sample_threejs.ply",
-    textureUrl: "/3d/equipment_sample_texture.png",
-  }),
-  createWorldSampleModelFile({
-    id: "pump-unit",
-    label: "Pump Unit",
-    plyUrl: "/3d/sample_pump_unit.ply",
-    textureUrl: "/3d/sample_pump_unit_texture.png",
-  }),
-  createWorldSampleModelFile({
-    id: "thermal-node",
-    label: "Thermal Node",
-    plyUrl: "/3d/sample_thermal_node.ply",
-    textureUrl: "/3d/sample_thermal_node_texture.png",
-  }),
-  createWorldSampleModelFile({
-    id: "valve-box",
-    label: "Valve Box",
-    plyUrl: "/3d/sample_valve_box.ply",
-    textureUrl: "/3d/sample_valve_box_texture.png",
-  }),
-  createWorldSampleModelFile({
-    id: "main-sample",
-    label: "Main Sample",
-    normalizeSize: 4.6,
-    plyUrl: "/3d/sample.ply",
-    textureUrl: "/3d/sample.png",
-  }),
+
+const CAMERA_VIEWS = [
+  { id: "overview", label: "Overview", icon: Compass },
+  { id: "operations", label: "Operations", icon: Activity },
+  { id: "grid", label: "Grid", icon: RadioTower },
 ];
-const DEMO_ASSETS = [
+
+const SAMPLE_WIND_FARM_UNITS = [
   {
-    id: "world-demo-compressor-01",
-    name: "Compressor 01",
+    id: "wtg-01",
+    name: "WTG-01",
+    type: "Turbine",
     status: "normal",
-    type: "압축 설비",
+    capacityMw: 4.2,
+    outputMw: 3.8,
+    windSpeed: 11.4,
+    rotorRpm: 14.6,
+    bearing: 18,
+    health: 97,
+    position: [-28, -14],
   },
   {
-    id: "world-demo-pump-02",
-    name: "Pump 02",
+    id: "wtg-02",
+    name: "WTG-02",
+    type: "Turbine",
+    status: "normal",
+    capacityMw: 4.2,
+    outputMw: 3.6,
+    windSpeed: 10.9,
+    rotorRpm: 13.8,
+    bearing: 24,
+    health: 95,
+    position: [-10, -18],
+  },
+  {
+    id: "wtg-03",
+    name: "WTG-03",
+    type: "Turbine",
     status: "caution",
-    type: "이송 펌프",
+    capacityMw: 4.2,
+    outputMw: 2.9,
+    windSpeed: 10.2,
+    rotorRpm: 11.7,
+    bearing: 31,
+    health: 82,
+    position: [9, -15],
   },
   {
-    id: "world-demo-panel-03",
-    name: "Panel 03",
+    id: "wtg-04",
+    name: "WTG-04",
+    type: "Turbine",
+    status: "normal",
+    capacityMw: 4.2,
+    outputMw: 3.9,
+    windSpeed: 11.8,
+    rotorRpm: 14.9,
+    bearing: 21,
+    health: 98,
+    position: [28, -10],
+  },
+  {
+    id: "wtg-05",
+    name: "WTG-05",
+    type: "Turbine",
+    status: "normal",
+    capacityMw: 4.2,
+    outputMw: 3.4,
+    windSpeed: 10.6,
+    rotorRpm: 12.9,
+    bearing: 28,
+    health: 94,
+    position: [-20, 8],
+  },
+  {
+    id: "wtg-06",
+    name: "WTG-06",
+    type: "Turbine",
     status: "warning",
-    type: "전기 패널",
+    capacityMw: 4.2,
+    outputMw: 1.8,
+    windSpeed: 9.7,
+    rotorRpm: 7.6,
+    bearing: 34,
+    health: 68,
+    position: [0, 10],
   },
   {
-    id: "world-demo-chiller-04",
-    name: "Chiller 04",
+    id: "wtg-07",
+    name: "WTG-07",
+    type: "Turbine",
     status: "normal",
-    type: "냉각 설비",
+    capacityMw: 4.2,
+    outputMw: 3.7,
+    windSpeed: 11.2,
+    rotorRpm: 14.1,
+    bearing: 16,
+    health: 96,
+    position: [22, 12],
   },
   {
-    id: "world-demo-blower-05",
-    name: "Blower 05",
-    status: "danger",
-    type: "송풍 설비",
-  },
-  {
-    id: "world-demo-abnormal-06",
-    name: "Abnormal Sample",
-    status: "error",
-    type: "이상 샘플 설비",
+    id: "substation-a",
+    name: "Substation A",
+    type: "Substation",
+    status: "normal",
+    capacityMw: 29.4,
+    outputMw: 23.1,
+    windSpeed: 0,
+    rotorRpm: 0,
+    bearing: 0,
+    health: 99,
+    position: [0, 26],
   },
 ];
-const WORLD_SAMPLE_ASSET_OVERRIDES = [
-  {
-    id: "world-sample-equipment-01",
-    name: "Equipment Sample 01",
-    status: "normal",
-    type: "Sample Equipment",
+
+const STATUS_THEME = {
+  normal: {
+    label: "Normal",
+    className:
+      "border-emerald-400/30 bg-emerald-400/10 text-emerald-200 shadow-emerald-950/30",
+    dotClassName: "bg-emerald-300",
+    color: 0x34d399,
   },
-  {
-    id: "world-sample-pump-02",
-    name: "Pump Unit 02",
-    status: "normal",
-    type: "Sample Pump",
+  caution: {
+    label: "Caution",
+    className:
+      "border-amber-300/40 bg-amber-300/10 text-amber-100 shadow-amber-950/30",
+    dotClassName: "bg-amber-200",
+    color: 0xfbbf24,
   },
-  {
-    id: "world-sample-thermal-03",
-    name: "Thermal Node 03",
-    status: "caution",
-    type: "Sample Thermal Node",
+  warning: {
+    label: "Warning",
+    className:
+      "border-rose-300/40 bg-rose-400/10 text-rose-100 shadow-rose-950/30",
+    dotClassName: "bg-rose-300",
+    color: 0xfb7185,
   },
-  {
-    id: "world-sample-valve-04",
-    name: "Valve Box 04",
-    status: "caution",
-    type: "Sample Valve Box",
+  offline: {
+    label: "Offline",
+    className:
+      "border-slate-400/30 bg-slate-400/10 text-slate-200 shadow-slate-950/30",
+    dotClassName: "bg-slate-300",
+    color: 0x94a3b8,
   },
-  {
-    id: "world-sample-abnormal-05",
-    name: "Abnormal Sample 05",
-    status: "danger",
-    type: "Sample Abnormal Equipment",
-  },
-];
-const WORLD_SAMPLE_ASSETS = WORLD_SAMPLE_MODEL_FILES.map((modelFile, index) => ({
-  ...DEMO_ASSETS[index],
-  ...WORLD_SAMPLE_ASSET_OVERRIDES[index],
-  modelFile,
-}));
-const REGISTERED_ASSET_SAMPLES = buildRegisteredAssetSamples(WORLD_SAMPLE_ASSETS, [
-  {
-    id: "registered-sample-motor-01",
-    name: "Motor Unit A",
-    status: "normal",
-    type: "회전 설비",
-  },
-  {
-    id: "registered-sample-pump-02",
-    name: "Transfer Pump B",
-    status: "caution",
-    type: "이송 펌프",
-  },
-  {
-    id: "registered-sample-panel-03",
-    name: "Power Panel C",
-    status: "warning",
-    type: "전기 패널",
-  },
-  {
-    id: "registered-sample-fan-04",
-    name: "Exhaust Fan D",
-    status: "danger",
-    type: "송풍 설비",
-  },
-]);
-const statusLabel = {
-  caution: "요주의",
-  danger: "이상",
-  error: "이상",
-  warning: "요주의",
 };
-const statusColor = {
-  caution: "#facc15",
-  danger: "#ef4444",
-  error: "#dc2626",
-  normal: "#67e8f9",
-  warning: "#fde047",
+
+const VIEW_CAMERA_PRESETS = {
+  overview: {
+    position: new THREE.Vector3(46, 33, 56),
+    target: new THREE.Vector3(0, 2.5, 3),
+  },
+  operations: {
+    position: new THREE.Vector3(34, 18, 26),
+    target: new THREE.Vector3(1, 5.5, 0),
+  },
+  grid: {
+    position: new THREE.Vector3(-22, 21, 48),
+    target: new THREE.Vector3(0, 2.4, 22),
+  },
 };
-function createWorldSampleModelFile({
-  id,
-  label,
-  normalizeSize = 3.8,
-  plyUrl,
-  textureUrl,
-}) {
-  return {
-    id,
-    label,
-    normalizeSize,
-    plyUrl,
-    textures: [
-      {
-        enabled: true,
-        id: `${id}-base-color`,
-        label: `${label} Texture`,
-        role: "baseColor",
-        source: textureUrl,
-        strength: 1,
-      },
-    ],
-  };
-}
-function buildRegisteredAssetSamples(sampleAssets, fallbackAssets) {
-  return sampleAssets.length
-    ? sampleAssets.map((asset) => ({
-        ...cloneWorldAsset(asset),
-        id: `registered-${asset.id}`,
-      }))
-    : fallbackAssets;
-}
-const EYE_HEIGHT = 3.4;
-const DEFAULT_ASSET_ROTATION = {
-  pitch: -64,
-  roll: -135,
-  yaw: 38,
-};
-const DEFAULT_CAMERA_VIEW_PRESET_ID = "person";
-const CAMERA_VIEW_PRESETS = [
-  {
-    id: "person",
-    label: "1인칭",
-    pitch: -0.05,
-    position: { x: 0, y: EYE_HEIGHT, z: 22 },
-    yaw: 0,
-  },
-  {
-    id: "overview",
-    label: "윗 사선",
-    pitch: -0.78,
-    position: { x: 0, y: 24, z: 30 },
-    yaw: 0,
-  },
-  {
-    id: "top",
-    label: "탑뷰",
-    pitch: -1.42,
-    position: { x: 0, y: 42, z: 4 },
-    yaw: 0,
-  },
-  {
-    id: "side",
-    label: "측면 조망",
-    pitch: -0.54,
-    position: { x: -36, y: 17, z: 4 },
-    yaw: 1.66,
-  },
-];
-const DEFAULT_CAMERA_VIEW_PRESET =
-  CAMERA_VIEW_PRESETS.find((preset) => preset.id === DEFAULT_CAMERA_VIEW_PRESET_ID) ??
-  CAMERA_VIEW_PRESETS[0];
-const DEFAULT_WORLD_SETTINGS = {
-  accentColor: "#38bdf8",
-  backgroundColor: "#020617",
-  floorColor: "#ffffff",
-  fogDistance: 94,
-  gridOpacity: 0.24,
-  lightLevel: 1,
-};
-export function LocationWorldViewerPage({ assets, location, site }) {
-  const storageKey = `checklab:location-world:${site.id}:${location.id}`;
-  const assetStorageKey = `${storageKey}:assets:v2`;
-  const placementStorageKey = `${storageKey}:placements:v2`;
-  const settingsStorageKey = `${storageKey}:settings`;
-  const initialAssets = useMemo(() => buildDisplayAssets(assets), [assets]);
-  const [worldAssets, setWorldAssets] = useState(initialAssets);
-  const [placements, setPlacements] = useState(() =>
-    buildDefaultPlacements(initialAssets),
+
+export function LocationWorldViewerPage({ site, location, assets = [] }) {
+  const units = useMemo(() => buildWindFarmUnits(assets), [assets]);
+  const [cameraView, setCameraView] = useState("overview");
+  const [cameraResetKey, setCameraResetKey] = useState(0);
+  const [selectedUnitId, setSelectedUnitId] = useState(
+    units[0]?.id ?? "wtg-01",
   );
-  const [worldSettings, setWorldSettings] = useState(DEFAULT_WORLD_SETTINGS);
-  const [selectedAssetId, setSelectedAssetId] = useState(
-    worldAssets[0]?.id ?? "",
-  );
-  const [isAddingAsset, setIsAddingAsset] = useState(false);
-  const [pendingAddAssetId, setPendingAddAssetId] = useState(
-    REGISTERED_ASSET_SAMPLES[0]?.id ?? "",
-  );
-  const [activeCameraPresetId, setActiveCameraPresetId] = useState(
-    DEFAULT_CAMERA_VIEW_PRESET_ID,
-  );
-  const [isSaved, setIsSaved] = useState(true);
-  const [isAssetRegistrationOpen, setIsAssetRegistrationOpen] = useState(false);
-  const [isWorldSettingsOpen, setIsWorldSettingsOpen] = useState(false);
+  const [selectedPart, setSelectedPart] = useState(null);
+
   useEffect(() => {
-    const storedAssets = readStoredWorldAssets(assetStorageKey, initialAssets);
-    setWorldAssets(storedAssets);
-    setPlacements(readStoredPlacements(placementStorageKey, storedAssets));
-    setWorldSettings(readStoredWorldSettings(settingsStorageKey));
-    setSelectedAssetId((currentId) =>
-      currentId && storedAssets.some((asset) => asset.id === currentId)
-        ? currentId
-        : (storedAssets[0]?.id ?? ""),
-    );
-    setIsSaved(true);
-  }, [assetStorageKey, initialAssets, placementStorageKey, settingsStorageKey]);
+    if (!units.some((unit) => unit.id === selectedUnitId)) {
+      setSelectedUnitId(units[0]?.id ?? "");
+    }
+  }, [selectedUnitId, units]);
+
   useEffect(() => {
-    setPlacements((currentPlacements) =>
-      mergePlacements(worldAssets, currentPlacements),
-    );
-    setSelectedAssetId((currentId) =>
-      currentId && worldAssets.some((asset) => asset.id === currentId)
-        ? currentId
-        : (worldAssets[0]?.id ?? ""),
-    );
-  }, [worldAssets]);
-  const selectedAsset = worldAssets.find(
-    (asset) => asset.id === selectedAssetId,
-  );
-  const selectedPlacement = placements[selectedAssetId];
-  const handlePlacementChange = (assetId, patch) => {
-    setPlacements((currentPlacements) => ({
-      ...currentPlacements,
-      [assetId]: {
-        ...currentPlacements[assetId],
-        ...patch,
-      },
-    }));
-    setIsSaved(false);
-  };
-  const handleSavePlacements = () => {
-    window.localStorage.setItem(placementStorageKey, JSON.stringify(placements));
-    window.localStorage.setItem(assetStorageKey, JSON.stringify(worldAssets));
-    window.localStorage.setItem(
-      settingsStorageKey,
-      JSON.stringify(worldSettings),
-    );
-    setIsSaved(true);
-  };
-  const handleResetPlacements = () => {
-    const nextAssets = buildDisplayAssets(assets);
-    const nextPlacements = buildDefaultPlacements(nextAssets);
-    setWorldAssets(nextAssets);
-    setPlacements(nextPlacements);
-    window.localStorage.setItem(placementStorageKey, JSON.stringify(nextPlacements));
-    window.localStorage.setItem(assetStorageKey, JSON.stringify(nextAssets));
-    setIsSaved(true);
-    setIsAddingAsset(false);
-    setIsAssetRegistrationOpen(false);
-    setPendingAddAssetId(REGISTERED_ASSET_SAMPLES[0]?.id ?? "");
-  };
-  const handleProximityFocus = (assetId) => {
-    setSelectedAssetId((currentAssetId) =>
-      currentAssetId === assetId ? currentAssetId : assetId,
-    );
-  };
-  const handleAddAssetAt = (position) => {
-    const sourceAsset =
-      REGISTERED_ASSET_SAMPLES.find((asset) => asset.id === pendingAddAssetId) ??
-      REGISTERED_ASSET_SAMPLES[0];
-    if (!sourceAsset) {
-      return;
+    if (selectedPart && !units.some((unit) => unit.id === selectedPart.unitId)) {
+      setSelectedPart(null);
     }
-    const nextAsset = {
-      ...sourceAsset,
-      id: `world-added-${sourceAsset.id}-${Date.now()}`,
-      sourceAssetId: sourceAsset.id,
-    };
-    setWorldAssets((currentAssets) => [...currentAssets, nextAsset]);
-    setPlacements((currentPlacements) => ({
-      ...currentPlacements,
-      [nextAsset.id]: {
-        rotationX: DEFAULT_ASSET_ROTATION.pitch,
-        rotationY: DEFAULT_ASSET_ROTATION.yaw,
-        rotationZ: DEFAULT_ASSET_ROTATION.roll,
-        x: clampNumber(
-          position.x,
-          -WORLD_SIZE.width / 2 + 3,
-          WORLD_SIZE.width / 2 - 3,
-        ),
-        z: clampNumber(
-          position.z,
-          -WORLD_SIZE.depth / 2 + 3,
-          WORLD_SIZE.depth / 2 - 3,
-        ),
-      },
-    }));
-    setSelectedAssetId(nextAsset.id);
-    setIsAddingAsset(false);
-    setIsAssetRegistrationOpen(false);
-    setPendingAddAssetId(REGISTERED_ASSET_SAMPLES[0]?.id ?? "");
-    setIsSaved(false);
+  }, [selectedPart, units]);
+
+  const selectedUnit =
+    units.find((unit) => unit.id === selectedUnitId) ?? units[0];
+  const metrics = useMemo(() => buildOperationalMetrics(units), [units]);
+  const alertUnits = units.filter((unit) => unit.status !== "normal");
+  const activeSiteName = site?.name || site?.id || "Wind site";
+  const activeLocationName = location?.name || location?.id || "Location";
+  const handleUnitSelect = (unitId) => {
+    setSelectedUnitId(unitId);
+    setSelectedPart(null);
   };
-  const handleAddStart = () => {
-    setPendingAddAssetId((currentId) =>
-      REGISTERED_ASSET_SAMPLES.some((asset) => asset.id === currentId)
-        ? currentId
-        : (REGISTERED_ASSET_SAMPLES[0]?.id ?? ""),
-    );
-    setIsWorldSettingsOpen(false);
-    setIsAssetRegistrationOpen(true);
-    setIsAddingAsset(true);
+  const handlePartSelect = (part) => {
+    setSelectedUnitId(part.unitId);
+    setSelectedPart(part);
   };
-  const handleAddCancel = () => {
-    setIsAddingAsset(false);
-    setPendingAddAssetId(REGISTERED_ASSET_SAMPLES[0]?.id ?? "");
-  };
-  const handleAssetRegistrationToggle = () => {
-    const nextIsOpen = !isAssetRegistrationOpen;
-    setIsAssetRegistrationOpen(nextIsOpen);
-    if (nextIsOpen) {
-      setIsWorldSettingsOpen(false);
-      return;
-    }
-    setIsAddingAsset(false);
-    setPendingAddAssetId(REGISTERED_ASSET_SAMPLES[0]?.id ?? "");
-  };
-  const handleWorldSettingsChange = (patch) => {
-    setWorldSettings((currentSettings) => ({
-      ...currentSettings,
-      ...patch,
-    }));
-    setIsSaved(false);
-  };
-  const handleCameraPresetSelect = (presetId) => {
-    setActiveCameraPresetId(presetId);
-    window.dispatchEvent(
-      new CustomEvent("location-world-camera-preset", {
-        detail: { presetId },
-      }),
-    );
-  };
-  const handleRemoveAsset = (assetId) => {
-    setWorldAssets((currentAssets) =>
-      currentAssets.filter((asset) => asset.id !== assetId),
-    );
-    setPlacements((currentPlacements) => {
-      const nextPlacements = { ...currentPlacements };
-      delete nextPlacements[assetId];
-      return nextPlacements;
-    });
-    setSelectedAssetId((currentAssetId) => {
-      if (currentAssetId !== assetId) {
-        return currentAssetId;
-      }
-      const nextAsset = worldAssets.find((asset) => asset.id !== assetId);
-      return nextAsset?.id ?? "";
-    });
-    setIsSaved(false);
-  };
+
   return (
-    <main className="LocationWorldViewerPage LocationWorldViewerPage__root-1 h-dvh min-h-0 min-w-0 overflow-hidden bg-neutral-950 text-white">
-      <LocationWorldScene
-        assets={worldAssets}
-        isAddingAsset={isAddingAsset}
-        location={location}
-        placements={placements}
-        selectedAssetId={selectedAssetId}
-        worldSettings={worldSettings}
-        onAddAssetAt={handleAddAssetAt}
-        onPlacementSelect={setSelectedAssetId}
-        onProximityFocus={handleProximityFocus}
-      />
-      <header className="LocationWorldViewerPage LocationWorldViewerPage__header-1 pointer-events-none absolute left-3 right-3 top-3 z-30 flex min-w-0 items-start justify-between gap-3">
-        <div className="LocationWorldViewerPage LocationWorldViewerPage__title-block-1 pointer-events-auto min-w-0 rounded-md border border-white/15 bg-black/55 px-3 py-2 shadow-2xl backdrop-blur-md">
-          <p className="LocationWorldViewerPage LocationWorldViewerPage__eyebrow-1 truncate text-[11px] font-semibold text-cyan-100/75">
-            {site.name} / {location.floor || location.id}
-          </p>
-          <h1 className="LocationWorldViewerPage LocationWorldViewerPage__title-1 truncate text-base font-semibold">
-            {location.name}
-          </h1>
-        </div>
-        <div className="LocationWorldViewerPage LocationWorldViewerPage__actions-1 pointer-events-auto flex shrink-0 items-center gap-2">
-          {!isSaved ? (
-            <button
-              type="button"
-              className="LocationWorldViewerPage LocationWorldViewerPage__save-1 inline-flex h-9 items-center gap-1.5 rounded-md border border-cyan-300/35 bg-cyan-300 px-3 text-xs font-semibold text-slate-950 shadow-xl transition hover:bg-cyan-200"
-              onClick={handleSavePlacements}
-            >
-              <Save
-                className="LocationWorldViewerPage LocationWorldViewerPage__icon-1 h-3.5 w-3.5"
+    <main className="LocationWorldViewerPage LocationWorldViewerPage__root-1 flex min-h-screen min-w-0 flex-1 flex-col overflow-y-auto bg-slate-950 text-slate-100 lg:h-screen lg:max-h-screen lg:min-h-0 lg:overflow-hidden lg:[height:100dvh] lg:[max-height:100dvh]">
+      <section className="LocationWorldViewerPage LocationWorldViewerPage__header-1 border-b border-white/10 bg-slate-950/95 px-4 py-3 md:px-5">
+        <div className="LocationWorldViewerPage LocationWorldViewerPage__header-inner-1 flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="LocationWorldViewerPage LocationWorldViewerPage__title-group-1 min-w-0">
+            <p className="LocationWorldViewerPage LocationWorldViewerPage__eyebrow-1 flex min-w-0 items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200/80">
+              <MapPin
+                className="LocationWorldViewerPage LocationWorldViewerPage__icon-map-1 h-3.5 w-3.5 shrink-0"
                 aria-hidden="true"
               />
-              현재 배치 저장하기
+              <span className="LocationWorldViewerPage LocationWorldViewerPage__site-1 truncate">
+                {activeSiteName} / {activeLocationName}
+              </span>
+            </p>
+            <div className="LocationWorldViewerPage LocationWorldViewerPage__headline-1 mt-1 flex min-w-0 flex-wrap items-center gap-2">
+              <h1 className="LocationWorldViewerPage LocationWorldViewerPage__title-1 truncate text-xl font-semibold text-white md:text-2xl">
+                Wind Farm Digital Twin
+              </h1>
+              <StatusBadge status={metrics.fleetStatus} />
+            </div>
+          </div>
+
+          <div className="LocationWorldViewerPage LocationWorldViewerPage__controls-1 flex min-w-0 flex-wrap items-center gap-2">
+            <div className="LocationWorldViewerPage LocationWorldViewerPage__view-tabs-1 inline-flex h-9 min-w-0 rounded-md border border-white/10 bg-white/5 p-1">
+              {CAMERA_VIEWS.map((view) => (
+                <button
+                  key={view.id}
+                  type="button"
+                  className={cn(
+                    "LocationWorldViewerPage LocationWorldViewerPage__view-button-1 inline-flex min-w-0 items-center gap-1.5 rounded px-2.5 text-xs font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white",
+                    cameraView === view.id && "bg-cyan-300 text-slate-950",
+                  )}
+                  aria-pressed={cameraView === view.id}
+                  onClick={() => setCameraView(view.id)}
+                >
+                  <view.icon
+                    className="LocationWorldViewerPage LocationWorldViewerPage__view-icon-1 h-3.5 w-3.5 shrink-0"
+                    aria-hidden="true"
+                  />
+                  <span className="LocationWorldViewerPage LocationWorldViewerPage__view-label-1 truncate">
+                    {view.label}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="LocationWorldViewerPage LocationWorldViewerPage__reset-button-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/5 text-slate-200 transition hover:bg-white/10 hover:text-white"
+              title="Reset camera"
+              onClick={() => setCameraResetKey((currentKey) => currentKey + 1)}
+            >
+              <RotateCcw
+                className="LocationWorldViewerPage LocationWorldViewerPage__reset-icon-1 h-4 w-4"
+                aria-hidden="true"
+              />
+              <span className="sr-only">Reset camera</span>
             </button>
-          ) : null}
-          <button
-            type="button"
-            className="LocationWorldViewerPage LocationWorldViewerPage__reset-1 grid h-9 w-9 place-items-center rounded-md border border-white/15 bg-black/45 text-white/80 shadow-xl transition hover:bg-white/15 hover:text-white"
-            onClick={handleResetPlacements}
-            title="배치 초기화"
-            aria-label="배치 초기화"
-          >
-            <RotateCcw
-              className="LocationWorldViewerPage LocationWorldViewerPage__icon-2 h-4 w-4"
-              aria-hidden="true"
-            />
-          </button>
-          <button
-            type="button"
-            className={cn(
-              "LocationWorldViewerPage LocationWorldViewerPage__asset-register-1 grid h-9 w-9 place-items-center rounded-md border shadow-xl transition",
-              isAssetRegistrationOpen
-                ? "border-cyan-300/55 bg-cyan-300 text-slate-950"
-                : "border-white/15 bg-black/45 text-white/80 hover:bg-white/15 hover:text-white",
-            )}
-            onClick={handleAssetRegistrationToggle}
-            title="설비 등록"
-            aria-label="설비 등록"
-            aria-pressed={isAssetRegistrationOpen}
-          >
-            <Plus
-              className="LocationWorldViewerPage LocationWorldViewerPage__icon-3 h-4 w-4"
-              aria-hidden="true"
-            />
-          </button>
-          <button
-            type="button"
-            className={cn(
-              "LocationWorldViewerPage LocationWorldViewerPage__settings-1 grid h-9 w-9 place-items-center rounded-md border shadow-xl transition",
-              isWorldSettingsOpen
-                ? "border-cyan-300/45 bg-cyan-300/20 text-cyan-50"
-                : "border-white/15 bg-black/45 text-white/80 hover:bg-white/15 hover:text-white",
-            )}
-            onClick={() => {
-              setIsWorldSettingsOpen((isOpen) => !isOpen);
-              setIsAssetRegistrationOpen(false);
-              setIsAddingAsset(false);
-            }}
-            title="월드 환경 설정"
-            aria-label="월드 환경 설정"
-            aria-pressed={isWorldSettingsOpen}
-          >
-            <SlidersHorizontal
-              className="LocationWorldViewerPage LocationWorldViewerPage__icon-4 h-4 w-4"
-              aria-hidden="true"
-            />
-          </button>
-          <Link
-            href={`/site/${encodeURIComponent(site.id)}/location/${encodeURIComponent(location.id)}`}
-            className="LocationWorldViewerPage LocationWorldViewerPage__back-1 inline-flex h-9 items-center rounded-md border border-white/15 bg-black/45 px-3 text-xs font-semibold text-white/80 shadow-xl transition hover:bg-white/15 hover:text-white"
-          >
-            위치 요약
-          </Link>
+          </div>
         </div>
-      </header>
-      {isAssetRegistrationOpen ? (
-        <WorldAssetRegistrationPanel
-          isAddingAsset={isAddingAsset}
-          pendingAddAssetId={pendingAddAssetId}
-          registeredAssetSamples={REGISTERED_ASSET_SAMPLES}
-          onAddCancel={handleAddCancel}
-          onAddStart={handleAddStart}
-          onClose={() => {
-            setIsAssetRegistrationOpen(false);
-            setIsAddingAsset(false);
-            setPendingAddAssetId(REGISTERED_ASSET_SAMPLES[0]?.id ?? "");
-          }}
-          onPendingAddAssetChange={setPendingAddAssetId}
+      </section>
+
+      <section className="LocationWorldViewerPage LocationWorldViewerPage__metrics-1 grid gap-px border-b border-white/10 bg-white/10 sm:grid-cols-2 xl:grid-cols-4">
+        <TwinMetric
+          icon={Zap}
+          label="Active output"
+          value={`${formatNumber(metrics.outputMw, 1)} MW`}
+          detail={`${metrics.outputPct}% of ${formatNumber(metrics.capacityMw, 1)} MW`}
         />
-      ) : null}
-      {isWorldSettingsOpen ? (
-        <WorldSettingsPanel
-          activeCameraPresetId={activeCameraPresetId}
-          settings={worldSettings}
-          onCameraPresetSelect={handleCameraPresetSelect}
-          onChange={handleWorldSettingsChange}
-          onClose={() => setIsWorldSettingsOpen(false)}
+        <TwinMetric
+          icon={Wind}
+          label="Wind speed"
+          value={`${formatNumber(metrics.windSpeed, 1)} m/s`}
+          detail="Hub-height average"
         />
-      ) : null}
-      {!isWorldSettingsOpen && !isAssetRegistrationOpen ? (
-        <WorldPlacementPanel
-          assets={worldAssets}
-          placements={placements}
-          selectedAsset={selectedAsset}
-          selectedPlacement={selectedPlacement}
-          onPlacementChange={handlePlacementChange}
-          onRemove={handleRemoveAsset}
-          onSelect={setSelectedAssetId}
+        <TwinMetric
+          icon={Gauge}
+          label="Availability"
+          value={`${metrics.availability}%`}
+          detail={`${metrics.normalCount}/${metrics.unitCount} units normal`}
         />
-      ) : null}
-      <WorldMovementPad />
+        <TwinMetric
+          icon={AlertTriangle}
+          label="Active alarms"
+          value={metrics.alertCount}
+          detail={metrics.alertCount ? "Field action required" : "No open alarms"}
+        />
+      </section>
+
+      <section className="LocationWorldViewerPage LocationWorldViewerPage__body-1 grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="LocationWorldViewerPage LocationWorldViewerPage__stage-shell-1 relative min-h-[560px] overflow-hidden bg-slate-950">
+          <WindFarmTwinStage
+            cameraResetKey={cameraResetKey}
+            cameraView={cameraView}
+            onPartSelect={handlePartSelect}
+            onUnitSelect={handleUnitSelect}
+            selectedPart={selectedPart}
+            selectedUnitId={selectedUnit?.id}
+            units={units}
+          />
+
+          <div className="LocationWorldViewerPage LocationWorldViewerPage__hud-top-1 pointer-events-none absolute left-4 top-4 grid gap-2 sm:grid-cols-2">
+            <HudPill
+              icon={Compass}
+              label="Yaw alignment"
+              value={`${selectedUnit?.bearing ?? 0} deg`}
+            />
+            <HudPill
+              icon={Activity}
+              label="Fleet load"
+              value={`${metrics.outputPct}%`}
+            />
+          </div>
+
+          {selectedPart ? (
+            <div className="LocationWorldViewerPage LocationWorldViewerPage__hud-selected-1 absolute bottom-4 left-4 right-4 max-w-xl rounded-md border border-white/10 bg-slate-950/80 p-3 shadow-2xl shadow-slate-950/50 backdrop-blur md:right-auto md:w-[28rem]">
+              <SelectedPartAnalysis
+                onClose={() => setSelectedPart(null)}
+                part={selectedPart}
+              />
+            </div>
+          ) : selectedUnit ? (
+            <div className="LocationWorldViewerPage LocationWorldViewerPage__hud-selected-1 absolute bottom-4 left-4 right-4 max-w-xl rounded-md border border-white/10 bg-slate-950/80 p-3 shadow-2xl shadow-slate-950/50 backdrop-blur md:right-auto md:w-[28rem]">
+              <SelectedUnitSummary unit={selectedUnit} />
+            </div>
+          ) : null}
+        </div>
+
+        <aside className="LocationWorldViewerPage LocationWorldViewerPage__side-1 flex min-h-0 flex-col border-t border-white/10 bg-slate-900/95 lg:border-l lg:border-t-0">
+          <div className="LocationWorldViewerPage LocationWorldViewerPage__side-section-1 border-b border-white/10 p-4">
+            <div className="LocationWorldViewerPage LocationWorldViewerPage__side-heading-1 flex min-w-0 items-center justify-between gap-2">
+              <h2 className="LocationWorldViewerPage LocationWorldViewerPage__side-title-1 truncate text-sm font-semibold text-white">
+                Field Units
+              </h2>
+              <span className="LocationWorldViewerPage LocationWorldViewerPage__side-count-1 rounded-sm border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] font-semibold text-slate-300">
+                {units.length}
+              </span>
+            </div>
+          </div>
+
+          <div className="LocationWorldViewerPage LocationWorldViewerPage__unit-list-1 min-h-0 flex-1 overflow-y-auto p-3">
+            <div className="LocationWorldViewerPage LocationWorldViewerPage__unit-list-inner-1 grid gap-2">
+              {units.map((unit) => (
+                <UnitListItem
+                  key={unit.id}
+                  isSelected={unit.id === selectedUnit?.id}
+                  onSelect={() => handleUnitSelect(unit.id)}
+                  unit={unit}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="LocationWorldViewerPage LocationWorldViewerPage__side-section-2 border-t border-white/10 p-4">
+            <h2 className="LocationWorldViewerPage LocationWorldViewerPage__side-title-2 truncate text-sm font-semibold text-white">
+              Live Alarms
+            </h2>
+            <div className="LocationWorldViewerPage LocationWorldViewerPage__alarm-list-1 mt-3 grid gap-2">
+              {alertUnits.length ? (
+                alertUnits.map((unit) => (
+                  <div
+                    key={unit.id}
+                    className="LocationWorldViewerPage LocationWorldViewerPage__alarm-item-1 rounded-md border border-white/10 bg-white/[0.03] p-3"
+                  >
+                    <div className="LocationWorldViewerPage LocationWorldViewerPage__alarm-row-1 flex min-w-0 items-center justify-between gap-2">
+                      <p className="LocationWorldViewerPage LocationWorldViewerPage__alarm-name-1 truncate text-xs font-semibold text-white">
+                        {unit.name}
+                      </p>
+                      <StatusBadge status={unit.status} />
+                    </div>
+                    <p className="LocationWorldViewerPage LocationWorldViewerPage__alarm-text-1 mt-2 text-xs leading-5 text-slate-300">
+                      {getAlarmMessage(unit)}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <p className="LocationWorldViewerPage LocationWorldViewerPage__alarm-empty-1 rounded-md border border-dashed border-white/10 px-3 py-4 text-xs text-slate-400">
+                  No active alarms
+                </p>
+              )}
+            </div>
+          </div>
+        </aside>
+      </section>
     </main>
   );
 }
-function LocationWorldScene({
-  assets,
-  isAddingAsset,
-  location,
-  onAddAssetAt,
-  onPlacementSelect,
-  onProximityFocus,
-  placements,
-  selectedAssetId,
-  worldSettings,
+
+function WindFarmTwinStage({
+  cameraResetKey,
+  cameraView,
+  onPartSelect,
+  onUnitSelect,
+  selectedPart,
+  selectedUnitId,
+  units,
 }) {
   const containerRef = useRef(null);
-  const assetGroupsRef = useRef(new Map());
-  const modelCacheRef = useRef(new Map());
-  const keysRef = useRef(new Set());
-  const sceneRef = useRef(null);
-  const cameraStateRef = useRef({
-    pitch: DEFAULT_CAMERA_VIEW_PRESET.pitch,
-    position: new THREE.Vector3(
-      DEFAULT_CAMERA_VIEW_PRESET.position.x,
-      DEFAULT_CAMERA_VIEW_PRESET.position.y,
-      DEFAULT_CAMERA_VIEW_PRESET.position.z,
-    ),
-    yaw: DEFAULT_CAMERA_VIEW_PRESET.yaw,
-  });
-  const proximityFocusRef = useRef({ assetId: "", lastChangedAt: 0 });
-  const projectedKeyRef = useRef("");
-  const placementsRef = useRef(placements);
-  const assetsRef = useRef(assets);
-  const worldSettingsRef = useRef(worldSettings);
-  const isAddingAssetRef = useRef(isAddingAsset);
-  const onAddAssetAtRef = useRef(onAddAssetAt);
-  const selectedAssetIdRef = useRef(selectedAssetId);
-  const onPlacementSelectRef = useRef(onPlacementSelect);
-  const onProximityFocusRef = useRef(onProximityFocus);
-  const [loadMessage, setLoadMessage] = useState("3D 월드 구성 중");
-  const [projectedCards, setProjectedCards] = useState([]);
+  const sceneApiRef = useRef(null);
+  const onPartSelectRef = useRef(onPartSelect);
+  const onUnitSelectRef = useRef(onUnitSelect);
+  const cameraViewRef = useRef(cameraView);
+  const selectedPartRef = useRef(selectedPart);
+  const selectedUnitIdRef = useRef(selectedUnitId);
+
   useEffect(() => {
-    placementsRef.current = placements;
-    updateAssetTransforms(assetGroupsRef.current, placements);
-  }, [placements]);
+    onPartSelectRef.current = onPartSelect;
+  }, [onPartSelect]);
+
   useEffect(() => {
-    worldSettingsRef.current = worldSettings;
-    applyWorldSettings(sceneRef.current, worldSettings);
-  }, [worldSettings]);
+    onUnitSelectRef.current = onUnitSelect;
+  }, [onUnitSelect]);
+
   useEffect(() => {
-    assetsRef.current = assets;
-    syncAssetModels({
-      assets,
-      groups: assetGroupsRef.current,
-      modelCache: modelCacheRef.current,
-      placements: placementsRef.current,
-      scene: sceneRef.current,
-      selectedAssetId: selectedAssetIdRef.current,
-    });
-  }, [assets]);
+    selectedPartRef.current = selectedPart;
+    sceneApiRef.current?.setSelectedPart(selectedPart);
+  }, [selectedPart]);
+
   useEffect(() => {
-    isAddingAssetRef.current = isAddingAsset;
-  }, [isAddingAsset]);
+    selectedUnitIdRef.current = selectedUnitId;
+    sceneApiRef.current?.setSelectedUnit(selectedUnitId);
+  }, [selectedUnitId]);
+
   useEffect(() => {
-    onAddAssetAtRef.current = onAddAssetAt;
-  }, [onAddAssetAt]);
-  useEffect(() => {
-    selectedAssetIdRef.current = selectedAssetId;
-    assetGroupsRef.current.forEach((group, assetId) => {
-      applyAssetSelection(group, assetId === selectedAssetId);
-    });
-  }, [selectedAssetId]);
-  useEffect(() => {
-    onPlacementSelectRef.current = onPlacementSelect;
-  }, [onPlacementSelect]);
-  useEffect(() => {
-    onProximityFocusRef.current = onProximityFocus;
-  }, [onProximityFocus]);
+    cameraViewRef.current = cameraView;
+    sceneApiRef.current?.setCameraView(cameraView);
+  }, [cameraResetKey, cameraView]);
+
   useEffect(() => {
     const container = containerRef.current;
+
     if (!container) {
       return undefined;
     }
+
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(
-      worldSettingsRef.current.backgroundColor,
-    );
-    scene.fog = new THREE.Fog(
-      worldSettingsRef.current.backgroundColor,
-      28,
-      worldSettingsRef.current.fogDistance,
-    );
-    const camera = new THREE.PerspectiveCamera(68, 1, 0.1, 900);
+    scene.background = new THREE.Color(0x071a2c);
+    scene.fog = new THREE.FogExp2(0x071a2c, 0.0095);
+
+    const camera = new THREE.PerspectiveCamera(46, 1, 0.1, 500);
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
       powerPreference: "high-performance",
-      preserveDrawingBuffer: true,
     });
-    const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-    const floorHit = new THREE.Vector3();
-    const placementPreview = createPlacementPreview();
-    const raycaster = new THREE.Raycaster();
-    const pointer = new THREE.Vector2();
-    let animationFrameId = 0;
-    let previousTimestamp = performance.now();
-    let isDisposed = false;
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.05;
     renderer.domElement.className =
       "LocationWorldViewerPage LocationWorldViewerPage__canvas-1 h-full w-full";
     container.appendChild(renderer.domElement);
-    sceneRef.current = scene;
-    const modelLoader = new ModelLoader();
-    createWorldEnvironment(scene, worldSettingsRef.current);
-    scene.add(placementPreview);
-    applyCameraState(camera, cameraStateRef.current);
-    resizeRenderer(container, renderer, camera);
-    const resizeObserver = new ResizeObserver(() =>
-      resizeRenderer(container, renderer, camera),
-    );
-    resizeObserver.observe(container);
-    const handleKeyDown = (event) => {
-      if (isEditableTarget(event.target)) {
-        return;
-      }
-      const action = keyToAction(event.key);
-      if (!action) {
-        return;
-      }
-      event.preventDefault();
-      keysRef.current.add(action);
-    };
-    const handleKeyUp = (event) => {
-      if (isEditableTarget(event.target)) {
-        return;
-      }
-      const action = keyToAction(event.key);
-      if (action) {
-        keysRef.current.delete(action);
-      }
-    };
-    const handleMoveEvent = (event) => {
-      const action = event.detail?.action;
-      if (!action) {
-        return;
-      }
-      if (event.detail.active) {
-        keysRef.current.add(action);
-        return;
-      }
-      keysRef.current.delete(action);
-    };
-    const handleCameraPresetEvent = (event) => {
-      const preset = CAMERA_VIEW_PRESETS.find(
-        (viewPreset) => viewPreset.id === event.detail?.presetId,
-      );
-      if (!preset) {
-        return;
-      }
-      keysRef.current.clear();
-      cameraStateRef.current.position.set(
-        preset.position.x,
-        preset.position.y,
-        preset.position.z,
-      );
-      cameraStateRef.current.pitch = preset.pitch;
-      cameraStateRef.current.yaw = preset.yaw;
-      applyCameraState(camera, cameraStateRef.current);
-    };
-    const handlePointerDown = (event) => {
-      const rect = renderer.domElement.getBoundingClientRect();
-      pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-      pointer.y = -(((event.clientY - rect.top) / rect.height) * 2 - 1);
-      raycaster.setFromCamera(pointer, camera);
-      if (isAddingAssetRef.current) {
-        if (raycaster.ray.intersectPlane(floorPlane, floorHit)) {
-          onAddAssetAtRef.current?.({
-            x: floorHit.x,
-            z: floorHit.z,
-          });
-        }
-        return;
-      }
-      const hits = raycaster.intersectObjects(
-        [...assetGroupsRef.current.values()],
-        true,
-      );
-      const assetId = hits.map((hit) => findAssetId(hit.object)).find(Boolean);
-      if (assetId) {
-        onPlacementSelectRef.current(assetId);
-      }
-    };
-    const handlePointerMove = (event) => {
-      if (!isAddingAssetRef.current) {
-        placementPreview.visible = false;
-        return;
-      }
-      const rect = renderer.domElement.getBoundingClientRect();
-      pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-      pointer.y = -(((event.clientY - rect.top) / rect.height) * 2 - 1);
-      raycaster.setFromCamera(pointer, camera);
-      if (!raycaster.ray.intersectPlane(floorPlane, floorHit)) {
-        placementPreview.visible = false;
-        return;
-      }
-      placementPreview.visible = true;
-      placementPreview.position.set(
-        clampNumber(
-          floorHit.x,
-          -WORLD_SIZE.width / 2 + 3,
-          WORLD_SIZE.width / 2 - 3,
-        ),
-        WORLD_ASSET_BASE_Y,
-        clampNumber(
-          floorHit.z,
-          -WORLD_SIZE.depth / 2 + 3,
-          WORLD_SIZE.depth / 2 - 3,
-        ),
-      );
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("keyup", handleKeyUp);
-    window.addEventListener("location-world-camera-preset", handleCameraPresetEvent);
-    window.addEventListener("location-world-move", handleMoveEvent);
-    renderer.domElement.addEventListener("pointerdown", handlePointerDown);
-    renderer.domElement.addEventListener("pointermove", handlePointerMove);
-    let assetModelLoadFailed = false;
-    const worldGroundPromise = loadWorldGroundModel(
-      modelLoader,
-      scene,
-      worldSettingsRef.current,
-    )
-      .then((groundModel) => {
-        if (isDisposed) {
-          disposeObject3D(groundModel);
-          return;
-        }
-        attachWorldGroundModel(scene, groundModel, worldSettingsRef.current);
-      })
-      .catch(() => {
-        if (!isDisposed) {
-          showFallbackWorldFloor(scene);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.maxPolarAngle = Math.PI * 0.48;
+    controls.minDistance = 16;
+    controls.maxDistance = 115;
+    controls.target.set(0, 2.5, 2);
+
+    addWindFarmAtmosphere(scene);
+    addWorldLighting(scene);
+    addWindFarmGround(scene);
+
+    const selectableObjects = [];
+    const partSelectableObjects = [];
+    const rotorEntries = [];
+    const unitObjectMap = new Map();
+    const windLineEntries = addWindFlow(scene);
+    const substationPosition = getSubstationPosition(units);
+
+    units.forEach((unit) => {
+      const unitGroup =
+        unit.type === "Substation"
+          ? createSubstationUnit(unit)
+          : createTurbineUnit(unit);
+
+      scene.add(unitGroup.group);
+      unitGroup.group.traverse((object) => {
+        object.userData.unitId = unit.id;
+
+        if (object.isMesh) {
+          if (object.userData.isPartSelectable) {
+            partSelectableObjects.push(object);
+          } else {
+            selectableObjects.push(object);
+          }
         }
       });
-    const assetModelPromise = Promise.all(
-      getWorldAssetModelFiles(assetsRef.current).map(async (modelFile) => [
-        getModelFileKey(modelFile),
-        await modelLoader.loadModel(modelFile),
-      ]),
-    )
-      .then((modelEntries) => {
-        if (isDisposed) {
-          modelEntries.forEach(([, model]) => disposeObject3D(model));
-          return;
-        }
-        modelCacheRef.current = new Map(modelEntries);
-        syncAssetModels({
-          assets: assetsRef.current,
-          groups: assetGroupsRef.current,
-          modelCache: modelCacheRef.current,
-          placements: placementsRef.current,
-          scene,
-          selectedAssetId: selectedAssetIdRef.current,
+
+      if (unitGroup.rotor) {
+        rotorEntries.push({
+          rotor: unitGroup.rotor,
+          speed: Math.max(unit.rotorRpm, 4) * 0.026,
+          status: unit.status,
         });
-      })
-      .catch(() => {
-        assetModelLoadFailed = true;
-        setLoadMessage("샘플 3D 모델을 불러오지 못했습니다.");
-      });
-    Promise.all([worldGroundPromise, assetModelPromise]).then(() => {
-      if (!isDisposed && !assetModelLoadFailed) {
-        setLoadMessage(undefined);
       }
+
+      unitObjectMap.set(unit.id, unitGroup);
     });
-    const animate = (timestamp) => {
-      const deltaSeconds = Math.min(
-        (timestamp - previousTimestamp) / 1000,
-        0.06,
-      );
-      previousTimestamp = timestamp;
-      updatePersonCamera(cameraStateRef.current, keysRef.current, deltaSeconds);
-      applyCameraState(camera, cameraStateRef.current);
-      if (!isAddingAssetRef.current && placementPreview.visible) {
-        placementPreview.visible = false;
+
+    addCollectionLines(scene, units, substationPosition);
+
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    const clock = new THREE.Clock();
+    let frameId = 0;
+    let cameraFocusAnimation = null;
+    let hoveredPartKey = "";
+    let selectedPartKey = "";
+
+    const resizeRenderer = () => {
+      const { clientHeight, clientWidth } = container;
+
+      if (!clientHeight || !clientWidth) {
+        return;
       }
-      updateProjectedCards({
-        assets: assetsRef.current,
-        camera,
-        groups: assetGroupsRef.current,
-        keyRef: projectedKeyRef,
-        selectedAssetId: selectedAssetIdRef.current,
-        setProjectedCards,
-      });
-      if (!isAddingAssetRef.current) {
-        updateNearestAssetFocus({
-          assets: assetsRef.current,
-          cameraPosition: cameraStateRef.current.position,
-          groups: assetGroupsRef.current,
-          proximityFocus: proximityFocusRef.current,
-          selectedAssetId: selectedAssetIdRef.current,
-          onFocus: onProximityFocusRef.current,
-        });
-      }
-      renderer.render(scene, camera);
-      animationFrameId = window.requestAnimationFrame(animate);
+
+      renderer.setSize(clientWidth, clientHeight, false);
+      camera.aspect = clientWidth / clientHeight;
+      camera.updateProjectionMatrix();
     };
-    animationFrameId = window.requestAnimationFrame(animate);
+
+    const setCameraView = (viewId) => {
+      const preset = VIEW_CAMERA_PRESETS[viewId] ?? VIEW_CAMERA_PRESETS.overview;
+
+      cameraFocusAnimation = null;
+      camera.position.copy(preset.position);
+      controls.target.copy(preset.target);
+      controls.update();
+    };
+
+    const focusCameraOnUnit = (entry) => {
+      const worldPosition = new THREE.Vector3();
+      const unitX = entry.unit.position?.[0] ?? 0;
+      const unitZ = entry.unit.position?.[1] ?? 0;
+      const sideSign = unitX > 8 ? -1 : 1;
+      const depthSign = unitZ > 8 ? -1 : 1;
+      const isSubstation = entry.unit.type === "Substation";
+      const targetHeight = isSubstation ? 2.1 : 5.55;
+      const cameraOffset = isSubstation
+        ? new THREE.Vector3(sideSign * 11.5, 6.2, depthSign * 10.5)
+        : new THREE.Vector3(sideSign * 12.5, 7.4, depthSign * 13.5);
+
+      entry.group.getWorldPosition(worldPosition);
+      worldPosition.y += targetHeight;
+
+      cameraFocusAnimation = {
+        duration: 720,
+        fromPosition: camera.position.clone(),
+        fromTarget: controls.target.clone(),
+        startTime: performance.now(),
+        toPosition: worldPosition.clone().add(cameraOffset),
+        toTarget: worldPosition.clone(),
+      };
+    };
+
+    const focusCameraOnPart = (partEntry) => {
+      const partPosition = new THREE.Vector3();
+      const unitPosition = new THREE.Vector3();
+      const unitEntry = unitObjectMap.get(partEntry.meta.unitId);
+      const isSubstation = partEntry.meta.unitType === "Substation";
+      const viewDistance = isSubstation ? 6.4 : 5.4;
+      const viewHeight = isSubstation ? 2.65 : 2.35;
+
+      partEntry.popupGroup?.getWorldPosition(partPosition);
+      unitEntry?.group.getWorldPosition(unitPosition);
+
+      const outward = partPosition.clone().sub(unitPosition);
+      outward.y = 0;
+
+      if (outward.lengthSq() < 0.01) {
+        outward.set(isSubstation ? 1 : 0.8, 0, isSubstation ? 0.8 : 1);
+      }
+
+      outward.normalize();
+
+      const sideOffset = new THREE.Vector3(-outward.z, 0, outward.x).multiplyScalar(
+        isSubstation ? 0.9 : 0.7,
+      );
+      const target = partPosition.clone().add(new THREE.Vector3(0, 0.36, 0));
+      const position = target
+        .clone()
+        .add(outward.multiplyScalar(viewDistance))
+        .add(sideOffset)
+        .add(new THREE.Vector3(0, viewHeight, 0));
+
+      cameraFocusAnimation = {
+        duration: 680,
+        fromPosition: camera.position.clone(),
+        fromTarget: controls.target.clone(),
+        startTime: performance.now(),
+        toPosition: position,
+        toTarget: target,
+      };
+    };
+
+    const setSelectedUnit = (unitId, options = {}) => {
+      let focusedEntry = null;
+
+      unitObjectMap.forEach((entry, entryId) => {
+        const isSelected = entryId === unitId;
+
+        entry.group.scale.setScalar(isSelected ? 1.06 : 1);
+        setUnitCutaway(entry, isSelected);
+
+        if (entry.selectionRing) {
+          entry.selectionRing.visible =
+            isSelected || entry.unit.status !== "normal";
+          entry.selectionRing.material.opacity = isSelected ? 0.75 : 0.36;
+          entry.selectionRing.material.color.setHex(
+            getThreeStatusColor(entry.unit.status),
+          );
+        }
+
+        if (entry.beacon) {
+          entry.beacon.material.emissiveIntensity = isSelected ? 1.9 : 0.8;
+        }
+
+        if (isSelected) {
+          focusedEntry = entry;
+        }
+      });
+
+      if (focusedEntry && options.focus !== false) {
+        focusCameraOnUnit(focusedEntry);
+      }
+    };
+
+    const applyPartInteractionState = () => {
+      unitObjectMap.forEach((entry) => {
+        entry.parts?.forEach((partEntry) => {
+          const mode =
+            partEntry.key === selectedPartKey
+              ? "selected"
+              : partEntry.key === hoveredPartKey
+                ? "hover"
+                : "idle";
+
+          setInspectablePartState(partEntry, mode);
+        });
+      });
+    };
+
+    const setHoveredPart = (partEntry) => {
+      const nextKey = partEntry?.key ?? "";
+
+      if (hoveredPartKey === nextKey) {
+        return;
+      }
+
+      hoveredPartKey = nextKey;
+      renderer.domElement.style.cursor = nextKey ? "pointer" : "";
+      applyPartInteractionState();
+    };
+
+    const setSelectedPart = (part) => {
+      selectedPartKey = getPartKey(part);
+      applyPartInteractionState();
+    };
+
+    const findPartEntryFromHit = (hit) => {
+      let current = hit?.object;
+
+      while (current) {
+        if (
+          current.userData?.partEntry &&
+          isObjectVisibleInWorld(current)
+        ) {
+          return current.userData.partEntry;
+        }
+
+        current = current.parent;
+      }
+
+      return null;
+    };
+
+    const pickPartEntry = () => {
+      const hits = raycaster.intersectObjects(partSelectableObjects, false);
+
+      for (const hit of hits) {
+        const partEntry = findPartEntryFromHit(hit);
+
+        if (partEntry) {
+          return partEntry;
+        }
+      }
+
+      return null;
+    };
+
+    const handlePointerDown = (event) => {
+      const bounds = renderer.domElement.getBoundingClientRect();
+
+      pointer.x = ((event.clientX - bounds.left) / bounds.width) * 2 - 1;
+      pointer.y = -((event.clientY - bounds.top) / bounds.height) * 2 + 1;
+      raycaster.setFromCamera(pointer, camera);
+
+      const partEntry = pickPartEntry();
+
+      if (partEntry) {
+        setSelectedUnit(partEntry.meta.unitId, { focus: false });
+        setSelectedPart(partEntry.meta);
+        focusCameraOnPart(partEntry);
+        onPartSelectRef.current?.(partEntry.meta);
+        return;
+      }
+
+      const hit = raycaster.intersectObjects(selectableObjects, false)[0];
+      const unitId = hit?.object?.userData?.unitId;
+
+      if (unitId) {
+        setSelectedUnit(unitId);
+        onUnitSelectRef.current?.(unitId);
+      }
+    };
+
+    const handlePointerMove = (event) => {
+      const bounds = renderer.domElement.getBoundingClientRect();
+
+      pointer.x = ((event.clientX - bounds.left) / bounds.width) * 2 - 1;
+      pointer.y = -((event.clientY - bounds.top) / bounds.height) * 2 + 1;
+      raycaster.setFromCamera(pointer, camera);
+      setHoveredPart(pickPartEntry());
+    };
+
+    const handlePointerLeave = () => {
+      setHoveredPart(null);
+    };
+
+    const updateCameraFocus = () => {
+      if (!cameraFocusAnimation) {
+        return;
+      }
+
+      const elapsed = performance.now() - cameraFocusAnimation.startTime;
+      const progress = Math.min(elapsed / cameraFocusAnimation.duration, 1);
+      const easedProgress =
+        progress < 0.5
+          ? 4 * progress * progress * progress
+          : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+
+      camera.position.lerpVectors(
+        cameraFocusAnimation.fromPosition,
+        cameraFocusAnimation.toPosition,
+        easedProgress,
+      );
+      controls.target.lerpVectors(
+        cameraFocusAnimation.fromTarget,
+        cameraFocusAnimation.toTarget,
+        easedProgress,
+      );
+
+      if (progress >= 1) {
+        cameraFocusAnimation = null;
+      }
+    };
+
+    const animate = () => {
+      const delta = Math.min(clock.getDelta(), 0.05);
+
+      rotorEntries.forEach((entry) => {
+        const statusFactor = entry.status === "warning" ? 0.45 : 1;
+        entry.rotor.rotation.z += entry.speed * statusFactor * delta;
+      });
+
+      windLineEntries.forEach((entry) => {
+        entry.line.position.x += entry.speed * delta;
+
+        if (entry.line.position.x > 48) {
+          entry.line.position.x = -48;
+        }
+      });
+
+      unitObjectMap.forEach((entry) => {
+        entry.parts?.forEach((partEntry) => {
+          const popupModel = partEntry.popupGroup?.userData?.popupModel;
+
+          if (partEntry.popupGroup?.visible && popupModel) {
+            popupModel.rotation.y += delta * 0.18;
+          }
+        });
+      });
+
+      updateCameraFocus();
+      controls.update();
+      renderer.render(scene, camera);
+      frameId = requestAnimationFrame(animate);
+    };
+
+    const resizeObserver = new ResizeObserver(resizeRenderer);
+    resizeObserver.observe(container);
+    renderer.domElement.addEventListener("pointerdown", handlePointerDown);
+    renderer.domElement.addEventListener("pointerleave", handlePointerLeave);
+    renderer.domElement.addEventListener("pointermove", handlePointerMove);
+
+    resizeRenderer();
+    setCameraView(cameraViewRef.current);
+    setSelectedUnit(selectedUnitIdRef.current);
+    setSelectedPart(selectedPartRef.current);
+    animate();
+
+    sceneApiRef.current = {
+      setCameraView,
+      setSelectedPart,
+      setSelectedUnit,
+    };
+
     return () => {
-      isDisposed = true;
-      window.cancelAnimationFrame(animationFrameId);
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("keyup", handleKeyUp);
-      window.removeEventListener("location-world-camera-preset", handleCameraPresetEvent);
-      window.removeEventListener("location-world-move", handleMoveEvent);
-      renderer.domElement.removeEventListener("pointerdown", handlePointerDown);
-      renderer.domElement.removeEventListener("pointermove", handlePointerMove);
+      sceneApiRef.current = null;
+      cancelAnimationFrame(frameId);
       resizeObserver.disconnect();
-      keysRef.current.clear();
-      assetGroupsRef.current.clear();
-      modelCacheRef.current.forEach((model) => disposeObject3D(model));
-      modelCacheRef.current.clear();
-      sceneRef.current = null;
-      if (renderer.domElement.parentNode === container) {
+      renderer.domElement.removeEventListener("pointerdown", handlePointerDown);
+      renderer.domElement.removeEventListener("pointerleave", handlePointerLeave);
+      renderer.domElement.removeEventListener("pointermove", handlePointerMove);
+      controls.dispose();
+
+      scene.traverse((object) => {
+        if (object.geometry) {
+          object.geometry.dispose();
+        }
+
+        const materials = Array.isArray(object.material)
+          ? object.material
+          : [object.material];
+
+        materials.filter(Boolean).forEach((material) => {
+          if (material.map) {
+            material.map.dispose();
+          }
+
+          material.dispose();
+        });
+      });
+
+      renderer.dispose();
+
+      if (renderer.domElement.parentElement === container) {
         container.removeChild(renderer.domElement);
       }
-      disposeObject3D(scene);
-      renderer.dispose();
     };
-  }, []);
-  return (
-    <div className="LocationWorldViewerPage LocationWorldViewerPage__scene-1 absolute inset-0">
-      <div
-        ref={containerRef}
-        className="LocationWorldViewerPage LocationWorldViewerPage__canvas-host-1 h-full min-h-0 w-full"
-      />
-      <div className="LocationWorldViewerPage LocationWorldViewerPage__vignette-1 pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,transparent_0%,rgba(2,6,23,0.2)_58%,rgba(2,6,23,0.72)_100%)]" />
-      {projectedCards.map((card) => (
-        <AssetWorldStatusCard key={card.id} card={card} />
-      ))}
-      {loadMessage ? (
-        <div className="LocationWorldViewerPage LocationWorldViewerPage__loader-1 absolute left-1/2 top-1/2 z-40 -translate-x-1/2 -translate-y-1/2 rounded-md border border-white/15 bg-black/65 px-4 py-3 text-sm font-semibold text-white shadow-2xl backdrop-blur">
-          {loadMessage}
-        </div>
-      ) : null}
-      <div className="LocationWorldViewerPage LocationWorldViewerPage__location-chip-1 pointer-events-none absolute bottom-4 left-4 rounded-md border border-white/15 bg-black/45 px-3 py-2 text-[11px] font-semibold text-white/75 backdrop-blur">
-        {location.name}
-      </div>
-    </div>
-  );
-}
-function WorldPlacementPanel({
-  assets,
-  onPlacementChange,
-  onRemove,
-  onSelect,
-  placements,
-  selectedAsset,
-  selectedPlacement,
-}) {
-  if (!selectedAsset || !selectedPlacement) {
-    return (
-      <aside className="LocationWorldViewerPage LocationWorldViewerPage__panel-1 absolute right-4 top-24 z-30 flex max-h-[calc(100dvh-7rem)] w-[min(22rem,calc(100dvw-2rem))] min-w-0 flex-col gap-3 rounded-md border border-white/15 bg-black/58 p-3 text-white shadow-2xl backdrop-blur-md">
-        <div className="LocationWorldViewerPage LocationWorldViewerPage__panel-header-1 min-w-0">
-          <p className="LocationWorldViewerPage LocationWorldViewerPage__panel-eyebrow-1 text-[11px] font-semibold text-cyan-100/70">
-            월드 배치
-          </p>
-          <h2 className="LocationWorldViewerPage LocationWorldViewerPage__panel-title-1 text-sm font-semibold">
-            등록된 오브젝트 없음
-          </h2>
-        </div>
-      </aside>
-    );
-  }
-  const telemetry = getAssetTelemetry(
-    selectedAsset,
-    assets.findIndex((asset) => asset.id === selectedAsset.id),
-  );
-  const selectedStatusLabel = getWorldStatusLabel(selectedAsset.status);
-  return (
-    <aside className="LocationWorldViewerPage LocationWorldViewerPage__panel-1 absolute right-4 top-24 z-30 flex max-h-[calc(100dvh-7rem)] w-[min(22rem,calc(100dvw-2rem))] min-w-0 flex-col gap-3 rounded-md border border-white/15 bg-black/58 p-3 text-white shadow-2xl backdrop-blur-md">
-      <div className="LocationWorldViewerPage LocationWorldViewerPage__panel-header-1 flex min-w-0 items-start justify-between gap-2">
-        <div className="LocationWorldViewerPage LocationWorldViewerPage__panel-copy-1 min-w-0">
-          <p className="LocationWorldViewerPage LocationWorldViewerPage__panel-eyebrow-1 text-[11px] font-semibold text-cyan-100/70">
-            가까운 설비 자동 포커싱
-          </p>
-          <h2 className="LocationWorldViewerPage LocationWorldViewerPage__panel-title-1 truncate text-sm font-semibold">
-            {selectedAsset.name}
-          </h2>
-        </div>
-        {selectedStatusLabel ? (
-          <span
-            className={cn(
-              "LocationWorldViewerPage LocationWorldViewerPage__panel-status-1 shrink-0 rounded-sm border px-1.5 py-0.5 text-[10px] font-bold",
-              getWorldStatusPillClassName(selectedAsset.status),
-            )}
-          >
-            {selectedStatusLabel}
-          </span>
-        ) : null}
-      </div>
-      <div className="LocationWorldViewerPage LocationWorldViewerPage__panel-actions-1 grid grid-cols-1 gap-2">
-        <button
-          type="button"
-          className="LocationWorldViewerPage LocationWorldViewerPage__delete-1 inline-flex h-9 items-center justify-center gap-1 rounded-md border border-red-400/35 bg-red-500/15 px-2 text-xs font-semibold text-red-100 transition hover:bg-red-500/25"
-          onClick={() => onRemove(selectedAsset.id)}
-        >
-          <Trash2
-            className="LocationWorldViewerPage LocationWorldViewerPage__delete-icon-1 h-3.5 w-3.5"
-            aria-hidden="true"
-          />
-          제거
-        </button>
-      </div>
-      <div className="LocationWorldViewerPage LocationWorldViewerPage__field-1 grid gap-1 text-[11px] font-semibold text-white/65">
-        <span>설비 선택</span>
-        <AssetSelector
-          assets={assets}
-          selectedAssetId={selectedAsset.id}
-          onSelect={onSelect}
-        />
-      </div>
-      <div className="LocationWorldViewerPage LocationWorldViewerPage__status-box-1 grid grid-cols-3 gap-2 rounded-md border border-white/10 bg-white/[0.06] p-2">
-        <MiniMetric icon={Thermometer} label="온도" value={`${telemetry.temperature}°C`} />
-        <MiniMetric icon={Gauge} label="초음파" value={`${telemetry.ultrasound} dB`} />
-        <MiniMetric icon={Camera} label="카메라" value={telemetry.camera} />
-      </div>
-      <div className="LocationWorldViewerPage LocationWorldViewerPage__position-grid-1 grid grid-cols-2 gap-2">
-        <WorldNumberField
-          label="X"
-          max={WORLD_SIZE.width / 2 - 3}
-          min={-WORLD_SIZE.width / 2 + 3}
-          onChange={(x) => onPlacementChange(selectedAsset.id, { x })}
-          value={selectedPlacement.x}
-        />
-        <WorldNumberField
-          label="Z"
-          max={WORLD_SIZE.depth / 2 - 3}
-          min={-WORLD_SIZE.depth / 2 + 3}
-          onChange={(z) => onPlacementChange(selectedAsset.id, { z })}
-          value={selectedPlacement.z}
-        />
-      </div>
-      <div className="LocationWorldViewerPage LocationWorldViewerPage__rotation-grid-1 grid grid-cols-3 gap-2">
-        <WorldNumberField
-          label="Pitch"
-          max={180}
-          min={-180}
-          onChange={(rotationX) =>
-            onPlacementChange(selectedAsset.id, { rotationX })
-          }
-          suffix="°"
-          value={selectedPlacement.rotationX ?? DEFAULT_ASSET_ROTATION.pitch}
-        />
-        <WorldNumberField
-          label="Yaw"
-          max={180}
-          min={-180}
-          onChange={(rotationY) =>
-            onPlacementChange(selectedAsset.id, { rotationY })
-          }
-          suffix="°"
-          value={selectedPlacement.rotationY ?? DEFAULT_ASSET_ROTATION.yaw}
-        />
-        <WorldNumberField
-          label="Roll"
-          max={180}
-          min={-180}
-          onChange={(rotationZ) =>
-            onPlacementChange(selectedAsset.id, { rotationZ })
-          }
-          suffix="°"
-          value={selectedPlacement.rotationZ ?? DEFAULT_ASSET_ROTATION.roll}
-        />
-      </div>
-      <div className="LocationWorldViewerPage LocationWorldViewerPage__summary-1 rounded-md border border-white/10 bg-white/[0.05] p-2 text-[11px] text-white/70">
-        <p className="LocationWorldViewerPage LocationWorldViewerPage__summary-title-1 mb-1 font-semibold text-white">
-          현재 요약
-        </p>
-        <p className="LocationWorldViewerPage LocationWorldViewerPage__summary-line-1">
-          위치 X {round(selectedPlacement.x)} / Z {round(selectedPlacement.z)} /
-          Pitch {round(selectedPlacement.rotationX ?? DEFAULT_ASSET_ROTATION.pitch)}°
-          / Yaw {round(selectedPlacement.rotationY ?? DEFAULT_ASSET_ROTATION.yaw)}°
-          / Roll {round(selectedPlacement.rotationZ ?? DEFAULT_ASSET_ROTATION.roll)}°
-        </p>
-        <p className="LocationWorldViewerPage LocationWorldViewerPage__summary-line-2">
-          {selectedAsset.type} / {telemetry.camera} / {telemetry.temperature}°C
-          / {telemetry.ultrasound} dB
-        </p>
-      </div>
-      <div className="LocationWorldViewerPage LocationWorldViewerPage__asset-list-1 min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
-        {assets.map((asset, index) => {
-          const placement = placements[asset.id];
-          return (
-            <button
-              key={asset.id}
-              type="button"
-              className={cn(
-                "LocationWorldViewerPage LocationWorldViewerPage__asset-row-1 grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-2 rounded-md border border-white/10 bg-white/[0.05] px-2 py-2 text-left transition hover:bg-white/[0.09]",
-                asset.id === selectedAsset.id &&
-                  "border-cyan-300/45 bg-cyan-300/15",
-              )}
-              onClick={() => onSelect(asset.id)}
-            >
-              <span className="LocationWorldViewerPage LocationWorldViewerPage__asset-name-1 min-w-0 truncate text-xs font-semibold text-white">
-                {index + 1}. {asset.name}
-              </span>
-              <span className="LocationWorldViewerPage LocationWorldViewerPage__asset-position-1 shrink-0 font-mono text-[10px] text-white/55">
-                {placement
-                  ? `${round(placement.x)}, ${round(placement.z)}`
-                  : "-"}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </aside>
-  );
-}
-function AssetSelector({ assets, selectedAssetId, onSelect }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const selectedAsset = assets.find((asset) => asset.id === selectedAssetId);
+  }, [units]);
 
   return (
-    <div className="LocationWorldViewerPage LocationWorldViewerPage__asset-selector-1 relative">
-      <button
-        type="button"
-        className="LocationWorldViewerPage LocationWorldViewerPage__selector-trigger-1 w-full h-9 min-w-0 rounded-md border border-white/15 bg-white/10 px-2 text-xs font-semibold text-white outline-none text-left flex items-center justify-between hover:bg-white/[0.15] transition"
-        onClick={() => setIsOpen(!isOpen)}
-      >
-        <span className="truncate">{selectedAsset?.name || "선택하세요"}</span>
-        <span className="shrink-0 text-white/60">▼</span>
-      </button>
-      {isOpen ? (
-        <div className="LocationWorldViewerPage LocationWorldViewerPage__selector-menu-1 absolute top-full left-0 right-0 z-50 mt-1 rounded-md border border-white/15 bg-black/85 shadow-2xl backdrop-blur-md overflow-y-auto max-h-56">
-          {assets.map((asset) => (
-            <button
-              key={asset.id}
-              type="button"
-              className={cn(
-                "LocationWorldViewerPage LocationWorldViewerPage__selector-option-1 w-full px-2 py-2 text-xs font-semibold text-left transition hover:bg-white/[0.1]",
-                asset.id === selectedAssetId && "bg-cyan-300/20 text-cyan-50",
-              )}
-              onClick={() => {
-                onSelect(asset.id);
-                setIsOpen(false);
-              }}
-            >
-              {asset.name}
-            </button>
-          ))}
+    <div
+      ref={containerRef}
+      className="LocationWorldViewerPage LocationWorldViewerPage__stage-1 h-full min-h-[560px] w-full"
+    />
+  );
+}
+
+function TwinMetric({ detail, icon: Icon, label, value }) {
+  return (
+    <div className="LocationWorldViewerPage LocationWorldViewerPage__metric-1 min-w-0 bg-slate-900 px-4 py-3">
+      <div className="LocationWorldViewerPage LocationWorldViewerPage__metric-row-1 flex min-w-0 items-center gap-3">
+        <span className="LocationWorldViewerPage LocationWorldViewerPage__metric-icon-shell-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-cyan-200/15 bg-cyan-200/10 text-cyan-100">
+          <Icon
+            className="LocationWorldViewerPage LocationWorldViewerPage__metric-icon-1 h-4 w-4"
+            aria-hidden="true"
+          />
+        </span>
+        <div className="LocationWorldViewerPage LocationWorldViewerPage__metric-copy-1 min-w-0">
+          <p className="LocationWorldViewerPage LocationWorldViewerPage__metric-label-1 truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+            {label}
+          </p>
+          <p className="LocationWorldViewerPage LocationWorldViewerPage__metric-value-1 truncate text-lg font-semibold text-white">
+            {value}
+          </p>
         </div>
+      </div>
+      <p className="LocationWorldViewerPage LocationWorldViewerPage__metric-detail-1 mt-2 truncate text-xs text-slate-400">
+        {detail}
+      </p>
+    </div>
+  );
+}
+
+function HudPill({ icon: Icon, label, value }) {
+  return (
+    <div className="LocationWorldViewerPage LocationWorldViewerPage__hud-pill-1 rounded-md border border-white/10 bg-slate-950/70 px-3 py-2 shadow-lg shadow-slate-950/30 backdrop-blur">
+      <div className="LocationWorldViewerPage LocationWorldViewerPage__hud-pill-row-1 flex min-w-0 items-center gap-2">
+        <Icon
+          className="LocationWorldViewerPage LocationWorldViewerPage__hud-pill-icon-1 h-3.5 w-3.5 shrink-0 text-cyan-200"
+          aria-hidden="true"
+        />
+        <p className="LocationWorldViewerPage LocationWorldViewerPage__hud-pill-label-1 truncate text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+          {label}
+        </p>
+      </div>
+      <p className="LocationWorldViewerPage LocationWorldViewerPage__hud-pill-value-1 mt-1 truncate text-sm font-semibold text-white">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function SelectedUnitSummary({ unit }) {
+  return (
+    <div className="LocationWorldViewerPage LocationWorldViewerPage__selected-1 min-w-0">
+      <div className="LocationWorldViewerPage LocationWorldViewerPage__selected-head-1 flex min-w-0 items-start justify-between gap-3">
+        <div className="LocationWorldViewerPage LocationWorldViewerPage__selected-title-group-1 min-w-0">
+          <p className="LocationWorldViewerPage LocationWorldViewerPage__selected-type-1 truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-200/80">
+            {unit.type}
+          </p>
+          <h2 className="LocationWorldViewerPage LocationWorldViewerPage__selected-title-1 truncate text-base font-semibold text-white">
+            {unit.name}
+          </h2>
+        </div>
+        <StatusBadge status={unit.status} />
+      </div>
+      <div className="LocationWorldViewerPage LocationWorldViewerPage__selected-grid-1 mt-3 grid gap-2 sm:grid-cols-4">
+        <TelemetryCell label="Output" value={`${formatNumber(unit.outputMw, 1)} MW`} />
+        <TelemetryCell label="Wind" value={`${formatNumber(unit.windSpeed, 1)} m/s`} />
+        <TelemetryCell label="Rotor" value={`${formatNumber(unit.rotorRpm, 1)} rpm`} />
+        <TelemetryCell label="Health" value={`${unit.health}%`} />
+      </div>
+      {unit.href ? (
+        <Link
+          href={unit.href}
+          className="LocationWorldViewerPage LocationWorldViewerPage__selected-link-1 mt-3 inline-flex h-8 items-center justify-center rounded-md border border-cyan-200/25 bg-cyan-200/10 px-3 text-xs font-semibold text-cyan-100 transition hover:bg-cyan-200/20"
+        >
+          Asset detail
+        </Link>
       ) : null}
     </div>
   );
 }
-function WorldMovementPad() {
+
+function SelectedPartAnalysis({ onClose, part }) {
   return (
-    <div className="LocationWorldViewerPage LocationWorldViewerPage__movement-1 absolute bottom-4 left-1/2 z-30 grid -translate-x-1/2 grid-cols-3 gap-1.5 rounded-md border border-white/15 bg-black/55 p-2 shadow-2xl backdrop-blur-md">
-      <span />
-      <MoveButton action="forward" icon={ArrowUp} label="앞" />
-      <span />
-      <MoveButton action="left" icon={ArrowLeft} label="왼쪽" />
-      <MoveButton action="back" icon={ArrowDown} label="뒤" />
-      <MoveButton action="right" icon={ArrowRight} label="오른쪽" />
-      <MoveButton action="turnLeft" label="좌회전" />
-      <div className="LocationWorldViewerPage LocationWorldViewerPage__eye-1 grid h-9 min-w-14 place-items-center rounded-md border border-cyan-300/25 bg-cyan-300/10 text-[10px] font-semibold text-cyan-100">
-        <Move3D
-          className="LocationWorldViewerPage LocationWorldViewerPage__eye-icon-1 h-3.5 w-3.5"
-          aria-hidden="true"
-        />
+    <div className="LocationWorldViewerPage LocationWorldViewerPage__part-analysis-1 min-w-0">
+      <div className="LocationWorldViewerPage LocationWorldViewerPage__part-head-1 flex min-w-0 items-start justify-between gap-3">
+        <div className="LocationWorldViewerPage LocationWorldViewerPage__part-title-group-1 min-w-0">
+          <p className="LocationWorldViewerPage LocationWorldViewerPage__part-type-1 truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-200/80">
+            {part.unitName} / {part.category}
+          </p>
+          <h2 className="LocationWorldViewerPage LocationWorldViewerPage__part-title-1 truncate text-base font-semibold text-white">
+            {part.name}
+          </h2>
+        </div>
+        <div className="LocationWorldViewerPage LocationWorldViewerPage__part-actions-1 flex shrink-0 items-center gap-2">
+          <StatusBadge status={part.status} />
+          <button
+            type="button"
+            className="LocationWorldViewerPage LocationWorldViewerPage__part-close-1 inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/5 text-slate-300 transition hover:bg-white/10 hover:text-white"
+            title="Close component analysis"
+            onClick={onClose}
+          >
+            <X
+              className="LocationWorldViewerPage LocationWorldViewerPage__part-close-icon-1 h-3.5 w-3.5"
+              aria-hidden="true"
+            />
+            <span className="sr-only">Close component analysis</span>
+          </button>
+        </div>
       </div>
-      <MoveButton action="turnRight" label="우회전" />
+
+      <div className="LocationWorldViewerPage LocationWorldViewerPage__part-grid-1 mt-3 grid gap-2 sm:grid-cols-4">
+        {part.metrics.map((metric) => (
+          <TelemetryCell
+            key={metric.label}
+            label={metric.label}
+            value={metric.value}
+          />
+        ))}
+      </div>
+
+      <div className="LocationWorldViewerPage LocationWorldViewerPage__part-analysis-body-1 mt-3 grid gap-2 sm:grid-cols-2">
+        <div className="LocationWorldViewerPage LocationWorldViewerPage__part-finding-1 rounded-md border border-white/10 bg-white/[0.04] p-3">
+          <p className="LocationWorldViewerPage LocationWorldViewerPage__part-finding-label-1 truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+            Condition
+          </p>
+          <p className="LocationWorldViewerPage LocationWorldViewerPage__part-finding-text-1 mt-1 text-xs leading-5 text-slate-200">
+            {part.finding}
+          </p>
+        </div>
+        <div className="LocationWorldViewerPage LocationWorldViewerPage__part-recommendation-1 rounded-md border border-cyan-200/15 bg-cyan-200/10 p-3">
+          <p className="LocationWorldViewerPage LocationWorldViewerPage__part-recommendation-label-1 truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-cyan-100/80">
+            Action
+          </p>
+          <p className="LocationWorldViewerPage LocationWorldViewerPage__part-recommendation-text-1 mt-1 text-xs leading-5 text-cyan-50">
+            {part.recommendation}
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
-function MoveButton({ action, icon: Icon, label }) {
-  const handlePress = () => {
-    window.dispatchEvent(
-      new CustomEvent("location-world-move", {
-        detail: { action, active: true },
-      }),
-    );
-  };
-  const handleRelease = () => {
-    window.dispatchEvent(
-      new CustomEvent("location-world-move", {
-        detail: { action, active: false },
-      }),
-    );
-  };
+
+function TelemetryCell({ label, value }) {
+  return (
+    <div className="LocationWorldViewerPage LocationWorldViewerPage__telemetry-cell-1 min-w-0 rounded-md border border-white/10 bg-white/[0.04] px-2 py-2">
+      <p className="LocationWorldViewerPage LocationWorldViewerPage__telemetry-label-1 truncate text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">
+        {label}
+      </p>
+      <p className="LocationWorldViewerPage LocationWorldViewerPage__telemetry-value-1 mt-1 truncate text-sm font-semibold text-white">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function UnitListItem({ isSelected, onSelect, unit }) {
   return (
     <button
       type="button"
-      className="LocationWorldViewerPage LocationWorldViewerPage__move-button-1 inline-flex h-9 min-w-14 items-center justify-center gap-1 rounded-md border border-white/15 bg-white/[0.08] px-2 text-[11px] font-semibold text-white/80 transition hover:bg-white/[0.15] hover:text-white"
-      onPointerDown={handlePress}
-      onPointerLeave={handleRelease}
-      onPointerUp={handleRelease}
+      className={cn(
+        "LocationWorldViewerPage LocationWorldViewerPage__unit-button-1 grid min-w-0 gap-2 rounded-md border border-white/10 bg-white/[0.03] p-3 text-left transition hover:border-cyan-200/35 hover:bg-white/[0.06]",
+        isSelected && "border-cyan-200/60 bg-cyan-200/10 shadow-lg shadow-cyan-950/20",
+      )}
+      onClick={onSelect}
     >
-      {Icon ? (
-        <Icon
-          className="LocationWorldViewerPage LocationWorldViewerPage__move-icon-1 h-3.5 w-3.5"
-          aria-hidden="true"
-        />
-      ) : null}
-      {label}
+      <div className="LocationWorldViewerPage LocationWorldViewerPage__unit-head-1 flex min-w-0 items-start justify-between gap-2">
+        <div className="LocationWorldViewerPage LocationWorldViewerPage__unit-copy-1 min-w-0">
+          <p className="LocationWorldViewerPage LocationWorldViewerPage__unit-type-1 truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+            {unit.type}
+          </p>
+          <p className="LocationWorldViewerPage LocationWorldViewerPage__unit-name-1 truncate text-sm font-semibold text-white">
+            {unit.name}
+          </p>
+        </div>
+        <StatusBadge status={unit.status} />
+      </div>
+      <div className="LocationWorldViewerPage LocationWorldViewerPage__unit-telemetry-1 grid grid-cols-3 gap-2">
+        <TelemetryCell label="MW" value={formatNumber(unit.outputMw, 1)} />
+        <TelemetryCell label="m/s" value={formatNumber(unit.windSpeed, 1)} />
+        <TelemetryCell label="Health" value={`${unit.health}%`} />
+      </div>
     </button>
   );
 }
-function RegisteredAssetAddPicker({ assets, onSelect, selectedAssetId }) {
+
+function StatusBadge({ status }) {
+  const theme = STATUS_THEME[normalizeOperationalStatus(status)];
+
   return (
-    <div className="LocationWorldViewerPage LocationWorldViewerPage__registered-picker-1 grid gap-2 rounded-md border border-white/10 bg-white/[0.05] p-2">
-      <div className="LocationWorldViewerPage LocationWorldViewerPage__registered-picker-head-1 min-w-0">
-        <p className="LocationWorldViewerPage LocationWorldViewerPage__registered-picker-eyebrow-1 text-[10px] font-semibold text-cyan-100/70">
-          등록 설비 목록
-        </p>
-        <p className="LocationWorldViewerPage LocationWorldViewerPage__registered-picker-title-1 truncate text-xs font-semibold text-white">
-          배치할 설비를 선택하세요
-        </p>
-      </div>
-      <div className="LocationWorldViewerPage LocationWorldViewerPage__registered-picker-list-1 grid gap-1">
-        {assets.map((asset) => {
-          const statusName = getWorldStatusLabel(asset.status);
-          return (
-            <button
-              key={asset.id}
-              type="button"
-              className={cn(
-                "LocationWorldViewerPage LocationWorldViewerPage__registered-picker-item-1 grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-md border px-2 py-2 text-left transition",
-                asset.id === selectedAssetId
-                  ? "border-cyan-300/55 bg-cyan-300/18 text-white"
-                  : "border-white/10 bg-black/20 text-white/78 hover:bg-white/[0.09] hover:text-white",
-              )}
-              onClick={() => onSelect(asset.id)}
-            >
-              <span className="LocationWorldViewerPage LocationWorldViewerPage__registered-picker-copy-1 min-w-0">
-                <span className="LocationWorldViewerPage LocationWorldViewerPage__registered-picker-name-1 block truncate text-xs font-semibold">
-                  {asset.name}
-                </span>
-                <span className="LocationWorldViewerPage LocationWorldViewerPage__registered-picker-type-1 block truncate text-[10px] font-semibold text-white/50">
-                  {asset.type}
-                </span>
-              </span>
-              {statusName ? (
-                <span
-                  className={cn(
-                    "LocationWorldViewerPage LocationWorldViewerPage__registered-picker-status-1 shrink-0 rounded-sm border px-1.5 py-0.5 text-[9px] font-bold",
-                    getWorldStatusPillClassName(asset.status),
-                  )}
-                >
-                  {statusName}
-                </span>
-              ) : null}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-function AssetWorldStatusCard({ card }) {
-  const telemetry = getAssetTelemetry(card.asset, card.index);
-  const statusName = getWorldStatusLabel(card.asset.status);
-  return (
-    <div
+    <span
       className={cn(
-        "LocationWorldViewerPage LocationWorldViewerPage__status-card-1 pointer-events-none absolute z-20 w-[11.5rem] -translate-x-1/2 -translate-y-full rounded-md border p-2 text-white shadow-2xl backdrop-blur-md transition",
-        getWorldStatusCardClassName(card.asset.status, card.selected),
+        "LocationWorldViewerPage LocationWorldViewerPage__status-1 inline-flex h-6 shrink-0 items-center gap-1.5 rounded-md border px-2 text-[11px] font-semibold shadow-sm",
+        theme.className,
       )}
-      style={{
-        left: `${card.left}%`,
-        top: `${card.top}%`,
-        opacity: card.opacity,
-      }}
     >
-      <div className="LocationWorldViewerPage LocationWorldViewerPage__status-title-row-1 mb-1 flex min-w-0 items-center justify-between gap-2">
-        <p className="LocationWorldViewerPage LocationWorldViewerPage__status-title-1 min-w-0 truncate text-xs font-semibold">
-          {card.asset.name}
-        </p>
-        {statusName ? (
-          <span
-            className={cn(
-              "LocationWorldViewerPage LocationWorldViewerPage__status-pill-1 shrink-0 rounded-sm border px-1 py-0.5 text-[9px] font-bold",
-              getWorldStatusPillClassName(card.asset.status),
-            )}
-          >
-            {statusName}
-          </span>
-        ) : null}
-      </div>
-      <div className="LocationWorldViewerPage LocationWorldViewerPage__status-grid-1 grid grid-cols-3 gap-1">
-        <StatusCell label="온도" value={`${telemetry.temperature}°`} />
-        <StatusCell label="초음파" value={`${telemetry.ultrasound}`} />
-        <StatusCell label="CAM" value={telemetry.camera} />
-      </div>
-    </div>
-  );
-}
-function MiniMetric({ icon: Icon, label, value }) {
-  return (
-    <div className="LocationWorldViewerPage LocationWorldViewerPage__mini-1 min-w-0 rounded-sm border border-white/10 bg-black/25 px-2 py-1.5">
-      <div className="LocationWorldViewerPage LocationWorldViewerPage__mini-label-1 mb-1 flex min-w-0 items-center gap-1 text-[10px] font-semibold text-white/55">
-        <Icon
-          className="LocationWorldViewerPage LocationWorldViewerPage__mini-icon-1 h-3 w-3 shrink-0"
-          aria-hidden="true"
-        />
-        <span className="truncate">{label}</span>
-      </div>
-      <p className="LocationWorldViewerPage LocationWorldViewerPage__mini-value-1 truncate font-mono text-xs font-semibold text-white">
-        {value}
-      </p>
-    </div>
-  );
-}
-function StatusCell({ label, value }) {
-  return (
-    <div className="LocationWorldViewerPage LocationWorldViewerPage__status-cell-1 min-w-0 rounded-sm border border-white/10 bg-white/[0.07] px-1.5 py-1">
-      <p className="LocationWorldViewerPage LocationWorldViewerPage__status-label-1 truncate text-[9px] font-semibold text-cyan-100/65">
-        {label}
-      </p>
-      <p className="LocationWorldViewerPage LocationWorldViewerPage__status-value-1 truncate font-mono text-[11px] font-semibold">
-        {value}
-      </p>
-    </div>
-  );
-}
-function getWorldStatusSeverity(status) {
-  if (status === "danger" || status === "error") {
-    return 2;
-  }
-  if (status === "caution" || status === "warning") {
-    return 1;
-  }
-  return 0;
-}
-function getWorldStatusLabel(status) {
-  return statusLabel[status] ?? "";
-}
-function getWorldStatusPillClassName(status) {
-  return getWorldStatusSeverity(status) >= 2
-    ? "border-red-200/60 bg-red-500/25 text-red-50"
-    : "border-yellow-200/70 bg-yellow-300/25 text-yellow-50";
-}
-function getWorldStatusCardClassName(status, selected) {
-  const severity = getWorldStatusSeverity(status);
-  if (severity >= 2) {
-    return "border-red-300/80 bg-red-950/75 shadow-red-500/30";
-  }
-  if (severity === 1) {
-    return "border-yellow-200/90 bg-yellow-950/70 shadow-yellow-300/30";
-  }
-  return selected
-    ? "border-lime-200/70 bg-lime-950/55"
-    : "border-cyan-200/30 bg-black/62";
-}
-function WorldNumberField({ label, max, min, onChange, suffix = "", value }) {
-  return (
-    <label className="LocationWorldViewerPage LocationWorldViewerPage__number-field-1 grid gap-1 text-[11px] font-semibold text-white/65">
-      {label}
-      <span className="LocationWorldViewerPage LocationWorldViewerPage__number-wrap-1 flex h-9 min-w-0 items-center gap-1 rounded-md border border-white/15 bg-white/10 px-2">
-        <input
-          className="LocationWorldViewerPage LocationWorldViewerPage__number-input-1 min-w-0 flex-1 bg-transparent font-mono text-xs font-semibold text-white outline-none"
-          max={max}
-          min={min}
-          type="number"
-          value={round(value)}
-          onChange={(event) =>
-            onChange(clampNumber(Number(event.target.value), min, max))
-          }
-        />
-        {suffix ? (
-          <span className="LocationWorldViewerPage LocationWorldViewerPage__number-suffix-1 shrink-0 text-[10px] text-white/55">
-            {suffix}
-          </span>
-        ) : null}
-      </span>
-    </label>
-  );
-}
-function WorldSettingsPanel({
-  activeCameraPresetId,
-  onCameraPresetSelect,
-  onChange,
-  onClose,
-  settings,
-}) {
-  return (
-    <aside className="LocationWorldViewerPage LocationWorldViewerPage__settings-panel-1 absolute right-4 top-24 z-30 grid max-h-[calc(100dvh-7rem)] w-[min(20rem,calc(100dvw-2rem))] gap-3 overflow-y-auto rounded-md border border-white/15 bg-black/58 p-3 text-white shadow-2xl backdrop-blur-md">
-      <div className="LocationWorldViewerPage LocationWorldViewerPage__settings-header-1 flex min-w-0 items-center justify-between gap-2">
-        <div className="LocationWorldViewerPage LocationWorldViewerPage__settings-title-wrap-1 flex min-w-0 items-center gap-1.5">
-          <SlidersHorizontal
-            className="LocationWorldViewerPage LocationWorldViewerPage__settings-icon-1 h-3.5 w-3.5 shrink-0 text-cyan-100/75"
-            aria-hidden="true"
-          />
-          <h2 className="LocationWorldViewerPage LocationWorldViewerPage__settings-title-1 truncate text-sm font-semibold">
-            월드 환경
-          </h2>
-        </div>
-        <button
-          type="button"
-          className="LocationWorldViewerPage LocationWorldViewerPage__settings-close-1 grid h-7 w-7 shrink-0 place-items-center rounded-md border border-white/15 bg-white/[0.08] text-white/70 transition hover:bg-white/[0.15] hover:text-white"
-          onClick={onClose}
-          title="닫기"
-          aria-label="닫기"
-        >
-          <X
-            className="LocationWorldViewerPage LocationWorldViewerPage__settings-close-icon-1 h-3.5 w-3.5"
-            aria-hidden="true"
-          />
-        </button>
-      </div>
-      <WorldCameraViewSection
-        activePresetId={activeCameraPresetId}
-        onPresetSelect={onCameraPresetSelect}
+      <span
+        className={cn(
+          "LocationWorldViewerPage LocationWorldViewerPage__status-dot-1 h-1.5 w-1.5 rounded-full",
+          theme.dotClassName,
+        )}
       />
-      <WorldEnvironmentSection settings={settings} onChange={onChange} />
-    </aside>
+      {theme.label}
+    </span>
   );
 }
-function WorldCameraViewSection({ activePresetId, onPresetSelect }) {
-  return (
-    <section className="LocationWorldViewerPage LocationWorldViewerPage__camera-views-1 grid gap-2 border-t border-white/10 pt-3">
-      <h3 className="LocationWorldViewerPage LocationWorldViewerPage__camera-views-title-1 truncate text-xs font-semibold text-white">
-        카메라 시점
-      </h3>
-      <div className="LocationWorldViewerPage LocationWorldViewerPage__camera-views-grid-1 grid grid-cols-2 gap-1.5">
-        {CAMERA_VIEW_PRESETS.map((preset) => (
-          <button
-            key={preset.id}
-            type="button"
-            className={cn(
-              "LocationWorldViewerPage LocationWorldViewerPage__camera-view-1 h-8 rounded-md border px-2 text-[11px] font-semibold transition",
-              activePresetId === preset.id
-                ? "border-cyan-300/55 bg-cyan-300 text-slate-950"
-                : "border-white/15 bg-white/[0.08] text-white/80 hover:bg-white/[0.15] hover:text-white",
-            )}
-            onClick={() => onPresetSelect(preset.id)}
-            aria-pressed={activePresetId === preset.id}
-          >
-            {preset.label}
-          </button>
-        ))}
-      </div>
-    </section>
-  );
-}
-function WorldAssetRegistrationPanel({
-  isAddingAsset,
-  onAddCancel,
-  onAddStart,
-  onClose,
-  onPendingAddAssetChange,
-  pendingAddAssetId,
-  registeredAssetSamples,
-}) {
-  return (
-    <aside className="LocationWorldViewerPage LocationWorldViewerPage__asset-registration-panel-1 absolute right-4 top-24 z-30 grid max-h-[calc(100dvh-7rem)] w-[min(20rem,calc(100dvw-2rem))] gap-3 overflow-y-auto rounded-md border border-white/15 bg-black/58 p-3 text-white shadow-2xl backdrop-blur-md">
-      <div className="LocationWorldViewerPage LocationWorldViewerPage__asset-registration-header-1 flex min-w-0 items-center justify-between gap-2">
-        <div className="LocationWorldViewerPage LocationWorldViewerPage__asset-registration-title-wrap-1 flex min-w-0 items-center gap-1.5">
-          <Plus
-            className="LocationWorldViewerPage LocationWorldViewerPage__asset-registration-icon-1 h-3.5 w-3.5 shrink-0 text-cyan-100/75"
-            aria-hidden="true"
-          />
-          <h2 className="LocationWorldViewerPage LocationWorldViewerPage__asset-registration-title-1 truncate text-sm font-semibold">
-            설비 등록
-          </h2>
-        </div>
-        <button
-          type="button"
-          className="LocationWorldViewerPage LocationWorldViewerPage__asset-registration-close-1 grid h-7 w-7 shrink-0 place-items-center rounded-md border border-white/15 bg-white/[0.08] text-white/70 transition hover:bg-white/[0.15] hover:text-white"
-          onClick={onClose}
-          title="닫기"
-          aria-label="닫기"
-        >
-          <X
-            className="LocationWorldViewerPage LocationWorldViewerPage__asset-registration-close-icon-1 h-3.5 w-3.5"
-            aria-hidden="true"
-          />
-        </button>
-      </div>
-      <WorldAssetAddSection
-        isAddingAsset={isAddingAsset}
-        pendingAddAssetId={pendingAddAssetId}
-        registeredAssetSamples={registeredAssetSamples}
-        onAddCancel={onAddCancel}
-        onAddStart={onAddStart}
-        onPendingAddAssetChange={onPendingAddAssetChange}
-      />
-    </aside>
-  );
-}
-function WorldAssetAddSection({
-  isAddingAsset,
-  onAddCancel,
-  onAddStart,
-  onPendingAddAssetChange,
-  pendingAddAssetId,
-  registeredAssetSamples,
-}) {
-  return (
-    <section className="LocationWorldViewerPage LocationWorldViewerPage__asset-add-section-1 grid gap-2 border-t border-white/10 pt-3">
-      <div className="LocationWorldViewerPage LocationWorldViewerPage__asset-add-header-1 flex min-w-0 items-center justify-between gap-2">
-        <h3 className="LocationWorldViewerPage LocationWorldViewerPage__asset-add-title-1 truncate text-xs font-semibold text-white">
-          등록 설비
-        </h3>
-        <button
-          type="button"
-          className={cn(
-            "LocationWorldViewerPage LocationWorldViewerPage__asset-add-toggle-1 grid h-8 w-8 shrink-0 place-items-center rounded-md border transition",
-            isAddingAsset
-              ? "border-cyan-300/55 bg-cyan-300 text-slate-950"
-              : "border-white/15 bg-white/[0.08] text-white/80 hover:bg-white/[0.15] hover:text-white",
-          )}
-          onClick={isAddingAsset ? onAddCancel : onAddStart}
-          title={isAddingAsset ? "배치 모드 취소" : "배치 모드 시작"}
-          aria-label={isAddingAsset ? "배치 모드 취소" : "배치 모드 시작"}
-        >
-          {isAddingAsset ? (
-            <X className="LocationWorldViewerPage LocationWorldViewerPage__asset-add-icon-1 h-3.5 w-3.5" aria-hidden="true" />
-          ) : (
-            <Plus className="LocationWorldViewerPage LocationWorldViewerPage__asset-add-icon-1 h-3.5 w-3.5" aria-hidden="true" />
-          )}
-        </button>
-      </div>
-      <RegisteredAssetAddPicker
-        assets={registeredAssetSamples}
-        selectedAssetId={pendingAddAssetId}
-        onSelect={onPendingAddAssetChange}
-      />
-      <p className="LocationWorldViewerPage LocationWorldViewerPage__asset-add-help-1 rounded-md border border-cyan-300/25 bg-cyan-300/10 px-2 py-1.5 text-[11px] font-semibold text-cyan-50/85">
-        {isAddingAsset
-          ? "목록에서 설비를 선택한 뒤 바닥 위치를 클릭하면 해당 설비가 배치됩니다."
-          : "배치할 설비를 선택하고 + 버튼을 눌러 배치 모드를 시작하세요."}
-      </p>
-    </section>
-  );
-}
-function WorldEnvironmentSection({ onChange, settings }) {
-  return (
-    <section className="LocationWorldViewerPage LocationWorldViewerPage__environment-1 grid gap-2">
-      <div className="LocationWorldViewerPage LocationWorldViewerPage__environment-colors-1 grid grid-cols-3 gap-2">
-        <WorldColorField
-          label="배경"
-          value={settings.backgroundColor}
-          onChange={(backgroundColor) => onChange({ backgroundColor })}
-        />
-        <WorldColorField
-          label="바닥"
-          value={settings.floorColor}
-          onChange={(floorColor) => onChange({ floorColor })}
-        />
-        <WorldColorField
-          label="강조"
-          value={settings.accentColor}
-          onChange={(accentColor) => onChange({ accentColor })}
-        />
-      </div>
-      <WorldRangeField
-        label="그리드"
-        max={0.65}
-        min={0.05}
-        step={0.01}
-        value={settings.gridOpacity}
-        onChange={(gridOpacity) => onChange({ gridOpacity })}
-      />
-      <WorldRangeField
-        label="조명"
-        max={1.4}
-        min={0.45}
-        step={0.05}
-        value={settings.lightLevel}
-        onChange={(lightLevel) => onChange({ lightLevel })}
-      />
-      <WorldRangeField
-        label="안개 거리"
-        max={140}
-        min={44}
-        step={1}
-        value={settings.fogDistance}
-        onChange={(fogDistance) => onChange({ fogDistance })}
-      />
-    </section>
-  );
-}
-function WorldColorField({ label, onChange, value }) {
-  return (
-    <label className="LocationWorldViewerPage LocationWorldViewerPage__color-field-1 grid gap-1 text-[10px] font-semibold text-white/60">
-      {label}
-      <input
-        className="LocationWorldViewerPage LocationWorldViewerPage__color-input-1 h-8 w-full min-w-0 rounded-md border border-white/15 bg-white/10 p-1 outline-none"
-        type="color"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    </label>
-  );
-}
-function WorldRangeField({ label, max, min, onChange, step, value }) {
-  return (
-    <label className="LocationWorldViewerPage LocationWorldViewerPage__range-field-1 grid gap-1 text-[10px] font-semibold text-white/60">
-      <span className="LocationWorldViewerPage LocationWorldViewerPage__range-label-1 flex items-center justify-between gap-2">
-        <span>{label}</span>
-        <span className="font-mono text-white/75">{round(value)}</span>
-      </span>
-      <input
-        className="LocationWorldViewerPage LocationWorldViewerPage__range-input-1 h-2 accent-cyan-300"
-        max={max}
-        min={min}
-        step={step}
-        type="range"
-        value={value}
-        onChange={(event) =>
-          onChange(clampNumber(Number(event.target.value), min, max))
-        }
-      />
-    </label>
-  );
-}
-function createWorldEnvironment(scene, settings) {
-  const floorMaterial = new THREE.MeshStandardMaterial({
-    color: settings.floorColor,
-    metalness: 0.04,
-    roughness: 0.88,
-    transparent: true,
-    opacity: 0.92,
+
+function buildWindFarmUnits(assets) {
+  const assetItems = Array.isArray(assets) ? assets : [];
+  const baseUnits = SAMPLE_WIND_FARM_UNITS.map((unit, index) => {
+    const asset = assetItems[index];
+    const status = normalizeOperationalStatus(asset?.status ?? unit.status);
+
+    return {
+      ...unit,
+      assetId: asset?.id ?? unit.id,
+      href: asset?.href,
+      name: asset?.name || unit.name,
+      status,
+      type: unit.type,
+      health: deriveHealth(unit.health, status),
+      outputMw: deriveOutput(unit.outputMw, status),
+    };
   });
-  const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(WORLD_SIZE.width, WORLD_SIZE.depth),
-    floorMaterial,
-  );
-  floor.name = "world-fallback-floor";
-  floor.rotation.x = -Math.PI / 2;
-  floor.position.y = WORLD_GROUND_Y;
-  floor.receiveShadow = true;
-  floor.visible = false;
-  scene.add(floor);
-  const grid = new THREE.GridHelper(WORLD_SIZE.width, 36, "#38bdf8", "#334155");
-  grid.name = "world-grid";
-  grid.position.y = WORLD_ASSET_BASE_Y * 0.5;
-  setGridMaterialOpacity(grid, settings.gridOpacity);
-  scene.add(grid);
-  const ambient = new THREE.AmbientLight("#ffffff", 1.15 * settings.lightLevel);
-  scene.add(ambient);
-  const hemisphere = new THREE.HemisphereLight(
-    "#c7d2fe",
-    "#0f172a",
-    1.45 * settings.lightLevel,
-  );
-  scene.add(hemisphere);
-  const keyLight = new THREE.DirectionalLight(
-    "#ffffff",
-    2.2 * settings.lightLevel,
-  );
-  keyLight.position.set(-16, 24, 18);
-  keyLight.castShadow = true;
-  keyLight.shadow.mapSize.set(2048, 2048);
-  keyLight.shadow.camera.left = -48;
-  keyLight.shadow.camera.right = 48;
-  keyLight.shadow.camera.top = 36;
-  keyLight.shadow.camera.bottom = -36;
-  scene.add(keyLight);
-  const lamps = [];
-  const fixtures = [];
-  [
-    [-22, 8, -15],
-    [0, 8, -15],
-    [22, 8, -15],
-    [-22, 8, 12],
-    [0, 8, 12],
-    [22, 8, 12],
-  ].forEach(([x, y, z]) => {
-    const lamp = new THREE.PointLight(
-      settings.accentColor,
-      1.6 * settings.lightLevel,
-      26,
-    );
-    lamp.position.set(x, y, z);
-    scene.add(lamp);
-    lamps.push(lamp);
-    const fixture = new THREE.Mesh(
-      new THREE.BoxGeometry(5.2, 0.16, 0.36),
-      new THREE.MeshStandardMaterial({
-        color: "#cffafe",
-        emissive: settings.accentColor,
-        emissiveIntensity: 0.75,
-      }),
-    );
-    fixture.position.set(x, y + 0.18, z);
-    scene.add(fixture);
-    fixtures.push(fixture);
-  });
-  scene.userData.worldEnvironment = {
-    ambient,
-    floor,
-    grid,
-    groundModel: null,
-    hemisphere,
-    keyLight,
-    fixtures,
-    lamps,
+
+  const extraUnits = assetItems
+    .slice(SAMPLE_WIND_FARM_UNITS.length)
+    .map((asset, index) => createAssetBackedTurbine(asset, index));
+
+  return [...baseUnits, ...extraUnits];
+}
+
+function createAssetBackedTurbine(asset, index) {
+  const status = normalizeOperationalStatus(asset?.status);
+  const column = index % 5;
+  const row = Math.floor(index / 5);
+  const capacityMw = 4.2;
+  const outputBase = 2.8 + column * 0.22;
+
+  return {
+    id: asset?.id || `asset-wtg-${index + 1}`,
+    assetId: asset?.id || `asset-wtg-${index + 1}`,
+    href: asset?.href,
+    name: asset?.name || `WTG-${index + SAMPLE_WIND_FARM_UNITS.length + 1}`,
+    type: "Turbine",
+    status,
+    capacityMw,
+    outputMw: deriveOutput(outputBase, status),
+    windSpeed: 9.8 + column * 0.3,
+    rotorRpm: 10.5 + column * 0.7,
+    bearing: 18 + column * 4,
+    health: deriveHealth(91 - row * 3, status),
+    position: [-36 + column * 18, 30 + row * 11],
   };
 }
-async function loadWorldGroundModel(modelLoader) {
-  return modelLoader.loadModel(WORLD_GROUND_MODEL_FILE);
+
+function buildOperationalMetrics(units) {
+  const turbineUnits = units.filter((unit) => unit.type !== "Substation");
+  const capacityMw = turbineUnits.reduce((sum, unit) => sum + unit.capacityMw, 0);
+  const outputMw = turbineUnits.reduce((sum, unit) => sum + unit.outputMw, 0);
+  const windSpeed =
+    turbineUnits.reduce((sum, unit) => sum + unit.windSpeed, 0) /
+    Math.max(turbineUnits.length, 1);
+  const normalCount = units.filter((unit) => unit.status === "normal").length;
+  const alertCount = units.length - normalCount;
+  const fleetStatus = units.some((unit) => unit.status === "warning")
+    ? "warning"
+    : units.some((unit) => unit.status === "caution")
+      ? "caution"
+      : "normal";
+
+  return {
+    alertCount,
+    availability: Math.round((normalCount / Math.max(units.length, 1)) * 100),
+    capacityMw,
+    fleetStatus,
+    normalCount,
+    outputMw,
+    outputPct: Math.round((outputMw / Math.max(capacityMw, 1)) * 100),
+    unitCount: units.length,
+    windSpeed,
+  };
 }
-function attachWorldGroundModel(scene, groundModel, settings) {
-  prepareWorldGroundModel(groundModel, settings);
-  scene.add(groundModel);
-  const environment = scene.userData.worldEnvironment;
-  if (!environment) {
-    return;
-  }
-  environment.groundModel = groundModel;
-  environment.floor.visible = false;
+
+function addWorldLighting(scene) {
+  const hemisphereLight = new THREE.HemisphereLight(0xb7e8ff, 0x0f172a, 1.7);
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 2.8);
+  const rimLight = new THREE.DirectionalLight(0x7dd3fc, 1.2);
+
+  directionalLight.position.set(26, 44, 20);
+  directionalLight.castShadow = true;
+  directionalLight.shadow.mapSize.set(2048, 2048);
+  directionalLight.shadow.camera.near = 10;
+  directionalLight.shadow.camera.far = 110;
+  directionalLight.shadow.camera.left = -50;
+  directionalLight.shadow.camera.right = 50;
+  directionalLight.shadow.camera.top = 50;
+  directionalLight.shadow.camera.bottom = -50;
+  rimLight.position.set(-28, 18, -20);
+
+  scene.add(hemisphereLight, directionalLight, rimLight);
 }
-function prepareWorldGroundModel(groundModel, settings) {
-  groundModel.name = "world-bg-sample-ground";
-  groundModel.userData.isWorldGround = true;
-  groundModel.traverse((object) => {
-    if (!(object instanceof THREE.Mesh)) {
-      return;
-    }
-    object.castShadow = false;
-    object.receiveShadow = true;
-    object.renderOrder = -1;
-    setMaterialColor(object.material, settings.floorColor);
-    setMaterialSurface(object.material, {
-      metalness: 0.02,
-      roughness: 0.86,
-    });
-  });
-  groundModel.updateMatrixWorld(true);
-  const bounds = new THREE.Box3().setFromObject(groundModel);
-  const center = bounds.getCenter(new THREE.Vector3());
-  groundModel.position.x -= center.x;
-  groundModel.position.z -= center.z;
-  groundModel.position.y += WORLD_GROUND_Y - bounds.min.y;
-  groundModel.updateMatrixWorld(true);
-}
-function showFallbackWorldFloor(scene) {
-  const environment = scene.userData.worldEnvironment;
-  if (environment?.floor) {
-    environment.floor.visible = true;
-  }
-}
-function setWorldGroundTint(groundModel, color) {
-  groundModel.traverse((object) => {
-    if (object instanceof THREE.Mesh) {
-      setMaterialColor(object.material, color);
-    }
-  });
-}
-function setMaterialColor(material, color) {
-  const materials = Array.isArray(material) ? material : [material];
-  materials.forEach((item) => {
-    if (item?.color) {
-      item.color.set(color);
-    }
-  });
-}
-function setMaterialSurface(material, surface) {
-  const materials = Array.isArray(material) ? material : [material];
-  materials.forEach((item) => {
-    if (!item) {
-      return;
-    }
-    if ("metalness" in item) {
-      item.metalness = surface.metalness;
-    }
-    if ("roughness" in item) {
-      item.roughness = surface.roughness;
-    }
-    item.needsUpdate = true;
-  });
-}
-function createPlacementPreview() {
-  const group = new THREE.Group();
-  const ring = new THREE.Mesh(
-    new THREE.TorusGeometry(2.4, 0.06, 8, 96),
+
+function addWindFarmAtmosphere(scene) {
+  const skyCanvas = document.createElement("canvas");
+  skyCanvas.width = 16;
+  skyCanvas.height = 128;
+  const context = skyCanvas.getContext("2d");
+  const gradient = context.createLinearGradient(0, 0, 0, skyCanvas.height);
+
+  gradient.addColorStop(0, "#102f4b");
+  gradient.addColorStop(0.48, "#071a2c");
+  gradient.addColorStop(1, "#03101c");
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, skyCanvas.width, skyCanvas.height);
+
+  const skyTexture = new THREE.CanvasTexture(skyCanvas);
+  skyTexture.colorSpace = THREE.SRGBColorSpace;
+
+  const skyDome = new THREE.Mesh(
+    new THREE.SphereGeometry(180, 32, 18),
     new THREE.MeshBasicMaterial({
-      color: "#22d3ee",
-      opacity: 0.92,
-      transparent: true,
+      map: skyTexture,
+      side: THREE.BackSide,
     }),
   );
-  const fill = new THREE.Mesh(
-    new THREE.CircleGeometry(2.35, 72),
+
+  skyDome.position.y = 28;
+  scene.add(skyDome);
+
+  const horizon = new THREE.Mesh(
+    new THREE.RingGeometry(76, 78, 96),
     new THREE.MeshBasicMaterial({
-      color: "#22d3ee",
-      opacity: 0.16,
+      color: 0x38bdf8,
+      opacity: 0.08,
       side: THREE.DoubleSide,
       transparent: true,
     }),
   );
-  const crossA = new THREE.Mesh(
-    new THREE.BoxGeometry(4.6, 0.025, 0.08),
-    new THREE.MeshBasicMaterial({
-      color: "#a5f3fc",
-      opacity: 0.72,
+
+  horizon.rotation.x = -Math.PI / 2;
+  horizon.position.y = 0.12;
+  scene.add(horizon);
+}
+
+function addWindFarmGround(scene) {
+  const roadMaterial = new THREE.MeshStandardMaterial({
+    color: 0x40566a,
+    metalness: 0.02,
+    roughness: 0.86,
+  });
+  const cableCorridorMaterial = new THREE.MeshBasicMaterial({
+    color: 0x22d3ee,
+    opacity: 0.12,
+    side: THREE.DoubleSide,
+    transparent: true,
+  });
+  const ocean = new THREE.Mesh(
+    new THREE.PlaneGeometry(190, 150),
+    new THREE.MeshStandardMaterial({
+      color: 0x0b4158,
+      metalness: 0.08,
+      opacity: 0.78,
+      roughness: 0.54,
       transparent: true,
     }),
   );
-  const crossB = new THREE.Mesh(
-    new THREE.BoxGeometry(0.08, 0.025, 4.6),
-    new THREE.MeshBasicMaterial({
-      color: "#a5f3fc",
-      opacity: 0.72,
+
+  ocean.rotation.x = -Math.PI / 2;
+  ocean.position.y = -0.08;
+  ocean.receiveShadow = true;
+  scene.add(ocean);
+
+  const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(110, 82),
+    new THREE.MeshStandardMaterial({
+      color: 0x14304a,
+      metalness: 0.05,
+      opacity: 0.9,
+      roughness: 0.82,
       transparent: true,
     }),
   );
-  ring.rotation.x = Math.PI / 2;
-  fill.rotation.x = -Math.PI / 2;
-  group.add(fill, ring, crossA, crossB);
-  group.visible = false;
-  return group;
-}
-function getWorldAssetModelFiles(assets) {
-  const modelFilesByKey = new Map();
-  assets.forEach((asset) => {
-    const modelFile = asset.modelFile ?? WORLD_SAMPLE_MODEL_FILES[0];
-    modelFilesByKey.set(getModelFileKey(modelFile), modelFile);
-  });
-  return Array.from(modelFilesByKey.values());
-}
-function getCachedModelForAsset(asset, modelCache) {
-  return modelCache.get(getModelFileKey(asset.modelFile ?? WORLD_SAMPLE_MODEL_FILES[0]));
-}
-function getModelFileKey(modelFile) {
-  return modelFile.id ?? modelFile.plyUrl;
-}
-function syncAssetModels({
-  assets,
-  groups,
-  modelCache,
-  placements,
-  scene,
-  selectedAssetId,
-}) {
-  if (!scene || !modelCache?.size) {
-    return;
-  }
-  const assetIds = new Set(assets.map((asset) => asset.id));
-  groups.forEach((group, assetId) => {
-    if (!assetIds.has(assetId)) {
-      scene.remove(group);
-      disposeObject3D(group);
-      groups.delete(assetId);
-    }
-  });
-  assets.forEach((asset, index) => {
-    const baseModel = getCachedModelForAsset(asset, modelCache);
-    if (!baseModel) {
-      return;
-    }
-    let group = groups.get(asset.id);
-    if (!group) {
-      group = createAssetModel(asset, baseModel);
-      scene.add(group);
-      groups.set(asset.id, group);
-    }
-    updateAssetModelStatus(group, asset);
-    applyPlacement(group, placements[asset.id] ?? buildDefaultPlacement(index));
-    applyAssetSelection(group, asset.id === selectedAssetId);
-  });
-}
-function createAssetModel(asset, baseModel) {
-  const root = new THREE.Group();
-  const model = cloneModelForAsset(baseModel);
-  const color = statusColor[asset.status] ?? statusColor.normal;
-  const platform = new THREE.Mesh(
-    new THREE.CylinderGeometry(2.6, 2.6, 0.16, 42),
+
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  const shallowWater = new THREE.Mesh(
+    new THREE.PlaneGeometry(116, 24),
     new THREE.MeshStandardMaterial({
-      color: "#0f172a",
-      metalness: 0.18,
-      roughness: 0.72,
+      color: 0x0e7490,
+      metalness: 0.05,
+      opacity: 0.22,
+      roughness: 0.62,
+      transparent: true,
     }),
   );
-  const halo = new THREE.Mesh(
-    new THREE.TorusGeometry(2.85, 0.045, 8, 64),
+
+  shallowWater.rotation.x = -Math.PI / 2;
+  shallowWater.position.z = -36;
+  shallowWater.position.y = 0.025;
+  scene.add(shallowWater);
+
+  const coastalShelf = new THREE.Mesh(
+    new THREE.PlaneGeometry(92, 9),
     new THREE.MeshStandardMaterial({
-      color,
-      emissive: color,
-      emissiveIntensity: 0.45,
+      color: 0x2c5364,
+      metalness: 0.02,
+      opacity: 0.34,
+      roughness: 0.8,
+      transparent: true,
     }),
   );
-  const selectionRing = new THREE.Mesh(
-    new THREE.TorusGeometry(3.25, 0.075, 8, 72),
+
+  coastalShelf.rotation.x = -Math.PI / 2;
+  coastalShelf.rotation.z = -0.05;
+  coastalShelf.position.set(-4, 0.035, -30);
+  coastalShelf.receiveShadow = true;
+  scene.add(coastalShelf);
+
+  const grid = new THREE.GridHelper(96, 24, 0x38bdf8, 0x1e3a5f);
+  grid.position.y = 0.04;
+  grid.material.opacity = 0.18;
+  grid.material.transparent = true;
+  scene.add(grid);
+
+  [
+    { position: [-8, 0.05, -42], rotation: 0.04, size: [150, 0.06] },
+    { position: [18, 0.055, -34], rotation: 0.02, size: [118, 0.05] },
+    { position: [-18, 0.052, -25], rotation: -0.03, size: [96, 0.045] },
+    { position: [10, 0.05, 39], rotation: -0.025, size: [140, 0.04] },
+    { position: [-26, 0.052, 31], rotation: 0.035, size: [86, 0.035] },
+  ].forEach((wave) => {
+    const line = new THREE.Mesh(
+      new THREE.PlaneGeometry(wave.size[0], wave.size[1]),
+      new THREE.MeshBasicMaterial({
+        color: 0x93c5fd,
+        opacity: 0.14,
+        side: THREE.DoubleSide,
+        transparent: true,
+      }),
+    );
+
+    line.rotation.x = -Math.PI / 2;
+    line.rotation.z = wave.rotation;
+    line.position.set(...wave.position);
+    scene.add(line);
+  });
+
+  [
+    { position: [-14, 0.065, 7], rotation: -0.43, size: [8.4, 62] },
+    { position: [11, 0.066, 6], rotation: 0.86, size: [7.8, 48] },
+    { position: [0, 0.067, -11], rotation: -1.2, size: [7.2, 58] },
+  ].forEach((corridor) => {
+    const strip = new THREE.Mesh(
+      new THREE.PlaneGeometry(corridor.size[0], corridor.size[1]),
+      cableCorridorMaterial.clone(),
+    );
+
+    strip.rotation.x = -Math.PI / 2;
+    strip.rotation.z = corridor.rotation;
+    strip.position.set(...corridor.position);
+    scene.add(strip);
+  });
+
+  [
+    { position: [-14, 0.085, 18], rotation: -0.52, size: [3.8, 46] },
+    { position: [16, 0.09, 2], rotation: 0.9, size: [3.2, 44] },
+    { position: [0, 0.095, -13], rotation: -1.3, size: [3, 54] },
+  ].forEach((road) => {
+    const strip = new THREE.Mesh(
+      new THREE.PlaneGeometry(road.size[0], road.size[1]),
+      roadMaterial,
+    );
+
+    strip.rotation.x = -Math.PI / 2;
+    strip.rotation.z = road.rotation;
+    strip.position.set(...road.position);
+    strip.receiveShadow = true;
+    scene.add(strip);
+  });
+
+  [
+    [-28, -14],
+    [-10, -18],
+    [9, -15],
+    [28, -10],
+    [-20, 8],
+    [0, 10],
+    [22, 12],
+  ].forEach(([x, z], index) => {
+    const installZone = new THREE.Mesh(
+      new THREE.RingGeometry(2.55, 2.85, 56),
+      new THREE.MeshBasicMaterial({
+        color: index === 5 ? 0xfb7185 : 0x67e8f9,
+        opacity: index === 5 ? 0.18 : 0.12,
+        side: THREE.DoubleSide,
+        transparent: true,
+      }),
+    );
+
+    installZone.rotation.x = -Math.PI / 2;
+    installZone.position.set(x, 0.11, z);
+    scene.add(installZone);
+  });
+
+  const substationApron = new THREE.Mesh(
+    new THREE.PlaneGeometry(14, 10),
     new THREE.MeshStandardMaterial({
-      color: "#bef264",
-      emissive: "#bef264",
-      emissiveIntensity: 0.82,
-    }),
-  );
-  const labelStem = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.025, 0.025, 2.8, 8),
-    new THREE.MeshBasicMaterial({
-      color,
+      color: 0x334155,
+      metalness: 0.02,
       opacity: 0.42,
+      roughness: 0.84,
       transparent: true,
     }),
   );
-  root.userData.assetId = asset.id;
-  root.userData.halo = halo;
-  root.userData.labelStem = labelStem;
-  root.userData.model = model;
-  root.userData.platform = platform;
-  root.userData.selectionRing = selectionRing;
-  model.rotation.order = "XYZ";
-  model.rotation.set(
-    THREE.MathUtils.degToRad(DEFAULT_ASSET_ROTATION.pitch),
-    THREE.MathUtils.degToRad(DEFAULT_ASSET_ROTATION.yaw),
-    THREE.MathUtils.degToRad(DEFAULT_ASSET_ROTATION.roll),
+
+  substationApron.rotation.x = -Math.PI / 2;
+  substationApron.position.set(0, 0.1, 26);
+  substationApron.receiveShadow = true;
+  scene.add(substationApron);
+}
+
+function addWindFlow(scene) {
+  const entries = [];
+  const material = new THREE.LineBasicMaterial({
+    color: 0x93c5fd,
+    opacity: 0.34,
+    transparent: true,
+  });
+
+  for (let index = 0; index < 18; index += 1) {
+    const z = -30 + index * 3.7;
+    const y = 9 + (index % 4) * 1.3;
+    const geometry = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-8, y, z),
+      new THREE.Vector3(6, y + 0.25, z + 0.45),
+    ]);
+    const line = new THREE.Line(geometry, material.clone());
+
+    line.position.x = -48 + index * 5.4;
+    scene.add(line);
+    entries.push({
+      line,
+      speed: 5.5 + (index % 5) * 0.8,
+    });
+  }
+
+  return entries;
+}
+
+function addCollectionLines(scene, units, substationPosition) {
+  const material = new THREE.LineBasicMaterial({
+    color: 0x22d3ee,
+    opacity: 0.34,
+    transparent: true,
+  });
+
+  units
+    .filter((unit) => unit.type !== "Substation")
+    .forEach((unit) => {
+      const geometry = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(unit.position[0], 0.09, unit.position[1]),
+        new THREE.Vector3(substationPosition[0], 0.09, substationPosition[1]),
+      ]);
+      const line = new THREE.Line(geometry, material.clone());
+
+      scene.add(line);
+    });
+}
+
+function createBladeGeometry(length = 4.35, rootWidth = 0.54, tipWidth = 0.13) {
+  const sectionCount = 7;
+  const positions = [];
+  const indices = [];
+
+  for (let index = 0; index < sectionCount; index += 1) {
+    const t = index / (sectionCount - 1);
+    const width = THREE.MathUtils.lerp(rootWidth, tipWidth, t);
+    const thickness = THREE.MathUtils.lerp(0.16, 0.045, t);
+    const y = 0.3 + length * t;
+    const camber = Math.sin(t * Math.PI) * 0.16;
+    const twist = THREE.MathUtils.lerp(0.09, -0.08, t);
+
+    positions.push(
+      -width / 2 + camber,
+      y,
+      -thickness / 2 + twist,
+      width / 2 + camber,
+      y,
+      -thickness / 2 - twist,
+      width / 2 + camber,
+      y,
+      thickness / 2 - twist,
+      -width / 2 + camber,
+      y,
+      thickness / 2 + twist,
+    );
+  }
+
+  for (let index = 0; index < sectionCount - 1; index += 1) {
+    const current = index * 4;
+    const next = current + 4;
+
+    indices.push(
+      current,
+      next,
+      current + 1,
+      current + 1,
+      next,
+      next + 1,
+      current + 1,
+      next + 1,
+      current + 2,
+      current + 2,
+      next + 1,
+      next + 2,
+      current + 2,
+      next + 2,
+      current + 3,
+      current + 3,
+      next + 2,
+      next + 3,
+      current + 3,
+      next + 3,
+      current,
+      current,
+      next + 3,
+      next,
+    );
+  }
+
+  indices.push(0, 1, 2, 0, 2, 3);
+  const last = (sectionCount - 1) * 4;
+  indices.push(last, last + 2, last + 1, last, last + 3, last + 2);
+
+  const geometry = new THREE.BufferGeometry();
+
+  geometry.setAttribute(
+    "position",
+    new THREE.Float32BufferAttribute(positions, 3),
   );
-  model.position.y = 2.06;
-  model.traverse((object) => {
-    object.userData.assetId = asset.id;
-    if (object instanceof THREE.Mesh) {
-      object.castShadow = true;
-      object.receiveShadow = true;
-    }
-  });
-  platform.position.y = 0.08;
-  halo.position.y = 0.22;
-  halo.rotation.x = Math.PI / 2;
-  selectionRing.position.y = 0.28;
-  selectionRing.rotation.x = Math.PI / 2;
-  selectionRing.visible = false;
-  labelStem.position.y = 2.65;
-  root.add(platform, halo, selectionRing, labelStem, model);
-  return root;
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
 }
-function cloneModelForAsset(baseModel) {
-  const model = baseModel.clone(true);
-  model.traverse((object) => {
-    if (!(object instanceof THREE.Mesh)) {
-      return;
-    }
-    object.geometry = object.geometry.clone();
-    if (Array.isArray(object.material)) {
-      object.material = object.material.map((material) => material.clone());
-      return;
-    }
-    object.material = object.material.clone();
-  });
-  return model;
+
+function addTowerBand(group, radius, y, material) {
+  const band = new THREE.Mesh(new THREE.TorusGeometry(radius, 0.018, 8, 44), material);
+
+  band.rotation.x = Math.PI / 2;
+  band.position.y = y;
+  group.add(band);
 }
-function updateAssetModelStatus(group, asset) {
-  const color = statusColor[asset.status] ?? statusColor.normal;
-  const severity = getWorldStatusSeverity(asset.status);
-  group.userData.statusSeverity = severity;
-  const haloMaterial = group.userData.halo?.material;
-  if (haloMaterial instanceof THREE.MeshStandardMaterial) {
-    haloMaterial.color.set(color);
-    haloMaterial.emissive.set(color);
-    haloMaterial.emissiveIntensity = [0.16, 0.95, 1.65][severity] ?? 0.16;
-  }
-  group.userData.halo?.scale.setScalar([0.84, 1.12, 1.34][severity] ?? 0.84);
-  const platformMaterial = group.userData.platform?.material;
-  if (platformMaterial instanceof THREE.MeshStandardMaterial) {
-    platformMaterial.color.set(severity ? "#1f1308" : "#0f172a");
-    platformMaterial.emissive.set(severity ? color : "#000000");
-    platformMaterial.emissiveIntensity = [0, 0.16, 0.32][severity] ?? 0;
-  }
-  const stemMaterial = group.userData.labelStem?.material;
-  if (stemMaterial instanceof THREE.MeshBasicMaterial) {
-    stemMaterial.color.set(color);
-  }
-  applyAssetSelection(group, group.userData.isSelected);
-}
-function applyAssetSelection(group, selected) {
-  group.userData.isSelected = selected;
-  group.userData.selectionRing.visible = selected;
-  const severity = group.userData.statusSeverity ?? 0;
-  group.userData.labelStem.material.opacity = selected
-    ? 0.95
-    : ([0.3, 0.68, 0.9][severity] ?? 0.3);
-}
-function updateAssetTransforms(groups, placements) {
-  groups.forEach((group, assetId) => {
-    const placement = placements[assetId];
-    if (placement) {
-      applyPlacement(group, placement);
-    }
-  });
-}
-function updateNearestAssetFocus({
-  assets,
-  cameraPosition,
-  groups,
-  onFocus,
-  proximityFocus,
-  selectedAssetId,
+
+function createCylinderMesh({
+  color,
+  height,
+  metalness = 0.08,
+  radius,
+  roughness = 0.66,
+  segments = 20,
 }) {
-  if (!assets.length || !onFocus) {
-    return;
-  }
-  const nearest = assets.reduce((currentNearest, asset) => {
-    const group = groups.get(asset.id);
-    if (!group) {
-      return currentNearest;
-    }
-    const distance = cameraPosition.distanceTo(group.position);
-    if (!currentNearest || distance < currentNearest.distance) {
-      return { assetId: asset.id, distance };
-    }
-    return currentNearest;
-  }, undefined);
-  if (
-    !nearest ||
-    nearest.distance > 13 ||
-    nearest.assetId === selectedAssetId
-  ) {
-    return;
-  }
-  const now = performance.now();
-  if (
-    proximityFocus.assetId === nearest.assetId &&
-    now - proximityFocus.lastChangedAt < 1200
-  ) {
-    return;
-  }
-  proximityFocus.assetId = nearest.assetId;
-  proximityFocus.lastChangedAt = now;
-  onFocus(nearest.assetId);
-}
-function applyPlacement(group, placement) {
-  group.position.set(placement.x, WORLD_ASSET_BASE_Y, placement.z);
-  group.rotation.y = 0;
-  if (group.userData.model) {
-    group.userData.model.rotation.order = "XYZ";
-    group.userData.model.rotation.set(
-      THREE.MathUtils.degToRad(
-        placement.rotationX ?? DEFAULT_ASSET_ROTATION.pitch,
-      ),
-      THREE.MathUtils.degToRad(
-        placement.rotationY ?? DEFAULT_ASSET_ROTATION.yaw,
-      ),
-      THREE.MathUtils.degToRad(
-        placement.rotationZ ?? DEFAULT_ASSET_ROTATION.roll,
-      ),
-    );
-  }
-}
-function updateProjectedCards({
-  assets,
-  camera,
-  groups,
-  keyRef,
-  selectedAssetId,
-  setProjectedCards,
-}) {
-  const cards = assets.flatMap((asset, index) => {
-    const group = groups.get(asset.id);
-    if (!group) {
-      return [];
-    }
-    const anchor = group.position.clone();
-    anchor.y += 6.1;
-    const projected = anchor.project(camera);
-    if (projected.z < -1 || projected.z > 1) {
-      return [];
-    }
-    const left = (projected.x + 1) * 50;
-    const top = (1 - projected.y) * 50;
-    if (left < -8 || left > 108 || top < -8 || top > 108) {
-      return [];
-    }
-    const distance = camera.position.distanceTo(group.position);
-    return [
-      {
-        asset,
-        id: asset.id,
-        index,
-        left: clampNumber(left, 2, 98),
-        opacity: clampNumber(1.12 - distance / 74, 0.38, 1),
-        selected: asset.id === selectedAssetId,
-        top: clampNumber(top, 6, 94),
-      },
-    ];
-  });
-  const key = cards
-    .map(
-      (card) =>
-        `${card.id}:${card.left.toFixed(1)}:${card.top.toFixed(1)}:${card.opacity.toFixed(2)}:${card.selected ? 1 : 0}`,
-    )
-    .join("|");
-  if (keyRef.current !== key) {
-    keyRef.current = key;
-    setProjectedCards(cards);
-  }
-}
-function resizeRenderer(container, renderer, camera) {
-  const bounds = container.getBoundingClientRect();
-  const width = Math.max(Math.round(bounds.width), 1);
-  const height = Math.max(Math.round(bounds.height), 1);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setSize(width, height, false);
-  camera.aspect = width / height;
-  camera.updateProjectionMatrix();
-}
-function updatePersonCamera(state, keys, deltaSeconds) {
-  const turnSpeed = 1.65;
-  const moveSpeed = keys.has("fast") ? 12 : 7.4;
-  if (keys.has("turnLeft")) {
-    state.yaw -= turnSpeed * deltaSeconds;
-  }
-  if (keys.has("turnRight")) {
-    state.yaw += turnSpeed * deltaSeconds;
-  }
-  const forward = new THREE.Vector3(
-    Math.sin(state.yaw),
-    0,
-    -Math.cos(state.yaw),
-  );
-  const right = new THREE.Vector3(-forward.z, 0, forward.x);
-  const move = new THREE.Vector3();
-  if (keys.has("forward")) {
-    move.add(forward);
-  }
-  if (keys.has("back")) {
-    move.sub(forward);
-  }
-  if (keys.has("right")) {
-    move.add(right);
-  }
-  if (keys.has("left")) {
-    move.sub(right);
-  }
-  if (move.lengthSq() > 0) {
-    move.normalize().multiplyScalar(moveSpeed * deltaSeconds);
-    state.position.add(move);
-    state.position.x = clampNumber(
-      state.position.x,
-      -WORLD_SIZE.width / 2 + 2,
-      WORLD_SIZE.width / 2 - 2,
-    );
-    state.position.z = clampNumber(
-      state.position.z,
-      -WORLD_SIZE.depth / 2 + 2,
-      WORLD_SIZE.depth / 2 - 2,
-    );
-  }
-}
-function applyCameraState(camera, state) {
-  camera.position.copy(state.position);
-  const pitch = state.pitch ?? -0.05;
-  const horizontalScale = Math.cos(pitch);
-  const lookDirection = new THREE.Vector3(
-    Math.sin(state.yaw) * horizontalScale,
-    Math.sin(pitch),
-    -Math.cos(state.yaw) * horizontalScale,
-  );
-  camera.lookAt(state.position.clone().add(lookDirection));
-}
-function applyWorldSettings(scene, settings) {
-  if (!scene) {
-    return;
-  }
-  scene.background = new THREE.Color(settings.backgroundColor);
-  scene.fog = new THREE.Fog(settings.backgroundColor, 28, settings.fogDistance);
-  const environment = scene.userData.worldEnvironment;
-  if (!environment) {
-    return;
-  }
-  environment.floor.material.color.set(settings.floorColor);
-  if (environment.groundModel) {
-    setWorldGroundTint(environment.groundModel, settings.floorColor);
-  }
-  setGridMaterialOpacity(
-    environment.grid,
-    settings.gridOpacity,
-    settings.accentColor,
-  );
-  environment.ambient.intensity = 1.15 * settings.lightLevel;
-  environment.hemisphere.intensity = 1.45 * settings.lightLevel;
-  environment.keyLight.intensity = 2.2 * settings.lightLevel;
-  environment.lamps.forEach((lamp) => {
-    lamp.color.set(settings.accentColor);
-    lamp.intensity = 1.6 * settings.lightLevel;
-  });
-  environment.fixtures.forEach((fixture) => {
-    fixture.material.emissive.set(settings.accentColor);
-  });
-}
-function setGridMaterialOpacity(grid, opacity, accentColor) {
-  const gridMaterials = Array.isArray(grid.material)
-    ? grid.material
-    : [grid.material];
-  gridMaterials.forEach((material, index) => {
-    material.opacity = opacity;
-    material.transparent = true;
-    if (index === 0 && accentColor && material.color) {
-      material.color.set(accentColor);
-    }
-  });
-}
-function keyToAction(key) {
-  const normalizedKey = key.toLowerCase();
-  if (normalizedKey === "arrowup" || normalizedKey === "w") {
-    return "forward";
-  }
-  if (normalizedKey === "arrowdown" || normalizedKey === "s") {
-    return "back";
-  }
-  if (normalizedKey === "arrowleft" || normalizedKey === "a") {
-    return "left";
-  }
-  if (normalizedKey === "arrowright" || normalizedKey === "d") {
-    return "right";
-  }
-  if (normalizedKey === "q") {
-    return "turnLeft";
-  }
-  if (normalizedKey === "e") {
-    return "turnRight";
-  }
-  if (normalizedKey === "shift") {
-    return "fast";
-  }
-  return undefined;
-}
-function isEditableTarget(target) {
-  if (!(target instanceof HTMLElement)) {
-    return false;
-  }
-  return Boolean(
-    target.closest("input, textarea, select, [contenteditable='true']"),
+  return new THREE.Mesh(
+    new THREE.CylinderGeometry(radius, radius, height, segments),
+    new THREE.MeshStandardMaterial({ color, metalness, roughness }),
   );
 }
-function findAssetId(object) {
+
+function setUnitCutaway(entry, isSelected) {
+  if (entry.internalGroup) {
+    entry.internalGroup.visible = isSelected;
+  }
+
+  entry.cutawayMeshes?.forEach((mesh) => {
+    setMeshCutaway(mesh, isSelected);
+  });
+}
+
+function setMeshCutaway(mesh, isCutaway) {
+  const materials = Array.isArray(mesh.material)
+    ? mesh.material
+    : [mesh.material];
+
+  materials.filter(Boolean).forEach((material) => {
+    if (!material.userData.locationWorldCutawayState) {
+      material.userData.locationWorldCutawayState = {
+        depthWrite: material.depthWrite,
+        opacity: material.opacity,
+        side: material.side,
+        transparent: material.transparent,
+      };
+    }
+
+    const original = material.userData.locationWorldCutawayState;
+
+    if (isCutaway) {
+      material.transparent = true;
+      material.opacity = 0.32;
+      material.depthWrite = false;
+      material.side = THREE.DoubleSide;
+    } else {
+      material.transparent = original.transparent;
+      material.opacity = original.opacity;
+      material.depthWrite = original.depthWrite;
+      material.side = original.side;
+    }
+
+    material.needsUpdate = true;
+  });
+
+  mesh.renderOrder = isCutaway ? 2 : 0;
+}
+
+function createPartMeta(
+  unit,
+  {
+    category,
+    finding,
+    health,
+    id,
+    load,
+    name,
+    recommendation,
+    signal,
+    status = "normal",
+    temperature,
+    vibration,
+  },
+) {
+  return {
+    category,
+    finding,
+    health,
+    id,
+    metrics: [
+      { label: "Health", value: `${health}%` },
+      { label: "Temp", value: temperature },
+      { label: "Vibration", value: vibration },
+      { label: "Load", value: load },
+    ],
+    name,
+    recommendation,
+    signal,
+    status: normalizeOperationalStatus(status),
+    unitId: unit.id,
+    unitName: unit.name,
+    unitType: unit.type,
+  };
+}
+
+function getPartKey(part) {
+  return part ? `${part.unitId}:${part.id}` : "";
+}
+
+function isObjectVisibleInWorld(object) {
   let current = object;
+
   while (current) {
-    if (current.userData.assetId) {
-      return current.userData.assetId;
+    if (current.visible === false) {
+      return false;
     }
+
     current = current.parent;
   }
-  return undefined;
+
+  return true;
 }
-function cloneWorldAsset(asset) {
-  return {
-    ...asset,
-    modelFile: cloneWorldModelFile(asset.modelFile),
+
+function registerInspectablePart(partEntries, { meshes, meta, popupGroup }) {
+  const partEntry = {
+    key: getPartKey(meta),
+    meshes,
+    meta,
+    popupGroup,
   };
-}
-function cloneWorldModelFile(modelFile) {
-  return {
-    ...modelFile,
-    textures: modelFile.textures?.map((texture) => ({ ...texture })) ?? [],
-  };
-}
-function buildDisplayAssets() {
-  return WORLD_SAMPLE_ASSETS.map(cloneWorldAsset);
-}
-function readStoredWorldAssets(storageKey, fallbackAssets) {
-  if (typeof window === "undefined") {
-    return fallbackAssets;
+
+  meshes.forEach((mesh) => {
+    isolateMeshMaterial(mesh);
+    mesh.userData.isPartSelectable = true;
+    mesh.userData.partEntry = partEntry;
+    mesh.userData.partId = meta.id;
+  });
+
+  if (popupGroup) {
+    popupGroup.visible = false;
   }
-  try {
-    const storedValue = window.localStorage.getItem(storageKey);
-    if (!storedValue) {
-      return fallbackAssets;
+
+  partEntries.push(partEntry);
+  return partEntry;
+}
+
+function setInspectablePartState(partEntry, mode) {
+  partEntry.meshes.forEach((mesh) => setMeshPartEmphasis(mesh, mode));
+
+  if (partEntry.popupGroup) {
+    partEntry.popupGroup.visible = mode === "selected";
+  }
+}
+
+function setMeshPartEmphasis(mesh, mode) {
+  const materials = Array.isArray(mesh.material)
+    ? mesh.material
+    : [mesh.material];
+
+  materials.filter(Boolean).forEach((material) => {
+    if (material.emissive && !material.userData.locationWorldPartState) {
+      material.userData.locationWorldPartState = {
+        emissive: material.emissive.getHex(),
+        emissiveIntensity: material.emissiveIntensity ?? 0,
+      };
     }
-    const parsedValue = JSON.parse(storedValue);
-    if (!Array.isArray(parsedValue)) {
-      return fallbackAssets;
+
+    const original = material.userData.locationWorldPartState;
+
+    if (!material.emissive || !original) {
+      return;
     }
-    return parsedValue.map((asset) => ({
-      ...asset,
-      modelFile: asset.modelFile
-        ? cloneWorldModelFile(asset.modelFile)
-        : cloneWorldModelFile(WORLD_SAMPLE_MODEL_FILES[0]),
-      status: asset.status ?? "normal",
-      type: asset.type || "설비",
-    }));
-  } catch {
-    return fallbackAssets;
-  }
-}
-function readStoredWorldSettings(storageKey) {
-  if (typeof window === "undefined") {
-    return DEFAULT_WORLD_SETTINGS;
-  }
-  try {
-    const storedValue = window.localStorage.getItem(storageKey);
-    if (!storedValue) {
-      return DEFAULT_WORLD_SETTINGS;
+
+    if (mode === "selected") {
+      material.emissive.setHex(0x22d3ee);
+      material.emissiveIntensity = 0.72;
+    } else if (mode === "hover") {
+      material.emissive.setHex(0x93c5fd);
+      material.emissiveIntensity = 0.42;
+    } else {
+      material.emissive.setHex(original.emissive);
+      material.emissiveIntensity = original.emissiveIntensity;
     }
-    return sanitizeWorldSettings(JSON.parse(storedValue));
-  } catch {
-    return DEFAULT_WORLD_SETTINGS;
-  }
+
+    material.needsUpdate = true;
+  });
+
+  mesh.renderOrder = mode === "selected" ? 4 : mode === "hover" ? 3 : 0;
 }
-function readStoredPlacements(storageKey, assets) {
-  if (typeof window === "undefined") {
-    return buildDefaultPlacements(assets);
-  }
-  try {
-    const storedValue = window.localStorage.getItem(storageKey);
-    if (!storedValue) {
-      return buildDefaultPlacements(assets);
-    }
-    const parsedValue = JSON.parse(storedValue);
-    return mergePlacements(
-      assets,
-      parsedValue && typeof parsedValue === "object" ? parsedValue : {},
-    );
-  } catch {
-    return buildDefaultPlacements(assets);
-  }
-}
-function mergePlacements(assets, currentPlacements) {
-  return Object.fromEntries(
-    assets.map((asset, index) => [
-      asset.id,
-      sanitizePlacement(currentPlacements[asset.id], index),
+
+function createPartPopupShell({ anchor, color = 0x38bdf8, position }) {
+  const popupGroup = new THREE.Group();
+  const modelGroup = new THREE.Group();
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(1.45, 0.02, 8, 88),
+    new THREE.MeshBasicMaterial({
+      color,
+      opacity: 0.78,
+      transparent: true,
+    }),
+  );
+  const plate = new THREE.Mesh(
+    new THREE.CircleGeometry(1.28, 72),
+    new THREE.MeshBasicMaterial({
+      color,
+      opacity: 0.12,
+      side: THREE.DoubleSide,
+      transparent: true,
+    }),
+  );
+  const connector = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(
+        anchor[0] - position[0],
+        anchor[1] - position[1],
+        anchor[2] - position[2],
+      ),
+      new THREE.Vector3(0, 0, 0),
     ]),
+    new THREE.LineBasicMaterial({
+      color,
+      opacity: 0.72,
+      transparent: true,
+    }),
+  );
+
+  popupGroup.position.set(...position);
+  ring.rotation.x = Math.PI / 2;
+  plate.rotation.x = Math.PI / 2;
+  modelGroup.position.y = 0.36;
+  modelGroup.scale.setScalar(2.05);
+  popupGroup.add(connector, plate, ring, modelGroup);
+  popupGroup.userData.popupModel = modelGroup;
+  return popupGroup;
+}
+
+function createBoxMesh({
+  color,
+  depth,
+  height,
+  metalness = 0.12,
+  roughness = 0.56,
+  width,
+}) {
+  return new THREE.Mesh(
+    new THREE.BoxGeometry(width, height, depth),
+    new THREE.MeshStandardMaterial({ color, metalness, roughness }),
   );
 }
-function buildDefaultPlacements(assets) {
-  return Object.fromEntries(
-    assets.map((asset, index) => [asset.id, buildDefaultPlacement(index)]),
+
+function isolateMeshMaterial(mesh) {
+  if (!mesh?.material || mesh.userData.hasIsolatedPartMaterial) {
+    return;
+  }
+
+  mesh.material = Array.isArray(mesh.material)
+    ? mesh.material.map((material) => material.clone())
+    : mesh.material.clone();
+  mesh.userData.hasIsolatedPartMaterial = true;
+}
+
+function addBoltCircle(group, meshes, {
+  boltHeight = 0.05,
+  boltRadius = 0.018,
+  center,
+  count = 12,
+  material,
+  radius,
+}) {
+  for (let index = 0; index < count; index += 1) {
+    const angle = (Math.PI * 2 * index) / count;
+    const bolt = new THREE.Mesh(
+      new THREE.CylinderGeometry(boltRadius, boltRadius, boltHeight, 10),
+      material,
+    );
+
+    bolt.rotation.x = Math.PI / 2;
+    bolt.position.set(
+      center[0] + Math.cos(angle) * radius,
+      center[1] + Math.sin(angle) * radius,
+      center[2],
+    );
+    group.add(bolt);
+    meshes?.push(bolt);
+  }
+}
+
+function addGearTeeth(group, meshes, {
+  center,
+  count = 18,
+  material,
+  radius,
+  toothDepth = 0.035,
+  toothHeight = 0.045,
+  toothWidth = 0.055,
+}) {
+  for (let index = 0; index < count; index += 1) {
+    const angle = (Math.PI * 2 * index) / count;
+    const tooth = new THREE.Mesh(
+      new THREE.BoxGeometry(toothWidth, toothHeight, toothDepth),
+      material,
+    );
+
+    tooth.position.set(
+      center[0] + Math.cos(angle) * radius,
+      center[1] + Math.sin(angle) * radius,
+      center[2],
+    );
+    tooth.rotation.z = angle;
+    group.add(tooth);
+    meshes?.push(tooth);
+  }
+}
+
+function addBearingBalls(group, meshes, {
+  ballRadius = 0.025,
+  center,
+  count = 12,
+  material,
+  radius,
+}) {
+  for (let index = 0; index < count; index += 1) {
+    const angle = (Math.PI * 2 * index) / count;
+    const ball = new THREE.Mesh(
+      new THREE.SphereGeometry(ballRadius, 12, 12),
+      material,
+    );
+
+    ball.position.set(
+      center[0] + Math.cos(angle) * radius,
+      center[1] + Math.sin(angle) * radius,
+      center[2],
+    );
+    group.add(ball);
+    meshes?.push(ball);
+  }
+}
+
+function addCoolingFinStack(group, meshes, {
+  center,
+  count,
+  depth,
+  height,
+  material,
+  spacing,
+  width,
+}) {
+  for (let index = 0; index < count; index += 1) {
+    const fin = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material);
+    const offset = (index - (count - 1) / 2) * spacing;
+
+    fin.position.set(center[0], center[1], center[2] + offset);
+    group.add(fin);
+    meshes?.push(fin);
+  }
+}
+
+function addWireBundle(group, meshes, {
+  colorSet = [0x38bdf8, 0x111827, 0x334155],
+  count = 5,
+  height,
+  materialOptions = {},
+  radius = 0.012,
+  start,
+  twist = 0.08,
+}) {
+  for (let index = 0; index < count; index += 1) {
+    const angle = (Math.PI * 2 * index) / count;
+    const wire = createCylinderMesh({
+      color: colorSet[index % colorSet.length],
+      height,
+      metalness: materialOptions.metalness ?? 0.08,
+      radius,
+      roughness: materialOptions.roughness ?? 0.62,
+      segments: 8,
+    });
+
+    wire.position.set(
+      start[0] + Math.cos(angle) * twist,
+      start[1],
+      start[2] + Math.sin(angle) * twist,
+    );
+    wire.rotation.z = Math.sin(angle) * 0.045;
+    group.add(wire);
+    meshes?.push(wire);
+  }
+}
+
+function createInsulatorStack({
+  color = 0xdbeafe,
+  height = 0.62,
+  radius = 0.055,
+  ringColor = 0x94a3b8,
+}) {
+  const group = new THREE.Group();
+  const meshes = [];
+  const core = createCylinderMesh({
+    color,
+    height,
+    metalness: 0.02,
+    radius: radius * 0.72,
+    roughness: 0.5,
+    segments: 16,
+  });
+
+  group.add(core);
+  meshes.push(core);
+
+  for (let index = 0; index < 4; index += 1) {
+    const skirt = createCylinderMesh({
+      color: index % 2 ? color : ringColor,
+      height: 0.035,
+      metalness: index % 2 ? 0.02 : 0.2,
+      radius: radius * (1.25 - index * 0.07),
+      roughness: 0.48,
+      segments: 18,
+    });
+
+    skirt.position.y = -height / 2 + 0.12 + index * 0.12;
+    group.add(skirt);
+    meshes.push(skirt);
+  }
+
+  return { group, meshes };
+}
+
+function createTurbineUnit(unit) {
+  const group = new THREE.Group();
+  const internalGroup = new THREE.Group();
+  const cutawayMeshes = [];
+  const partEntries = [];
+  const statusColor = getThreeStatusColor(unit.status);
+  const whiteMaterial = new THREE.MeshStandardMaterial({
+    color: 0xdfe7ee,
+    metalness: 0.08,
+    roughness: 0.58,
+  });
+  const nacelleMaterial = new THREE.MeshStandardMaterial({
+    color: 0xcbd5e1,
+    metalness: 0.18,
+    roughness: 0.48,
+  });
+  const bladeMaterial = new THREE.MeshStandardMaterial({
+    color: unit.status === "warning" ? 0xe7d8bd : 0xdce6ed,
+    metalness: 0.04,
+    roughness: 0.62,
+  });
+  const concreteMaterial = new THREE.MeshStandardMaterial({
+    color: 0x65758a,
+    metalness: 0.02,
+    roughness: 0.9,
+  });
+  const trimMaterial = new THREE.MeshStandardMaterial({
+    color: 0x334155,
+    metalness: 0.22,
+    roughness: 0.5,
+  });
+  const markerMaterial = new THREE.MeshStandardMaterial({
+    color: 0x9f1d2f,
+    metalness: 0.04,
+    roughness: 0.66,
+  });
+  const steelMaterial = new THREE.MeshStandardMaterial({
+    color: 0x94a3b8,
+    metalness: 0.34,
+    roughness: 0.44,
+  });
+  const copperMaterial = new THREE.MeshStandardMaterial({
+    color: 0xb45309,
+    emissive: 0x451a03,
+    emissiveIntensity: 0.16,
+    metalness: 0.2,
+    roughness: 0.42,
+  });
+  const signalMaterial = new THREE.MeshStandardMaterial({
+    color: 0x38bdf8,
+    emissive: 0x0891b2,
+    emissiveIntensity: 0.55,
+    metalness: 0.08,
+    roughness: 0.36,
+  });
+  const cableMaterial = new THREE.MeshStandardMaterial({
+    color: 0x0f172a,
+    metalness: 0.18,
+    roughness: 0.62,
+  });
+  const beaconMaterial = new THREE.MeshStandardMaterial({
+    color: statusColor,
+    emissive: statusColor,
+    emissiveIntensity: 0.8,
+    roughness: 0.36,
+  });
+  const ringMaterial = new THREE.MeshBasicMaterial({
+    color: statusColor,
+    opacity: unit.status === "normal" ? 0.18 : 0.42,
+    transparent: true,
+  });
+
+  group.position.set(unit.position[0], 0, unit.position[1]);
+  group.rotation.y = THREE.MathUtils.degToRad(unit.bearing);
+  internalGroup.visible = false;
+
+  const foundation = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.16, 1.28, 0.34, 42),
+    concreteMaterial,
   );
-}
-function buildDefaultPlacement(index) {
-  const columns = 3;
-  const column = index % columns;
-  const row = Math.floor(index / columns);
-  return {
-    rotationX: DEFAULT_ASSET_ROTATION.pitch,
-    rotationY: DEFAULT_ASSET_ROTATION.yaw,
-    rotationZ: DEFAULT_ASSET_ROTATION.roll,
-    x: -18 + column * 18,
-    z: -12 + row * 13,
-  };
-}
-function sanitizePlacement(placement, index) {
-  const fallback = buildDefaultPlacement(index);
-  if (!placement || typeof placement !== "object") {
-    return fallback;
+  foundation.position.y = 0.17;
+  foundation.castShadow = true;
+  foundation.receiveShadow = true;
+  group.add(foundation);
+  addTowerBand(group, 0.96, 0.38, trimMaterial);
+
+  for (let index = 0; index < 12; index += 1) {
+    const angle = (Math.PI * 2 * index) / 12;
+    const bolt = createCylinderMesh({
+      color: 0x1f2937,
+      height: 0.12,
+      radius: 0.025,
+      segments: 10,
+    });
+
+    bolt.position.set(Math.cos(angle) * 0.74, 0.47, Math.sin(angle) * 0.74);
+    group.add(bolt);
   }
-  return {
-    rotationX: clampNumber(
-      readNumber(placement.rotationX, fallback.rotationX),
-      -180,
-      180,
-    ),
-    rotationY: clampNumber(
-      readNumber(placement.rotationY, fallback.rotationY),
-      -180,
-      180,
-    ),
-    rotationZ: clampNumber(
-      readNumber(placement.rotationZ, fallback.rotationZ),
-      -180,
-      180,
-    ),
-    x: clampNumber(
-      readNumber(placement.x, fallback.x),
-      -WORLD_SIZE.width / 2 + 3,
-      WORLD_SIZE.width / 2 - 3,
-    ),
-    z: clampNumber(
-      readNumber(placement.z, fallback.z),
-      -WORLD_SIZE.depth / 2 + 3,
-      WORLD_SIZE.depth / 2 - 3,
-    ),
-  };
-}
-function sanitizeWorldSettings(settings) {
-  if (!settings || typeof settings !== "object") {
-    return DEFAULT_WORLD_SETTINGS;
+
+  const tower = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.23, 0.5, 8.55, 36),
+    whiteMaterial,
+  );
+  tower.position.y = 4.58;
+  tower.castShadow = true;
+  tower.receiveShadow = true;
+  group.add(tower);
+  cutawayMeshes.push(tower);
+  addTowerBand(group, 0.48, 1.25, trimMaterial);
+  addTowerBand(group, 0.36, 4.7, trimMaterial);
+  addTowerBand(group, 0.25, 8.48, trimMaterial);
+
+  const accessDoor = new THREE.Mesh(
+    new THREE.BoxGeometry(0.28, 0.76, 0.035),
+    trimMaterial,
+  );
+  accessDoor.position.set(0, 1.03, 0.5);
+  group.add(accessDoor);
+
+  [-0.12, 0.12].forEach((x) => {
+    const rail = createCylinderMesh({
+      color: 0x475569,
+      height: 2.55,
+      metalness: 0.28,
+      radius: 0.012,
+      roughness: 0.5,
+      segments: 8,
+    });
+
+    rail.position.set(x, 2.52, 0.52);
+    group.add(rail);
+  });
+
+  for (let rungIndex = 0; rungIndex < 8; rungIndex += 1) {
+    const rung = createCylinderMesh({
+      color: 0x475569,
+      height: 0.28,
+      metalness: 0.28,
+      radius: 0.009,
+      roughness: 0.5,
+      segments: 8,
+    });
+
+    rung.rotation.z = Math.PI / 2;
+    rung.position.set(0, 1.42 + rungIndex * 0.28, 0.54);
+    group.add(rung);
   }
+
+  const nacelle = new THREE.Mesh(
+    new THREE.BoxGeometry(2.4, 0.82, 1.12),
+    nacelleMaterial,
+  );
+  nacelle.position.set(0, 8.9, 0.34);
+  nacelle.castShadow = true;
+  group.add(nacelle);
+  cutawayMeshes.push(nacelle);
+
+  const roofPanel = new THREE.Mesh(
+    new THREE.BoxGeometry(1.15, 0.055, 0.46),
+    trimMaterial.clone(),
+  );
+  roofPanel.position.set(-0.12, 9.34, 0.25);
+  group.add(roofPanel);
+  cutawayMeshes.push(roofPanel);
+
+  [-1.23, 1.23].forEach((x) => {
+    const vent = new THREE.Mesh(
+      new THREE.BoxGeometry(0.035, 0.3, 0.56),
+      trimMaterial.clone(),
+    );
+
+    vent.position.set(x, 8.95, 0.28);
+    group.add(vent);
+    cutawayMeshes.push(vent);
+  });
+
+  const rearServiceBox = new THREE.Mesh(
+    new THREE.BoxGeometry(0.9, 0.42, 0.28),
+    trimMaterial.clone(),
+  );
+  rearServiceBox.position.set(0, 8.78, -0.37);
+  group.add(rearServiceBox);
+  cutawayMeshes.push(rearServiceBox);
+
+  const noseCone = new THREE.Mesh(
+    new THREE.ConeGeometry(0.4, 0.72, 36),
+    nacelleMaterial,
+  );
+  noseCone.rotation.x = Math.PI / 2;
+  noseCone.position.set(0, 8.9, 1.16);
+  noseCone.castShadow = true;
+  group.add(noseCone);
+  cutawayMeshes.push(noseCone);
+
+  const loadPct = Math.round((unit.outputMw / Math.max(unit.capacityMw, 1)) * 100);
+  const generatorMeshes = [];
+  const generator = createCylinderMesh({
+    color: 0x8fa3b8,
+    height: 0.72,
+    metalness: 0.44,
+    radius: 0.27,
+    roughness: 0.38,
+    segments: 36,
+  });
+  generator.rotation.x = Math.PI / 2;
+  generator.position.set(-0.48, 8.9, 0.12);
+  generator.castShadow = true;
+  internalGroup.add(generator);
+  generatorMeshes.push(generator);
+
+  [-0.39, 0.39].forEach((z) => {
+    const endCap = createCylinderMesh({
+      color: 0x475569,
+      height: 0.06,
+      metalness: 0.38,
+      radius: 0.285,
+      roughness: 0.42,
+      segments: 36,
+    });
+
+    endCap.rotation.x = Math.PI / 2;
+    endCap.position.set(-0.48, 8.9, z);
+    internalGroup.add(endCap);
+    generatorMeshes.push(endCap);
+    addBoltCircle(internalGroup, generatorMeshes, {
+      boltHeight: 0.028,
+      boltRadius: 0.009,
+      center: [-0.48, 8.9, z + (z > 0 ? 0.035 : -0.035)],
+      count: 12,
+      material: cableMaterial,
+      radius: 0.22,
+    });
+  });
+
+  [-0.22, -0.1, 0.02, 0.14, 0.26].forEach((z) => {
+    const fin = new THREE.Mesh(
+      new THREE.BoxGeometry(0.68, 0.035, 0.028),
+      steelMaterial,
+    );
+
+    fin.position.set(-0.48, 9.18, z);
+    internalGroup.add(fin);
+    generatorMeshes.push(fin);
+  });
+
+  addCoolingFinStack(internalGroup, generatorMeshes, {
+    center: [-0.77, 8.9, 0.02],
+    count: 7,
+    depth: 0.025,
+    height: 0.33,
+    material: steelMaterial,
+    spacing: 0.105,
+    width: 0.032,
+  });
+  addCoolingFinStack(internalGroup, generatorMeshes, {
+    center: [-0.19, 8.9, 0.02],
+    count: 7,
+    depth: 0.025,
+    height: 0.33,
+    material: steelMaterial,
+    spacing: 0.105,
+    width: 0.032,
+  });
+
+  [-0.25, -0.08, 0.08, 0.25].forEach((z) => {
+    const winding = new THREE.Mesh(
+      new THREE.TorusGeometry(0.225, 0.014, 8, 38),
+      copperMaterial,
+    );
+
+    winding.position.set(-0.48, 8.9, z);
+    internalGroup.add(winding);
+    generatorMeshes.push(winding);
+  });
+
+  addGearTeeth(internalGroup, generatorMeshes, {
+    center: [-0.48, 8.9, 0.015],
+    count: 20,
+    material: copperMaterial,
+    radius: 0.235,
+    toothDepth: 0.018,
+    toothHeight: 0.028,
+    toothWidth: 0.045,
+  });
+
+  const terminalBox = createBoxMesh({
+    color: 0x1f2937,
+    depth: 0.14,
+    height: 0.22,
+    metalness: 0.24,
+    roughness: 0.5,
+    width: 0.26,
+  });
+  terminalBox.position.set(-0.48, 8.54, -0.12);
+  internalGroup.add(terminalBox);
+  generatorMeshes.push(terminalBox);
+
+  [-0.08, 0, 0.08].forEach((x) => {
+    const terminalLug = createCylinderMesh({
+      color: 0xb45309,
+      height: 0.08,
+      metalness: 0.28,
+      radius: 0.012,
+      roughness: 0.42,
+      segments: 10,
+    });
+
+    terminalLug.rotation.x = Math.PI / 2;
+    terminalLug.position.set(-0.48 + x, 8.44, -0.205);
+    internalGroup.add(terminalLug);
+    generatorMeshes.push(terminalLug);
+  });
+
+  const generatorPopup = createPartPopupShell({
+    anchor: [-0.48, 8.9, 0.12],
+    color: 0x38bdf8,
+    position: [2.75, 9.45, 1.85],
+  });
+  const generatorPopupModel = generatorPopup.userData.popupModel;
+  const popupGeneratorBody = createCylinderMesh({
+    color: 0x8fa3b8,
+    height: 0.86,
+    metalness: 0.48,
+    radius: 0.32,
+    roughness: 0.36,
+    segments: 36,
+  });
+  popupGeneratorBody.rotation.x = Math.PI / 2;
+  generatorPopupModel.add(popupGeneratorBody);
+  [-0.32, 0.32].forEach((z) => {
+    const popupEndCap = createCylinderMesh({
+      color: 0x475569,
+      height: 0.055,
+      metalness: 0.38,
+      radius: 0.325,
+      roughness: 0.42,
+      segments: 36,
+    });
+
+    popupEndCap.rotation.x = Math.PI / 2;
+    popupEndCap.position.z = z;
+    generatorPopupModel.add(popupEndCap);
+  });
+  [-0.26, -0.09, 0.09, 0.26].forEach((z) => {
+    const popupWinding = new THREE.Mesh(
+      new THREE.TorusGeometry(0.28, 0.017, 8, 42),
+      copperMaterial.clone(),
+    );
+
+    popupWinding.position.z = z;
+    generatorPopupModel.add(popupWinding);
+  });
+  addGearTeeth(generatorPopupModel, null, {
+    center: [0, 0, 0],
+    count: 22,
+    material: copperMaterial.clone(),
+    radius: 0.3,
+    toothDepth: 0.02,
+    toothHeight: 0.032,
+    toothWidth: 0.045,
+  });
+  group.add(generatorPopup);
+  registerInspectablePart(partEntries, {
+    meshes: generatorMeshes,
+    meta: createPartMeta(unit, {
+      category: "Powertrain",
+      finding:
+        unit.status === "warning"
+          ? "Generator temperature is elevated during derated operation."
+          : "Generator thermal profile is stable across the stator housing.",
+      health: unit.status === "warning" ? 74 : Math.min(unit.health + 1, 99),
+      id: "generator",
+      load: `${loadPct}%`,
+      name: "Generator Stator",
+      recommendation:
+        unit.status === "warning"
+          ? "Inspect cooling airflow and terminal resistance in the next stop window."
+          : "Keep routine thermal trend monitoring active.",
+      signal: "98%",
+      status: unit.status === "warning" ? "caution" : "normal",
+      temperature: unit.status === "warning" ? "78 C" : "64 C",
+      vibration: unit.status === "warning" ? "3.6 mm/s" : "1.4 mm/s",
+    }),
+    popupGroup: generatorPopup,
+  });
+
+  const gearboxMeshes = [];
+  const gearbox = createCylinderMesh({
+    color: 0x64748b,
+    height: 0.52,
+    metalness: 0.42,
+    radius: 0.28,
+    roughness: 0.4,
+    segments: 32,
+  });
+  gearbox.rotation.x = Math.PI / 2;
+  gearbox.position.set(0.12, 8.9, 0.56);
+  gearbox.castShadow = true;
+  internalGroup.add(gearbox);
+  gearboxMeshes.push(gearbox);
+
+  [0.27, 0.85].forEach((z) => {
+    const flange = new THREE.Mesh(
+      new THREE.TorusGeometry(0.285, 0.018, 10, 40),
+      steelMaterial,
+    );
+
+    flange.position.set(0.12, 8.9, z);
+    internalGroup.add(flange);
+    gearboxMeshes.push(flange);
+    addBoltCircle(internalGroup, gearboxMeshes, {
+      boltHeight: 0.024,
+      boltRadius: 0.008,
+      center: [0.12, 8.9, z],
+      count: 10,
+      material: cableMaterial,
+      radius: 0.245,
+    });
+  });
+
+  [0.44, 0.56, 0.68].forEach((z, index) => {
+    const gearRing = new THREE.Mesh(
+      new THREE.TorusGeometry(0.18 + index * 0.025, 0.012, 8, 28),
+      index === 1 ? copperMaterial : steelMaterial,
+    );
+
+    gearRing.position.set(0.12, 8.9, z);
+    internalGroup.add(gearRing);
+    gearboxMeshes.push(gearRing);
+    addGearTeeth(internalGroup, gearboxMeshes, {
+      center: [0.12, 8.9, z],
+      count: 14 + index * 2,
+      material: index === 1 ? copperMaterial : steelMaterial,
+      radius: 0.2 + index * 0.025,
+      toothDepth: 0.014,
+      toothHeight: 0.024,
+      toothWidth: 0.038,
+    });
+  });
+
+  const oilFilter = createBoxMesh({
+    color: 0x0f172a,
+    depth: 0.18,
+    height: 0.18,
+    metalness: 0.2,
+    roughness: 0.52,
+    width: 0.28,
+  });
+  oilFilter.position.set(0.42, 8.68, 0.44);
+  internalGroup.add(oilFilter);
+  gearboxMeshes.push(oilFilter);
+
+  const sightGlass = new THREE.Mesh(
+    new THREE.CircleGeometry(0.055, 24),
+    new THREE.MeshBasicMaterial({
+      color: 0x38bdf8,
+      opacity: 0.65,
+      side: THREE.DoubleSide,
+      transparent: true,
+    }),
+  );
+  sightGlass.rotation.y = Math.PI / 2;
+  sightGlass.position.set(0.435, 8.9, 0.66);
+  internalGroup.add(sightGlass);
+  gearboxMeshes.push(sightGlass);
+
+  const breatherCap = createCylinderMesh({
+    color: 0x0f172a,
+    height: 0.12,
+    metalness: 0.26,
+    radius: 0.035,
+    roughness: 0.48,
+    segments: 14,
+  });
+  breatherCap.position.set(0.12, 9.23, 0.56);
+  internalGroup.add(breatherCap);
+  gearboxMeshes.push(breatherCap);
+
+  const gearboxPopup = createPartPopupShell({
+    anchor: [0.12, 8.9, 0.56],
+    color: 0xfbbf24,
+    position: [2.92, 8.62, 2.2],
+  });
+  const gearboxPopupModel = gearboxPopup.userData.popupModel;
+  const popupGearboxBody = createCylinderMesh({
+    color: 0x64748b,
+    height: 0.62,
+    metalness: 0.44,
+    radius: 0.34,
+    roughness: 0.38,
+    segments: 36,
+  });
+  popupGearboxBody.rotation.x = Math.PI / 2;
+  gearboxPopupModel.add(popupGearboxBody);
+  [0.34, -0.34].forEach((z) => {
+    const popupFlange = new THREE.Mesh(
+      new THREE.TorusGeometry(0.345, 0.02, 10, 42),
+      steelMaterial.clone(),
+    );
+
+    popupFlange.position.z = z;
+    gearboxPopupModel.add(popupFlange);
+  });
+  [0, 0.18, -0.18].forEach((z, index) => {
+    const popupGear = new THREE.Mesh(
+      new THREE.TorusGeometry(0.19 + index * 0.04, 0.017, 8, 32),
+      index === 0 ? copperMaterial.clone() : steelMaterial.clone(),
+    );
+
+    popupGear.position.z = z;
+    gearboxPopupModel.add(popupGear);
+    addGearTeeth(gearboxPopupModel, null, {
+      center: [0, 0, z],
+      count: 16 + index * 2,
+      material: index === 0 ? copperMaterial.clone() : steelMaterial.clone(),
+      radius: 0.215 + index * 0.04,
+      toothDepth: 0.016,
+      toothHeight: 0.027,
+      toothWidth: 0.04,
+    });
+  });
+  group.add(gearboxPopup);
+  registerInspectablePart(partEntries, {
+    meshes: gearboxMeshes,
+    meta: createPartMeta(unit, {
+      category: "Powertrain",
+      finding:
+        unit.status === "warning"
+          ? "Gearbox vibration trend exceeds the normal band at low rotor speed."
+          : "Gear mesh frequency remains inside the expected envelope.",
+      health: unit.status === "warning" ? 68 : unit.status === "caution" ? 83 : 96,
+      id: "gearbox",
+      load: `${Math.max(loadPct - 4, 0)}%`,
+      name: "Planetary Gearbox",
+      recommendation:
+        unit.status === "warning"
+          ? "Schedule borescope inspection and oil particle analysis."
+          : "Continue oil condition sampling on the standard interval.",
+      signal: "96%",
+      status: unit.status === "warning" ? "warning" : unit.status,
+      temperature: unit.status === "warning" ? "86 C" : "61 C",
+      vibration: unit.status === "warning" ? "5.2 mm/s" : "1.8 mm/s",
+    }),
+    popupGroup: gearboxPopup,
+  });
+
+  const driveTrainMeshes = [];
+  const driveShaft = createCylinderMesh({
+    color: 0xd1d5db,
+    height: 1.72,
+    metalness: 0.54,
+    radius: 0.055,
+    roughness: 0.34,
+    segments: 20,
+  });
+  driveShaft.rotation.x = Math.PI / 2;
+  driveShaft.position.set(0, 8.9, 0.82);
+  internalGroup.add(driveShaft);
+  driveTrainMeshes.push(driveShaft);
+
+  const bearingCore = new THREE.Mesh(
+    new THREE.TorusGeometry(0.25, 0.035, 10, 36),
+    copperMaterial,
+  );
+  bearingCore.position.set(0, 8.9, 1.07);
+  internalGroup.add(bearingCore);
+  driveTrainMeshes.push(bearingCore);
+
+  const bearingOuterRace = new THREE.Mesh(
+    new THREE.TorusGeometry(0.33, 0.026, 10, 44),
+    steelMaterial,
+  );
+  bearingOuterRace.position.set(0, 8.9, 1.07);
+  internalGroup.add(bearingOuterRace);
+  driveTrainMeshes.push(bearingOuterRace);
+
+  const bearingInnerRace = new THREE.Mesh(
+    new THREE.TorusGeometry(0.16, 0.02, 10, 36),
+    steelMaterial,
+  );
+  bearingInnerRace.position.set(0, 8.9, 1.07);
+  internalGroup.add(bearingInnerRace);
+  driveTrainMeshes.push(bearingInnerRace);
+
+  addBearingBalls(internalGroup, driveTrainMeshes, {
+    ballRadius: 0.026,
+    center: [0, 8.9, 1.07],
+    count: 14,
+    material: steelMaterial,
+    radius: 0.245,
+  });
+
+  const brakeDisc = createCylinderMesh({
+    color: 0x94a3b8,
+    height: 0.06,
+    metalness: 0.5,
+    radius: 0.32,
+    roughness: 0.34,
+    segments: 40,
+  });
+  brakeDisc.rotation.x = Math.PI / 2;
+  brakeDisc.position.set(0, 8.9, 1.24);
+  internalGroup.add(brakeDisc);
+  driveTrainMeshes.push(brakeDisc);
+
+  addBoltCircle(internalGroup, driveTrainMeshes, {
+    boltHeight: 0.03,
+    boltRadius: 0.012,
+    center: [0, 8.9, 1.285],
+    count: 8,
+    material: cableMaterial,
+    radius: 0.22,
+  });
+
+  for (let index = 0; index < 10; index += 1) {
+    const angle = (Math.PI * 2 * index) / 10;
+    const coolingHole = createCylinderMesh({
+      color: 0x111827,
+      height: 0.064,
+      metalness: 0.12,
+      radius: 0.014,
+      roughness: 0.5,
+      segments: 10,
+    });
+
+    coolingHole.rotation.x = Math.PI / 2;
+    coolingHole.position.set(
+      Math.cos(angle) * 0.27,
+      8.9 + Math.sin(angle) * 0.27,
+      1.286,
+    );
+    internalGroup.add(coolingHole);
+    driveTrainMeshes.push(coolingHole);
+  }
+
+  [-0.18, 0.18].forEach((x) => {
+    const caliper = createBoxMesh({
+      color: 0x334155,
+      depth: 0.1,
+      height: 0.16,
+      metalness: 0.32,
+      roughness: 0.46,
+      width: 0.14,
+    });
+
+    caliper.position.set(x, 8.66, 1.24);
+    internalGroup.add(caliper);
+    driveTrainMeshes.push(caliper);
+
+    const pad = createBoxMesh({
+      color: 0x111827,
+      depth: 0.115,
+      height: 0.055,
+      metalness: 0.1,
+      roughness: 0.72,
+      width: 0.12,
+    });
+
+    pad.position.set(x, 8.78, 1.24);
+    internalGroup.add(pad);
+    driveTrainMeshes.push(pad);
+  });
+
+  const shaftPopup = createPartPopupShell({
+    anchor: [0, 8.9, 1.12],
+    color: 0x93c5fd,
+    position: [2.52, 8.05, 2.52],
+  });
+  const shaftPopupModel = shaftPopup.userData.popupModel;
+  const popupShaft = createCylinderMesh({
+    color: 0xd1d5db,
+    height: 0.96,
+    metalness: 0.56,
+    radius: 0.07,
+    roughness: 0.32,
+    segments: 20,
+  });
+  popupShaft.rotation.x = Math.PI / 2;
+  shaftPopupModel.add(popupShaft);
+  const popupBearingOuter = new THREE.Mesh(
+    new THREE.TorusGeometry(0.36, 0.028, 10, 48),
+    steelMaterial.clone(),
+  );
+  popupBearingOuter.position.z = 0.04;
+  shaftPopupModel.add(popupBearingOuter);
+  addBearingBalls(shaftPopupModel, null, {
+    ballRadius: 0.028,
+    center: [0, 0, 0.04],
+    count: 14,
+    material: steelMaterial.clone(),
+    radius: 0.265,
+  });
+  const popupBrake = createCylinderMesh({
+    color: 0x94a3b8,
+    height: 0.08,
+    metalness: 0.5,
+    radius: 0.34,
+    roughness: 0.34,
+    segments: 40,
+  });
+  popupBrake.rotation.x = Math.PI / 2;
+  popupBrake.position.z = 0.32;
+  shaftPopupModel.add(popupBrake);
+  addBoltCircle(shaftPopupModel, null, {
+    boltHeight: 0.032,
+    boltRadius: 0.012,
+    center: [0, 0, 0.37],
+    count: 8,
+    material: cableMaterial.clone(),
+    radius: 0.23,
+  });
+  group.add(shaftPopup);
+  registerInspectablePart(partEntries, {
+    meshes: driveTrainMeshes,
+    meta: createPartMeta(unit, {
+      category: "Mechanical",
+      finding: "Main bearing and brake disc alignment are within tolerance.",
+      health: unit.status === "warning" ? 72 : 95,
+      id: "main-shaft-bearing",
+      load: `${Math.min(loadPct + 6, 100)}%`,
+      name: "Main Shaft Bearing",
+      recommendation: "Monitor axial vibration during the next high-wind period.",
+      signal: "97%",
+      status: unit.status === "warning" ? "caution" : "normal",
+      temperature: unit.status === "warning" ? "74 C" : "57 C",
+      vibration: unit.status === "warning" ? "3.9 mm/s" : "1.2 mm/s",
+    }),
+    popupGroup: shaftPopup,
+  });
+
+  const cableMeshes = [];
+  addWireBundle(internalGroup, cableMeshes, {
+    colorSet: [0x38bdf8, 0x111827, 0x334155, 0xb45309, 0x64748b],
+    count: 7,
+    height: 7.36,
+    materialOptions: { metalness: 0.08, roughness: 0.62 },
+    radius: 0.009,
+    start: [0, 4.85, -0.05],
+    twist: 0.13,
+  });
+
+  [-0.18, 0, 0.18].forEach((x) => {
+    const cable = createCylinderMesh({
+      color: x === 0 ? 0x38bdf8 : 0x111827,
+      height: 7.45,
+      metalness: 0.08,
+      radius: x === 0 ? 0.013 : 0.018,
+      roughness: 0.62,
+      segments: 8,
+    });
+
+    cable.position.set(x, 4.82, -0.05);
+    internalGroup.add(cable);
+    cableMeshes.push(cable);
+  });
+
+  [2.2, 4.7, 7.55].forEach((y) => {
+    const cableClamp = new THREE.Mesh(
+      new THREE.TorusGeometry(0.255, 0.012, 8, 28),
+      cableMaterial,
+    );
+
+    cableClamp.rotation.x = Math.PI / 2;
+    cableClamp.position.set(0, y, -0.05);
+    internalGroup.add(cableClamp);
+    cableMeshes.push(cableClamp);
+  });
+
+  const strainRelief = createBoxMesh({
+    color: 0x111827,
+    depth: 0.2,
+    height: 0.12,
+    metalness: 0.18,
+    roughness: 0.58,
+    width: 0.46,
+  });
+  strainRelief.position.set(0, 1.18, -0.17);
+  internalGroup.add(strainRelief);
+  cableMeshes.push(strainRelief);
+
+  const cablePopup = createPartPopupShell({
+    anchor: [0, 4.82, -0.05],
+    color: 0x22d3ee,
+    position: [1.98, 5.3, 1.85],
+  });
+  const cablePopupModel = cablePopup.userData.popupModel;
+  addWireBundle(cablePopupModel, null, {
+    colorSet: [0x38bdf8, 0x111827, 0x334155, 0xb45309, 0x64748b],
+    count: 7,
+    height: 0.96,
+    radius: 0.012,
+    start: [0, 0, 0],
+    twist: 0.16,
+  });
+  [-0.16, 0, 0.16].forEach((x) => {
+    const popupCable = createCylinderMesh({
+      color: x === 0 ? 0x38bdf8 : 0x111827,
+      height: 0.96,
+      metalness: 0.08,
+      radius: x === 0 ? 0.02 : 0.026,
+      roughness: 0.62,
+      segments: 10,
+    });
+
+    popupCable.position.x = x;
+    cablePopupModel.add(popupCable);
+  });
+  group.add(cablePopup);
+  registerInspectablePart(partEntries, {
+    meshes: cableMeshes,
+    meta: createPartMeta(unit, {
+      category: "Electrical",
+      finding: "Power cable insulation and signal pair are reporting clean continuity.",
+      health: unit.status === "warning" ? 88 : 97,
+      id: "power-cable-bundle",
+      load: `${loadPct}%`,
+      name: "Tower Power Cable",
+      recommendation: "Keep partial-discharge sampling enabled for the tower run.",
+      signal: "99%",
+      status: "normal",
+      temperature: unit.status === "warning" ? "49 C" : "43 C",
+      vibration: "0.4 mm/s",
+    }),
+    popupGroup: cablePopup,
+  });
+
+  const controlMeshes = [];
+  const baseCabinet = new THREE.Mesh(
+    new THREE.BoxGeometry(0.38, 0.72, 0.28),
+    cableMaterial,
+  );
+  baseCabinet.position.set(-0.2, 1.26, -0.12);
+  internalGroup.add(baseCabinet);
+  controlMeshes.push(baseCabinet);
+
+  const dataModule = new THREE.Mesh(
+    new THREE.BoxGeometry(0.28, 0.18, 0.08),
+    signalMaterial,
+  );
+  dataModule.position.set(0.18, 1.52, -0.26);
+  internalGroup.add(dataModule);
+  controlMeshes.push(dataModule);
+
+  [-0.08, 0.08].forEach((x) => {
+    const breaker = createBoxMesh({
+      color: 0x334155,
+      depth: 0.035,
+      height: 0.14,
+      metalness: 0.18,
+      roughness: 0.55,
+      width: 0.08,
+    });
+
+    breaker.position.set(-0.2 + x, 1.4, -0.275);
+    internalGroup.add(breaker);
+    controlMeshes.push(breaker);
+  });
+
+  for (let row = 0; row < 2; row += 1) {
+    for (let column = 0; column < 4; column += 1) {
+      const terminal = createBoxMesh({
+        color: column % 2 ? 0x64748b : 0x94a3b8,
+        depth: 0.028,
+        height: 0.052,
+        metalness: 0.16,
+        roughness: 0.55,
+        width: 0.045,
+      });
+
+      terminal.position.set(
+        -0.32 + column * 0.075,
+        1.17 + row * 0.075,
+        -0.275,
+      );
+      internalGroup.add(terminal);
+      controlMeshes.push(terminal);
+    }
+  }
+
+  [
+    { color: 0x38bdf8, points: [[-0.3, 1.28, -0.305], [0.18, 1.48, -0.305]] },
+    { color: 0xb45309, points: [[-0.23, 1.2, -0.31], [0.16, 1.42, -0.31]] },
+    { color: 0x94a3b8, points: [[-0.15, 1.16, -0.315], [0.18, 1.36, -0.315]] },
+  ].forEach((wire) => {
+    const line = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(
+        wire.points.map((point) => new THREE.Vector3(...point)),
+      ),
+      new THREE.LineBasicMaterial({
+        color: wire.color,
+        opacity: 0.82,
+        transparent: true,
+      }),
+    );
+
+    internalGroup.add(line);
+  });
+
+  const controlPopup = createPartPopupShell({
+    anchor: [-0.2, 1.35, -0.12],
+    color: 0x67e8f9,
+    position: [1.72, 2.2, 1.48],
+  });
+  const controlPopupModel = controlPopup.userData.popupModel;
+  const popupCabinet = createBoxMesh({
+    color: 0x0f172a,
+    depth: 0.34,
+    height: 0.72,
+    metalness: 0.24,
+    roughness: 0.52,
+    width: 0.5,
+  });
+  const popupScreen = createBoxMesh({
+    color: 0x38bdf8,
+    depth: 0.025,
+    height: 0.18,
+    metalness: 0.08,
+    roughness: 0.36,
+    width: 0.32,
+  });
+  popupScreen.position.set(0, 0.12, 0.185);
+  controlPopupModel.add(popupCabinet, popupScreen);
+  for (let index = 0; index < 6; index += 1) {
+    const led = new THREE.Mesh(
+      new THREE.SphereGeometry(0.018, 10, 10),
+      index % 2 ? copperMaterial.clone() : signalMaterial.clone(),
+    );
+
+    led.position.set(-0.18 + index * 0.072, -0.12, 0.19);
+    controlPopupModel.add(led);
+  }
+  group.add(controlPopup);
+  registerInspectablePart(partEntries, {
+    meshes: controlMeshes,
+    meta: createPartMeta(unit, {
+      category: "Controls",
+      finding: "Controller IO, breaker state, and telemetry signal are synchronized.",
+      health: unit.status === "warning" ? 90 : 98,
+      id: "base-control-cabinet",
+      load: "42%",
+      name: "Base Control Cabinet",
+      recommendation: "Review event buffer after maintenance actions are closed.",
+      signal: "99%",
+      status: "normal",
+      temperature: "38 C",
+      vibration: "0.3 mm/s",
+    }),
+    popupGroup: controlPopup,
+  });
+
+  const beacon = new THREE.Mesh(
+    new THREE.SphereGeometry(0.18, 16, 16),
+    beaconMaterial,
+  );
+  beacon.position.set(0.72, 9.48, 0.24);
+  group.add(beacon);
+
+  const rotor = new THREE.Group();
+  rotor.position.set(0, 8.9, 1.58);
+
+  const hub = new THREE.Mesh(
+    new THREE.SphereGeometry(0.38, 28, 28),
+    nacelleMaterial,
+  );
+  hub.castShadow = true;
+  rotor.add(hub);
+  cutawayMeshes.push(hub);
+
+  const spinner = new THREE.Mesh(
+    new THREE.ConeGeometry(0.28, 0.52, 28),
+    nacelleMaterial,
+  );
+  spinner.rotation.x = Math.PI / 2;
+  spinner.position.z = 0.34;
+  spinner.castShadow = true;
+  rotor.add(spinner);
+  cutawayMeshes.push(spinner);
+
+  for (let bladeIndex = 0; bladeIndex < 3; bladeIndex += 1) {
+    const bladePivot = new THREE.Group();
+    const rootClamp = createCylinderMesh({
+      color: 0x94a3b8,
+      height: 0.6,
+      metalness: 0.2,
+      radius: 0.16,
+      roughness: 0.52,
+      segments: 20,
+    });
+    const blade = new THREE.Mesh(createBladeGeometry(), bladeMaterial);
+    const bladeTip = new THREE.Mesh(
+      new THREE.BoxGeometry(0.12, 0.34, 0.055),
+      markerMaterial,
+    );
+
+    rootClamp.position.y = 0.42;
+    bladeTip.position.y = 4.55;
+    blade.castShadow = true;
+    bladeTip.castShadow = true;
+    bladePivot.rotation.z = (Math.PI * 2 * bladeIndex) / 3;
+    bladePivot.add(rootClamp);
+    bladePivot.add(blade);
+    bladePivot.add(bladeTip);
+    rotor.add(bladePivot);
+  }
+
+  group.add(rotor);
+  group.add(internalGroup);
+
+  const selectionRing = new THREE.Mesh(
+    new THREE.TorusGeometry(2.1, 0.035, 8, 96),
+    ringMaterial,
+  );
+  selectionRing.rotation.x = Math.PI / 2;
+  selectionRing.position.y = 0.1;
+  selectionRing.visible = unit.status !== "normal";
+  group.add(selectionRing);
+
   return {
-    accentColor: readColor(
-      settings.accentColor,
-      DEFAULT_WORLD_SETTINGS.accentColor,
-    ),
-    backgroundColor: readColor(
-      settings.backgroundColor,
-      DEFAULT_WORLD_SETTINGS.backgroundColor,
-    ),
-    floorColor: readColor(
-      settings.floorColor,
-      DEFAULT_WORLD_SETTINGS.floorColor,
-    ),
-    fogDistance: clampNumber(
-      readNumber(settings.fogDistance, DEFAULT_WORLD_SETTINGS.fogDistance),
-      44,
-      140,
-    ),
-    gridOpacity: clampNumber(
-      readNumber(settings.gridOpacity, DEFAULT_WORLD_SETTINGS.gridOpacity),
-      0.05,
-      0.65,
-    ),
-    lightLevel: clampNumber(
-      readNumber(settings.lightLevel, DEFAULT_WORLD_SETTINGS.lightLevel),
-      0.45,
-      1.4,
-    ),
+    beacon,
+    cutawayMeshes,
+    group,
+    internalGroup,
+    parts: partEntries,
+    rotor,
+    selectionRing,
+    unit,
   };
 }
-function getAssetTelemetry(asset, index) {
-  const statusOffset =
-    {
-      caution: 7,
-      danger: 18,
-      error: 24,
-      normal: 0,
-      warning: 12,
-    }[asset.status] ?? 0;
+
+function createSubstationUnit(unit) {
+  const group = new THREE.Group();
+  const internalGroup = new THREE.Group();
+  const cutawayMeshes = [];
+  const partEntries = [];
+  const statusColor = getThreeStatusColor(unit.status);
+  const baseMaterial = new THREE.MeshStandardMaterial({
+    color: 0x273449,
+    metalness: 0.2,
+    roughness: 0.6,
+  });
+  const concreteMaterial = new THREE.MeshStandardMaterial({
+    color: 0x64748b,
+    metalness: 0.02,
+    roughness: 0.88,
+  });
+  const accentMaterial = new THREE.MeshStandardMaterial({
+    color: 0x67e8f9,
+    emissive: 0x0e7490,
+    emissiveIntensity: 0.5,
+    roughness: 0.42,
+  });
+  const steelMaterial = new THREE.MeshStandardMaterial({
+    color: 0x94a3b8,
+    metalness: 0.34,
+    roughness: 0.44,
+  });
+  const darkMaterial = new THREE.MeshStandardMaterial({
+    color: 0x172033,
+    metalness: 0.22,
+    roughness: 0.58,
+  });
+  const copperMaterial = new THREE.MeshStandardMaterial({
+    color: 0xb45309,
+    emissive: 0x451a03,
+    emissiveIntensity: 0.18,
+    metalness: 0.24,
+    roughness: 0.42,
+  });
+  const breakerMaterial = new THREE.MeshStandardMaterial({
+    color: 0x0f172a,
+    metalness: 0.24,
+    roughness: 0.52,
+  });
+  const beaconMaterial = new THREE.MeshStandardMaterial({
+    color: statusColor,
+    emissive: statusColor,
+    emissiveIntensity: 0.8,
+    roughness: 0.36,
+  });
+  const ringMaterial = new THREE.MeshBasicMaterial({
+    color: statusColor,
+    opacity: 0.36,
+    transparent: true,
+  });
+
+  group.position.set(unit.position[0], 0, unit.position[1]);
+  internalGroup.visible = false;
+
+  const base = new THREE.Mesh(new THREE.BoxGeometry(8.8, 0.65, 5.8), baseMaterial);
+  base.position.y = 0.35;
+  base.castShadow = true;
+  base.receiveShadow = true;
+  group.add(base);
+  cutawayMeshes.push(base);
+
+  const slab = new THREE.Mesh(
+    new THREE.BoxGeometry(9.7, 0.18, 6.7),
+    concreteMaterial,
+  );
+  slab.position.y = 0.14;
+  slab.receiveShadow = true;
+  group.add(slab);
+
+  for (let index = 0; index < 14; index += 1) {
+    const isLongSide = index < 8;
+    const sideIndex = isLongSide ? index : index - 8;
+    const post = createCylinderMesh({
+      color: 0x64748b,
+      height: 1.1,
+      metalness: 0.22,
+      radius: 0.035,
+      roughness: 0.48,
+      segments: 8,
+    });
+
+    post.position.set(
+      isLongSide ? -4.5 + sideIndex * 1.3 : sideIndex % 2 ? 4.75 : -4.75,
+      0.75,
+      isLongSide ? (index % 2 ? 3.15 : -3.15) : -1.9 + Math.floor(sideIndex / 2) * 1.9,
+    );
+    group.add(post);
+  }
+
+  const controlRoom = new THREE.Mesh(
+    new THREE.BoxGeometry(4.6, 2.1, 3.1),
+    baseMaterial.clone(),
+  );
+  controlRoom.position.set(-1.5, 1.7, 0);
+  controlRoom.castShadow = true;
+  group.add(controlRoom);
+  cutawayMeshes.push(controlRoom);
+
+  const controlRoof = new THREE.Mesh(
+    new THREE.BoxGeometry(4.95, 0.16, 3.35),
+    darkMaterial.clone(),
+  );
+  controlRoof.position.set(-1.5, 2.84, 0);
+  controlRoof.castShadow = true;
+  group.add(controlRoof);
+  cutawayMeshes.push(controlRoof);
+
+  const protectionRackMeshes = [];
+
+  for (let index = 0; index < 4; index += 1) {
+    const rack = new THREE.Mesh(
+      new THREE.BoxGeometry(0.38, 0.86, 0.18),
+      breakerMaterial,
+    );
+    const statusPanel = new THREE.Mesh(
+      new THREE.BoxGeometry(0.24, 0.12, 0.035),
+      index % 2 ? accentMaterial : copperMaterial,
+    );
+
+    rack.position.set(-2.82 + index * 0.42, 1.58, 0.86);
+    statusPanel.position.set(-2.82 + index * 0.42, 1.88, 0.97);
+    internalGroup.add(rack);
+    internalGroup.add(statusPanel);
+    protectionRackMeshes.push(rack, statusPanel);
+
+    for (let buttonIndex = 0; buttonIndex < 3; buttonIndex += 1) {
+      const button = new THREE.Mesh(
+        new THREE.SphereGeometry(0.026, 10, 10),
+        buttonIndex === 0 ? accentMaterial : copperMaterial,
+      );
+
+      button.position.set(
+        -2.91 + index * 0.42 + buttonIndex * 0.06,
+        1.66,
+        0.965,
+      );
+      internalGroup.add(button);
+      protectionRackMeshes.push(button);
+    }
+
+    const handle = createCylinderMesh({
+      color: 0x94a3b8,
+      height: 0.18,
+      metalness: 0.3,
+      radius: 0.009,
+      roughness: 0.42,
+      segments: 8,
+    });
+
+    handle.rotation.x = Math.PI / 2;
+    handle.position.set(-2.64 + index * 0.42, 1.46, 0.97);
+    internalGroup.add(handle);
+    protectionRackMeshes.push(handle);
+  }
+
+  const rackCableDuct = createBoxMesh({
+    color: 0x475569,
+    depth: 0.16,
+    height: 0.08,
+    metalness: 0.22,
+    roughness: 0.48,
+    width: 1.85,
+  });
+  rackCableDuct.position.set(-2.18, 1.08, 0.84);
+  internalGroup.add(rackCableDuct);
+  protectionRackMeshes.push(rackCableDuct);
+
+  const rackPopup = createPartPopupShell({
+    anchor: [-2.18, 1.68, 0.88],
+    color: 0x67e8f9,
+    position: [-4.62, 3.1, 2.1],
+  });
+  const rackPopupModel = rackPopup.userData.popupModel;
+  for (let index = 0; index < 4; index += 1) {
+    const popupRack = createBoxMesh({
+      color: 0x0f172a,
+      depth: 0.18,
+      height: 0.78,
+      metalness: 0.24,
+      roughness: 0.52,
+      width: 0.26,
+    });
+    const popupScreen = createBoxMesh({
+      color: index % 2 ? 0xb45309 : 0x38bdf8,
+      depth: 0.025,
+      height: 0.1,
+      metalness: 0.08,
+      roughness: 0.36,
+      width: 0.18,
+    });
+
+    popupRack.position.x = -0.42 + index * 0.28;
+    popupScreen.position.set(-0.42 + index * 0.28, 0.16, 0.105);
+    rackPopupModel.add(popupRack, popupScreen);
+
+    for (let buttonIndex = 0; buttonIndex < 3; buttonIndex += 1) {
+      const popupButton = new THREE.Mesh(
+        new THREE.SphereGeometry(0.018, 10, 10),
+        buttonIndex === 0 ? accentMaterial.clone() : copperMaterial.clone(),
+      );
+
+      popupButton.position.set(
+        -0.49 + index * 0.28 + buttonIndex * 0.04,
+        -0.08,
+        0.105,
+      );
+      rackPopupModel.add(popupButton);
+    }
+  }
+  group.add(rackPopup);
+  registerInspectablePart(partEntries, {
+    meshes: protectionRackMeshes,
+    meta: createPartMeta(unit, {
+      category: "Protection",
+      finding: "Protection relays and breaker IO channels are synchronized.",
+      health: 98,
+      id: "protection-rack",
+      load: "36%",
+      name: "Protection Relay Rack",
+      recommendation: "Keep relay event capture enabled for grid switching tests.",
+      signal: "99%",
+      status: "normal",
+      temperature: "35 C",
+      vibration: "0.2 mm/s",
+    }),
+    popupGroup: rackPopup,
+  });
+
+  const controlBus = createCylinderMesh({
+    color: 0xb45309,
+    height: 2.7,
+    metalness: 0.3,
+    radius: 0.045,
+    roughness: 0.4,
+    segments: 16,
+  });
+  controlBus.rotation.z = Math.PI / 2;
+  controlBus.position.set(-1.5, 2.2, -0.88);
+  internalGroup.add(controlBus);
+  const busbarMeshes = [controlBus];
+
+  for (let index = 0; index < 3; index += 1) {
+    const windowPanel = new THREE.Mesh(
+      new THREE.BoxGeometry(0.72, 0.42, 0.035),
+      accentMaterial,
+    );
+
+    windowPanel.position.set(-2.65 + index * 0.78, 1.95, 1.58);
+    group.add(windowPanel);
+  }
+
+  const busBar = createCylinderMesh({
+    color: 0x67e8f9,
+    height: 5.8,
+    metalness: 0.24,
+    radius: 0.065,
+    roughness: 0.4,
+    segments: 16,
+  });
+  busBar.rotation.z = Math.PI / 2;
+  busBar.position.set(1.2, 3.2, 1.9);
+  group.add(busBar);
+  busbarMeshes.push(busBar);
+
+  [-0.9, 1.2, 3.3].forEach((x) => {
+    const { group: insulator, meshes } = createInsulatorStack({
+      color: 0xdbeafe,
+      height: 0.7,
+      radius: 0.06,
+      ringColor: 0x64748b,
+    });
+    const clamp = createBoxMesh({
+      color: 0x94a3b8,
+      depth: 0.22,
+      height: 0.05,
+      metalness: 0.34,
+      roughness: 0.44,
+      width: 0.3,
+    });
+
+    insulator.position.set(x, 2.78, 1.9);
+    clamp.position.set(x, 3.16, 1.9);
+    group.add(insulator, clamp);
+    busbarMeshes.push(...meshes, clamp);
+  });
+
+  [-0.32, 0, 0.32].forEach((offset) => {
+    const phaseLink = createCylinderMesh({
+      color: offset === 0 ? 0x67e8f9 : 0xb45309,
+      height: 2.2,
+      metalness: 0.28,
+      radius: 0.032,
+      roughness: 0.38,
+      segments: 14,
+    });
+
+    phaseLink.rotation.z = Math.PI / 2;
+    phaseLink.position.set(2.24, 2.35 + offset, 0.32);
+    internalGroup.add(phaseLink);
+    busbarMeshes.push(phaseLink);
+
+    const phaseClamp = new THREE.Mesh(
+      new THREE.TorusGeometry(0.06, 0.008, 8, 18),
+      steelMaterial,
+    );
+
+    phaseClamp.rotation.y = Math.PI / 2;
+    phaseClamp.position.set(3.26, 2.35 + offset, 0.32);
+    internalGroup.add(phaseClamp);
+    busbarMeshes.push(phaseClamp);
+  });
+
+  const busbarPopup = createPartPopupShell({
+    anchor: [1.2, 3.2, 1.9],
+    color: 0x22d3ee,
+    position: [4.68, 3.62, 2.82],
+  });
+  const busbarPopupModel = busbarPopup.userData.popupModel;
+  [-0.18, 0, 0.18].forEach((y, index) => {
+    const popupBus = createCylinderMesh({
+      color: index === 1 ? 0x67e8f9 : 0xb45309,
+      height: 0.96,
+      metalness: 0.3,
+      radius: 0.035,
+      roughness: 0.38,
+      segments: 16,
+    });
+
+    popupBus.rotation.z = Math.PI / 2;
+    popupBus.position.y = y;
+    busbarPopupModel.add(popupBus);
+
+    [-0.32, 0.32].forEach((x) => {
+      const popupClamp = new THREE.Mesh(
+        new THREE.TorusGeometry(0.048, 0.006, 8, 18),
+        steelMaterial.clone(),
+      );
+
+      popupClamp.rotation.y = Math.PI / 2;
+      popupClamp.position.set(x, y, 0);
+      busbarPopupModel.add(popupClamp);
+    });
+  });
+  group.add(busbarPopup);
+  registerInspectablePart(partEntries, {
+    meshes: busbarMeshes,
+    meta: createPartMeta(unit, {
+      category: "Grid",
+      finding: "Phase bus temperature and load balance are inside operating limits.",
+      health: 99,
+      id: "high-voltage-busbar",
+      load: "79%",
+      name: "High Voltage Busbar",
+      recommendation: "Maintain infrared scan cadence after high-output intervals.",
+      signal: "99%",
+      status: "normal",
+      temperature: "51 C",
+      vibration: "0.1 mm/s",
+    }),
+    popupGroup: busbarPopup,
+  });
+
+  [-2.8, 3.8].forEach((x) => {
+    const gantryPost = createCylinderMesh({
+      color: 0x94a3b8,
+      height: 2.45,
+      metalness: 0.36,
+      radius: 0.055,
+      roughness: 0.45,
+      segments: 12,
+    });
+
+    gantryPost.position.set(x, 1.85, 1.9);
+    group.add(gantryPost);
+  });
+
+  const transformerMeshes = [];
+
+  for (let index = 0; index < 3; index += 1) {
+    const transformerGroup = new THREE.Group();
+    const transformer = new THREE.Mesh(
+      new THREE.BoxGeometry(0.92, 0.9, 1.35),
+      darkMaterial,
+    );
+    const coil = createCylinderMesh({
+      color: 0x1f2937,
+      height: 1.15,
+      metalness: 0.18,
+      radius: 0.26,
+      roughness: 0.54,
+      segments: 20,
+    });
+
+    transformer.position.y = 0.52;
+    transformer.castShadow = true;
+    transformerGroup.add(transformer);
+    cutawayMeshes.push(transformer);
+    transformerMeshes.push(transformer);
+
+    [-0.49, 0.49].forEach((x) => {
+      for (let finIndex = 0; finIndex < 6; finIndex += 1) {
+        const coolingFin = createBoxMesh({
+          color: 0x0f172a,
+          depth: 0.045,
+          height: 0.64,
+          metalness: 0.24,
+          roughness: 0.54,
+          width: 0.026,
+        });
+
+        coolingFin.position.set(x, 0.58, -0.45 + finIndex * 0.16);
+        transformerGroup.add(coolingFin);
+        transformerMeshes.push(coolingFin);
+      }
+    });
+
+    for (let layerIndex = 0; layerIndex < 5; layerIndex += 1) {
+      const lamination = createBoxMesh({
+        color: layerIndex % 2 ? 0x334155 : 0x475569,
+        depth: 0.018,
+        height: 0.74,
+        metalness: 0.26,
+        roughness: 0.48,
+        width: 0.54,
+      });
+
+      lamination.position.set(0, 0.62, -0.2 + layerIndex * 0.055);
+      transformerGroup.add(lamination);
+      transformerMeshes.push(lamination);
+    }
+
+    coil.rotation.x = Math.PI / 2;
+    coil.position.set(0, 0.68, -0.72);
+    coil.castShadow = true;
+    transformerGroup.add(coil);
+    transformerMeshes.push(coil);
+
+    [-0.26, 0, 0.26].forEach((x) => {
+      const insulator = createCylinderMesh({
+        color: 0xdbeafe,
+        height: 0.5,
+        metalness: 0.02,
+        radius: 0.055,
+        roughness: 0.5,
+        segments: 14,
+      });
+
+      insulator.position.set(x, 1.23, 0.54);
+      transformerGroup.add(insulator);
+      transformerMeshes.push(insulator);
+
+      const { group: bushingStack, meshes } = createInsulatorStack({
+        color: 0xdbeafe,
+        height: 0.34,
+        radius: 0.045,
+        ringColor: 0x94a3b8,
+      });
+
+      bushingStack.position.set(x, 1.54, 0.54);
+      transformerGroup.add(bushingStack);
+      transformerMeshes.push(...meshes);
+    });
+
+    transformerGroup.position.set(1.1 + index * 1.35, 0.62, -1.2);
+    group.add(transformerGroup);
+
+    for (let coilIndex = 0; coilIndex < 3; coilIndex += 1) {
+      const internalCoil = new THREE.Mesh(
+        new THREE.TorusGeometry(0.23, 0.018, 8, 32),
+        copperMaterial,
+      );
+
+      internalCoil.rotation.x = Math.PI / 2;
+      internalCoil.position.set(
+        1.1 + index * 1.35,
+        1.08 + coilIndex * 0.16,
+        -1.2,
+      );
+      internalGroup.add(internalCoil);
+      transformerMeshes.push(internalCoil);
+    }
+  }
+
+  const transformerPopup = createPartPopupShell({
+    anchor: [2.45, 1.18, -1.2],
+    color: 0xf59e0b,
+    position: [4.88, 2.35, -2.76],
+  });
+  const transformerPopupModel = transformerPopup.userData.popupModel;
+  const popupCore = createBoxMesh({
+    color: 0x1f2937,
+    depth: 0.3,
+    height: 0.68,
+    metalness: 0.24,
+    roughness: 0.48,
+    width: 0.36,
+  });
+  transformerPopupModel.add(popupCore);
+  [-0.24, 0.24].forEach((x) => {
+    for (let finIndex = 0; finIndex < 5; finIndex += 1) {
+      const popupFin = createBoxMesh({
+        color: 0x0f172a,
+        depth: 0.028,
+        height: 0.5,
+        metalness: 0.24,
+        roughness: 0.54,
+        width: 0.018,
+      });
+
+      popupFin.position.set(x, 0, -0.18 + finIndex * 0.09);
+      transformerPopupModel.add(popupFin);
+    }
+  });
+  [-0.18, 0.18].forEach((x) => {
+    for (let index = 0; index < 4; index += 1) {
+      const winding = new THREE.Mesh(
+        new THREE.TorusGeometry(0.16 + index * 0.012, 0.012, 8, 34),
+        copperMaterial.clone(),
+      );
+
+      winding.rotation.y = Math.PI / 2;
+      winding.position.set(x, -0.18 + index * 0.12, 0);
+      transformerPopupModel.add(winding);
+    }
+  });
+  group.add(transformerPopup);
+  registerInspectablePart(partEntries, {
+    meshes: transformerMeshes,
+    meta: createPartMeta(unit, {
+      category: "Transformer",
+      finding: "Winding temperature spread and bushing signals remain balanced.",
+      health: 97,
+      id: "transformer-windings",
+      load: "78%",
+      name: "Transformer Windings",
+      recommendation: "Track dissolved gas trend before seasonal peak loading.",
+      signal: "98%",
+      status: "normal",
+      temperature: "67 C",
+      vibration: "0.6 mm/s",
+    }),
+    popupGroup: transformerPopup,
+  });
+
+  const cableTrayMeshes = [];
+
+  [-0.15, 0.15].forEach((z) => {
+    const cableTray = createCylinderMesh({
+      color: 0x38bdf8,
+      height: 3.9,
+      metalness: 0.16,
+      radius: 0.025,
+      roughness: 0.42,
+      segments: 12,
+    });
+
+    cableTray.rotation.z = Math.PI / 2;
+    cableTray.position.set(1.55, 1.72, -1.2 + z);
+    internalGroup.add(cableTray);
+    cableTrayMeshes.push(cableTray);
+  });
+
+  [-0.36, 0, 0.36].forEach((x) => {
+    const trayClamp = createBoxMesh({
+      color: 0x475569,
+      depth: 0.36,
+      height: 0.045,
+      metalness: 0.24,
+      roughness: 0.48,
+      width: 0.12,
+    });
+
+    trayClamp.position.set(1.55 + x, 1.72, -1.2);
+    internalGroup.add(trayClamp);
+    cableTrayMeshes.push(trayClamp);
+  });
+
+  const cableTrayPopup = createPartPopupShell({
+    anchor: [1.55, 1.72, -1.2],
+    color: 0x38bdf8,
+    position: [3.82, 1.86, -3.02],
+  });
+  const cableTrayPopupModel = cableTrayPopup.userData.popupModel;
+  [-0.16, 0.16].forEach((z) => {
+    const popupTray = createCylinderMesh({
+      color: 0x38bdf8,
+      height: 0.92,
+      metalness: 0.16,
+      radius: 0.026,
+      roughness: 0.42,
+      segments: 12,
+    });
+
+    popupTray.rotation.z = Math.PI / 2;
+    popupTray.position.z = z;
+    cableTrayPopupModel.add(popupTray);
+  });
+  group.add(cableTrayPopup);
+  registerInspectablePart(partEntries, {
+    meshes: cableTrayMeshes,
+    meta: createPartMeta(unit, {
+      category: "Electrical",
+      finding: "Cable tray current and fiber telemetry are stable.",
+      health: 99,
+      id: "substation-cable-tray",
+      load: "63%",
+      name: "Cable Tray",
+      recommendation: "Verify terminations during the next planned outage.",
+      signal: "99%",
+      status: "normal",
+      temperature: "42 C",
+      vibration: "0.1 mm/s",
+    }),
+    popupGroup: cableTrayPopup,
+  });
+
+  const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 16), beaconMaterial);
+  beacon.position.set(3.1, 3.45, 1.9);
+  group.add(beacon);
+  group.add(internalGroup);
+
+  const selectionRing = new THREE.Mesh(
+    new THREE.TorusGeometry(4.8, 0.045, 8, 112),
+    ringMaterial,
+  );
+  selectionRing.rotation.x = Math.PI / 2;
+  selectionRing.position.y = 0.12;
+  selectionRing.visible = unit.status !== "normal";
+  group.add(selectionRing);
+
   return {
-    camera: `C${(index % 4) + 1}`,
-    temperature: Math.round(42 + statusOffset + index * 1.7),
-    ultrasound: Math.round(51 + statusOffset * 0.8 + index * 2.2),
+    beacon,
+    cutawayMeshes,
+    group,
+    internalGroup,
+    parts: partEntries,
+    selectionRing,
+    unit,
   };
 }
-function readNumber(value, fallback) {
-  const parsedValue = Number(value);
-  return Number.isFinite(parsedValue) ? parsedValue : fallback;
+
+function getSubstationPosition(units) {
+  const substation = units.find((unit) => unit.type === "Substation");
+
+  return substation?.position ?? [0, 26];
 }
-function readColor(value, fallback) {
-  return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value)
-    ? value
-    : fallback;
+
+function getAlarmMessage(unit) {
+  if (unit.status === "warning") {
+    return "Output derating and vibration trend above operating band.";
+  }
+
+  if (unit.status === "caution") {
+    return "Yaw alignment variance detected during the last sampling window.";
+  }
+
+  if (unit.status === "offline") {
+    return "Unit telemetry is unavailable.";
+  }
+
+  return "No active alarm";
 }
-function clampNumber(value, min, max) {
-  return Math.min(max, Math.max(min, value));
+
+function deriveHealth(baseHealth, status) {
+  if (status === "warning") {
+    return Math.min(baseHealth, 68);
+  }
+
+  if (status === "caution") {
+    return Math.min(baseHealth, 84);
+  }
+
+  if (status === "offline") {
+    return 0;
+  }
+
+  return baseHealth;
 }
-function round(value) {
-  return Number(value.toFixed(1));
+
+function deriveOutput(baseOutput, status) {
+  if (status === "warning") {
+    return Number((baseOutput * 0.48).toFixed(1));
+  }
+
+  if (status === "caution") {
+    return Number((baseOutput * 0.78).toFixed(1));
+  }
+
+  if (status === "offline") {
+    return 0;
+  }
+
+  return baseOutput;
+}
+
+function normalizeOperationalStatus(status) {
+  if (status === "normal" || status === "caution" || status === "warning") {
+    return status;
+  }
+
+  if (status === "danger" || status === "error") {
+    return "warning";
+  }
+
+  if (status === "offline") {
+    return "offline";
+  }
+
+  return "normal";
+}
+
+function getThreeStatusColor(status) {
+  return STATUS_THEME[normalizeOperationalStatus(status)].color;
+}
+
+function formatNumber(value, fractionDigits = 0) {
+  return new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: fractionDigits,
+    minimumFractionDigits: fractionDigits,
+  }).format(Number.isFinite(value) ? value : 0);
 }

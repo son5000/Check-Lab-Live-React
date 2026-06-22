@@ -1,135 +1,76 @@
-import { notFound } from "next/navigation";
-import {
-    fetchSite,
-    fetchSiteLocation,
-    fetchSiteLocationAssets,
-    fetchSiteLocations,
-    fetchSites,
-} from "@/app/site/services/site-management-api";
-import { LocationWorldViewerPage } from "@/app/site/[site_id]/location/[locationId]/world/location-world-viewer-page";
-const dashboardStatuses = [
-    "normal",
-    "caution",
-    "warning",
-    "danger",
-    "error",
-];
-export default async function LocationWorldPage({ params }) {
-    const siteSummaries = await fetchSites().catch((error) => {
-        console.error("[CheckLab API] failed to load world site list", {
-            error,
-            site_id: params.site_id,
-        });
-        return [];
-    });
-    const siteSummary = siteSummaries.find((summary) => matchesSiteRoute(summary, params.site_id));
-    const resolvedSiteId = siteSummary?.site_id ?? params.site_id;
-    const [siteDetail, siteLocations] = await Promise.all([
-        fetchSite(resolvedSiteId).catch((error) => {
-            console.error("[CheckLab API] failed to load world site", {
-                error,
-                site_id: resolvedSiteId,
-            });
-            return undefined;
-        }),
-        fetchSiteLocations(resolvedSiteId).catch((error) => {
-            console.error("[CheckLab API] failed to load world location list", {
-                error,
-                site_id: resolvedSiteId,
-            });
-            return [];
-        }),
-    ]);
-    const locationSummary = siteLocations.find((summary) => matchesLocationRoute(summary, params.locationId, siteSummary ?? siteDetail));
-    const resolvedLocationId = locationSummary?.location_id ?? params.locationId;
-    const [locationDetail, locationAssets] = await Promise.all([
-        fetchSiteLocation(resolvedSiteId, resolvedLocationId).catch((error) => {
-            console.error("[CheckLab API] failed to load world location", {
-                error,
-                location_id: resolvedLocationId,
-                site_id: resolvedSiteId,
-            });
-            return undefined;
-        }),
-        fetchSiteLocationAssets(resolvedSiteId, resolvedLocationId).catch((error) => {
-            console.error("[CheckLab API] failed to load world assets", {
-                error,
-                location_id: resolvedLocationId,
-                site_id: resolvedSiteId,
-            });
-            return [];
-        }),
-    ]);
-    const resolvedLocation = locationDetail ?? locationSummary;
-    if (!resolvedLocation) {
-        notFound();
-    }
-    const site = siteDetail
-        ? {
-            id: siteDetail.site_id,
-            name: siteDetail.site_name || siteDetail.site_id,
-        }
-        : siteSummary
-            ? {
-                id: siteSummary.site_id,
-                name: siteSummary.site_name || siteSummary.site_id,
-            }
-        : {
-            id: resolvedSiteId,
-            name: resolvedSiteId,
-        };
-    const location = {
-        floor: resolvedLocation.display_label || "",
-        id: resolvedLocation.location_id,
-        name: resolvedLocation.location_name ||
-            resolvedLocation.display_label ||
-            resolvedLocation.location_id,
-        siteId: resolvedLocation.site_id || resolvedSiteId,
-        summary: resolvedLocation.description || resolvedLocation.summary || "",
-    };
-    const assets = locationAssets.map((asset) => ({
-        href: `/site/${encodeURIComponent(asset.site_id)}/location/${encodeURIComponent(asset.location_id)}/asset/${encodeURIComponent(asset.asset_id)}`,
-        id: asset.asset_id,
-        name: asset.display_name || asset.asset_name || asset.asset_id,
-        status: dashboardStatuses.includes(asset.status) ? asset.status : "normal",
-        type: asset.location_name || asset.asset_type || "설비",
-    }));
-    return (<LocationWorldViewerPage site={site} location={location} assets={assets}/>);
+import Link from "next/link";
+import { Box, ExternalLink, Wind } from "lucide-react";
+import { sampleAssets, sampleLocation, sampleSite } from "./sample-wind-farm-demo";
+
+export default function LocationWorldPage({ params }) {
+  const viewerHref = `/site/${encodeURIComponent(params.site_id)}/location/${encodeURIComponent(params.locationId)}/world/viewer`;
+
+  return (
+    <main className="LocationWorldLaunchPage LocationWorldLaunchPage__root-1 flex min-h-screen min-w-0 flex-1 items-center justify-center bg-slate-950 p-4 text-slate-100">
+      <section className="LocationWorldLaunchPage LocationWorldLaunchPage__panel-1 w-full max-w-xl rounded-md border border-white/10 bg-slate-900 p-5 shadow-2xl shadow-slate-950/40">
+        <div className="LocationWorldLaunchPage LocationWorldLaunchPage__title-row-1 flex min-w-0 items-start gap-3">
+          <span className="LocationWorldLaunchPage LocationWorldLaunchPage__icon-shell-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-cyan-200/20 bg-cyan-200/10 text-cyan-100">
+            <Wind
+              className="LocationWorldLaunchPage LocationWorldLaunchPage__icon-1 h-5 w-5"
+              aria-hidden="true"
+            />
+          </span>
+          <div className="LocationWorldLaunchPage LocationWorldLaunchPage__copy-1 min-w-0">
+            <p className="LocationWorldLaunchPage LocationWorldLaunchPage__eyebrow-1 truncate text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200/80">
+              {sampleSite.name} / {sampleLocation.name}
+            </p>
+            <h1 className="LocationWorldLaunchPage LocationWorldLaunchPage__title-1 mt-1 text-2xl font-semibold text-white">
+              Wind Farm Digital Twin
+            </h1>
+            <p className="LocationWorldLaunchPage LocationWorldLaunchPage__summary-1 mt-2 text-sm leading-6 text-slate-300">
+              {sampleLocation.summary}
+            </p>
+          </div>
+        </div>
+
+        <div className="LocationWorldLaunchPage LocationWorldLaunchPage__metrics-1 mt-5 grid gap-2 sm:grid-cols-3">
+          <LaunchMetric label="Units" value={sampleAssets.length} />
+          <LaunchMetric
+            label="Warnings"
+            value={sampleAssets.filter((asset) => asset.status === "warning").length}
+          />
+          <LaunchMetric
+            label="Watch"
+            value={sampleAssets.filter((asset) => asset.status === "caution").length}
+          />
+        </div>
+
+        <Link
+          href={viewerHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          prefetch={false}
+          className="LocationWorldLaunchPage LocationWorldLaunchPage__open-link-1 mt-5 inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-cyan-200/25 bg-cyan-300 px-4 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200"
+        >
+          <Box
+            className="LocationWorldLaunchPage LocationWorldLaunchPage__open-icon-1 h-4 w-4"
+            aria-hidden="true"
+          />
+          Open Viewer
+          <ExternalLink
+            className="LocationWorldLaunchPage LocationWorldLaunchPage__external-icon-1 h-4 w-4"
+            aria-hidden="true"
+          />
+        </Link>
+      </section>
+    </main>
+  );
 }
-function matchesSiteRoute(site, routeValue) {
-    return matchesAnyRouteValue(routeValue, [
-        site.site_id,
-        site.site_name,
-    ]);
-}
-function matchesLocationRoute(location, routeValue, site) {
-    const siteName = site?.site_name;
-    return matchesAnyRouteValue(routeValue, [
-        location.location_id,
-        location.location_name,
-        location.display_label,
-        siteName && location.location_name
-            ? `${siteName} ${location.location_name}`
-            : undefined,
-        siteName && location.display_label
-            ? `${siteName} ${location.display_label}`
-            : undefined,
-    ]);
-}
-function matchesAnyRouteValue(routeValue, candidates) {
-    const normalizedRouteValue = normalizeRouteValue(routeValue);
-    return candidates.some((candidate) => {
-        if (!candidate) {
-            return false;
-        }
-        return normalizeRouteValue(candidate) === normalizedRouteValue;
-    });
-}
-function normalizeRouteValue(value) {
-    return decodeURIComponent(String(value ?? ""))
-        .normalize("NFKD")
-        .toLowerCase()
-        .replace(/['"]/g, "")
-        .replace(/[^0-9a-z가-힣]+/g, "-")
-        .replace(/^-+|-+$/g, "");
+
+function LaunchMetric({ label, value }) {
+  return (
+    <div className="LocationWorldLaunchPage LocationWorldLaunchPage__metric-1 min-w-0 rounded-md border border-white/10 bg-white/[0.04] px-3 py-2">
+      <p className="LocationWorldLaunchPage LocationWorldLaunchPage__metric-label-1 truncate text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+        {label}
+      </p>
+      <p className="LocationWorldLaunchPage LocationWorldLaunchPage__metric-value-1 mt-1 truncate text-lg font-semibold text-white">
+        {value}
+      </p>
+    </div>
+  );
 }

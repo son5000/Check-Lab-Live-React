@@ -284,7 +284,7 @@ export function LocationSummaryPage({ site, location, assets }) {
     setPendingSaveComparison(undefined);
     setIsSavingAssetOptions(false);
   };
-  const worldHref = `/site/${encodeURIComponent(site.site_id)}/location/${encodeURIComponent(location.id)}/world`;
+  const worldHref = `/site/${encodeURIComponent(site.site_id)}/location/${encodeURIComponent(location.id)}/world/viewer`;
   const selectedSavedAsset = selectedAsset
     ? savedAssetsById[selectedAsset.id]
     : undefined;
@@ -319,7 +319,8 @@ export function LocationSummaryPage({ site, location, assets }) {
               <Link
                 href={worldHref}
                 target="_blank"
-                rel="noreferrer"
+                rel="noopener noreferrer"
+                prefetch={false}
                 className="LocationSummaryPage LocationSummaryPage__world-link-1 inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-xs font-semibold text-foreground transition hover:bg-accent"
               >
                 <Box
